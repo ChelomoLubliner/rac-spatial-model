@@ -1,0 +1,134 @@
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+set.seed(313)
+library(data.table)
+library(imager)
+library(parallel)
+library(doParallel)
+library(splines)
+library(spam)
+library(Matrix)
+library(lme4)
+library(rgl)
+library(fields)
+library(survival)  # Needed for CML_MODEL (clogit)
+library(smoothie)
+
+
+col_shoe <- 307 # 307 is the number of columns in each shoe
+row_shoe <- 395 # 395 is the number of rows in each shoe
+num_shoe <- 387  # 387 is the number of shoes but 386 is the number of shoes with RACs - shoe 127 has no RACS
+
+rel_col_shoe <- 150  # out of the 307 columns only 150 are relevant (contain non zero pixels in some shoes)
+rel_row_shoe <- 300  # out of the 395 rows only 300 are relevant (contain non zero pixels in some shoes)
+rel_x_cord <- 0.25 # using coordinates as in the locations_data.CSV file the relevant x coordinates are between -.25 and 0.25
+rel_Y_cord <- 0.5 # the relevant Y coordinates are between -0.5 and 0.5
+```
+
+```{r}
+
+source("config.R")
+
+# MODEL_FEATURE <- "CML_MODEL"
+# MODEL_FEATURE <- "NEW_X_NS_XY"
+
+```
+
+
+
+
+```{r }
+file_name <- paste(ROOT_PATH, "saved_models/", MODEL_FEATURE, ".rds", sep = "")
+rand <- readRDS(file = file_name)
+
+# Always load the Random model to get sigma_sq and mean for calibration
+random_model <- readRDS(file = paste(ROOT_PATH, "saved_models/NEW_X_NS_XY.rds", sep = ""))
+sigma_sq <- as.numeric(attr(VarCorr(random_model)$shoe, "stddev"))^2
+
+file_name <- paste(ROOT_PATH, "processed_data/dataCC_distance.csv", sep = "")
+dataCC <- read.csv(file_name, header = TRUE)
+
+xcoor <- t(matrix(rep((-col_shoe / 2 + 1:col_shoe) * rel_Y_cord / rel_col_shoe, row_shoe), col_shoe, row_shoe))
+ycoor <- -matrix(rep((-row_shoe / 2 + 1:row_shoe) * rel_Y_cord / rel_col_shoe, col_shoe), row_shoe, col_shoe)
+xy <- expand.grid(xcoor[1, ], ycoor[, 1]) #307 * 395
+colnames(xy)[colnames(xy) == "Var1"] <- "x"
+colnames(xy)[colnames(xy) == "Var2"] <- "y"
+img <- load.image(paste(ROOT_PATH, "data/freq_min_18.png", sep = "")) #prototype
+img <- t(as.matrix(img))
+
+```
+
+
+```{r }
+
+# Build design matrix (same spline basis for both models: new_x and y)
+nknotsx <- 3
+nknotsy <- 5
+knots_new_x <- as.numeric(quantile(dataCC$new_x,1:nknotsx/(1+nknotsx)))
+knotsy <-as.numeric(quantile(dataCC$y,1:nknotsy/(1+nknotsy)))
+bas_new_x <- ns(dataCC$new_x,knots=knots_new_x)
+basy <- ns(dataCC$y,knots=knotsy)
+
+newdesignmat <- rep(1,length(xy$x))
+for(i in 1:length(predict(basy,1))) {
+  for(j in 1:length(predict(bas_new_x,1))) {
+    newdesignmat <-  cbind(newdesignmat,predict(bas_new_x, xy$x)[,j]*predict(basy, xy$y)[,i])  } }
+
+img_filled <- t(as.matrix(load.image(paste(ROOT_PATH,"data/freq_min_18.png", sep = ""))))
+
+# Compute Random model mean (needed for CML mean adjustment)
+pred_random <- newdesignmat %*% fixef(random_model) + log(0.005)
+pred_random[t(img_filled)==0] <- NA
+m <- mean(pred_random, na.rm=TRUE)
+
+# Compute predictions for the selected model
+if(MODEL_FEATURE == 'CML_MODEL'){
+  model_coef <- c(0, coef(rand))
+  pred.case_control <- newdesignmat %*% model_coef
+  pred.case_control[t(img_filled)==0] <- NA
+  # Mean adjustment: shift CML mean to match Random model mean
+  m_1 <- mean(pred.case_control, na.rm=TRUE)
+  pred.case_control <- pred.case_control - m_1 + m
+} else if(MODEL_FEATURE == 'NEW_X_NS_XY'){
+  model_coef <- fixef(rand)
+  pred.case_control <- newdesignmat %*% model_coef + log(0.005)
+  pred.case_control[t(img_filled)==0] <- NA
+} else { stop("Invalid MODEL_FEATURE value. Use 'NEW_X_NS_XY' or 'CML_MODEL'.")}
+
+# Clean up variables
+rm(newdesignmat, rand, random_model, dataCC, pred_random)
+if(exists("bas_new_x")) rm(bas_new_x)
+if(exists("basy")) rm(basy)
+
+```
+
+
+```{r }
+pred.case_control_img<-pred.case_control
+prob.pred <- exp(matrix(pred.case_control_img ,row_shoe,col_shoe,byrow=1))/(1+exp(matrix(pred.case_control_img ,row_shoe,col_shoe,byrow=1)))
+intens <- -log(1-prob.pred) #turning it to intensity
+# Scale to marginal probability: exp(-sigma^2/2) converts from conditional to marginal
+intens <- intens * exp(-sigma_sq/2)
+old_matrix <- intens
+
+```
+
+```{r }
+intens[img==0] <- NA
+rotated_intens <- t(intens)[, nrow(intens):1]
+image.plot(rotated_intens, axes = TRUE)
+file_name <- paste(ROOT_PATH, "model_images/",MODEL_FEATURE, "_SHOE.pdf", sep = "")
+pdf(file = file_name, height = 6, width = 6)
+image.plot(rotated_intens, axes = TRUE)
+abline(v = 0.5, col = "black", lty = 1, lwd = 1)
+abline(h = 0.5, col = "black", lty = 1, lwd = 1)
+grid(nx = 10, ny = 10, col = "gray30", lty = "dotted")
+dev.off()
+
+```
+
+```{r}
+```

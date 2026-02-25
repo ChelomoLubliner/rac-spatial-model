@@ -1,0 +1,26 @@
+# R
+.Rhistory
+.Rdata
+.RData
+.Rproj.user
+*.Rproj
+.httr-oauth
+.Renviron
+
+# Byte-compiled
+*.pyc
+__pycache__/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Knit output
+*.html
+*.nb.html

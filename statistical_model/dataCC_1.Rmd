@@ -1,0 +1,255 @@
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+source("config.R")
+
+```
+
+
+```{r}
+set.seed(313)
+library(ggplot2)
+col_shoe <- 307 # 307 is the number of columns in each shoe
+row_shoe <- 395 # 395 is the number of rows in each shoe
+num_shoe <- 387  # 387 is the number of shoes but 386 is the number of shoes with RACs - shoe 127 has no RACS
+
+rel_col_shoe <- 150  # out of the 307 columns only 150 are relevant (contain non zero pixels in some shoes)
+rel_row_shoe <- 300  # out of the 395 rows only 300 are relevant (contain non zero pixels in some shoes)
+rel_x_cord <- 0.25 # using coordinates as in the locations_data.csv file the relevant x coordinates are between -.25 and 0.25
+rel_Y_cord <- 0.5 # the relevant Y coordinates are between -0.5 and 0.5
+
+
+```
+
+```{r 2.init_functions}
+#The following two functions convert the x and Y coordinates of the location of a RAC to the X and Y pixels
+
+##################################################################################################################
+# aspix_x converts the x coordinate to the x pixel
+# INPUT:
+# ======
+# x - the x coordinate
+# col_shoe - the number of columns in each shoe
+# rel_col_shoe -the number of relevant columns
+#out of the 307 columns only 150 are relevant (contain non zero pixels in some shoes)
+# rel_x_cord - the relevant coordintes
+#(using coordinates as in the locations_data.csv file. The relevant x coordinates are between -.25 and 0.25)
+##################################################################################################################
+aspix_x <- function(x, col_shoe = 307, rel_col_shoe = 150, rel_x_cord = 0.25) {
+  not_rel_col <- ceiling((col_shoe - rel_col_shoe) / 2)
+  delx <- (2 * rel_x_cord) / rel_col_shoe
+  pix_x <- col_shoe - (floor((x + rel_x_cord) / delx) + not_rel_col) # The plus rel_x_cord is because it is --rel_x_cord (the x starts from -rel_x_cord)
+  return(pix_x)
+}
+
+##################################################################################################################
+# aspix_y converts the Y coordinate to the Y pixel
+# INPUT:
+# ======
+# y - the y coordinate
+# row_shoe - the number of rows in each shoe
+# rel_row_shoe -the number of relevant rows
+#out of the 395 rows only 300 are relevant (contain non zero pixels in some shoes)
+# rel_Y_cord - the relevant coordintes
+#(using coordinates as in the locations_data.csv file. the relevant Y coordinates are between -0.5 and 0.5)
+##################################################################################################################
+
+aspix_y <- function(y, row_shoe = 395, rel_row_shoe = 300, rel_Y_cord = 0.5) {
+  not_rel_row <- ceiling((row_shoe - rel_row_shoe) / 2)
+  dely <- (2 * rel_Y_cord) / rel_row_shoe
+  pix_y <- row_shoe - (floor((y + rel_Y_cord) / dely) + not_rel_row) # The plus rel_Y_cord is because it is --rel_Y_cord (the y starts from -0.5)
+  return(pix_y)
+}
+```
+
+```{r 3_contacts_data}
+#############################
+#organizing the contacts_data
+#############################
+
+#We are importing the contacts_data as character and creating a list of contact shoe matrices
+file_name <- paste(ROOT_PATH, "data/contacts_data.txt", sep = "")
+d <- readChar(file_name, nchars = (col_shoe * row_shoe + 2) * num_shoe)
+data <- list()
+for (i in 1:num_shoe) {
+  data[[i]] <- matrix(
+    as.numeric(unlist(strsplit(substr(d, 1 + (col_shoe * row_shoe + 2) * (i - 1), (col_shoe * row_shoe + 2) * i - 2), split = ""))),
+    row_shoe, col_shoe, byrow = 1
+  )
+}
+
+#Shoe 9 should be mirrored as all other shoes
+shoe9rev <- data[[9]] #(compare image(data[[8]]) and image(data[[9]]))
+data[[9]] <- data[[9]][, ncol(data[[9]]):1]
+
+#########cleaning the data set###########################################
+#There are identifying stamps the police put on each shoeprint
+#These are not part of the shoe's contact surface and thus are omitted
+#The first stage in cleaning the stamps was to try to separate them from the actual contact surface
+#We try to find the lower bound of the cumulative contact surfce to separate the stamps from the actual contact surface
+#we found that if we look only at the contact surface that appeared in more than 8 shoes it provided a relatively good separation
+allcont <- data[[1]]
+for (i in 2:num_shoe) {
+  allcont <- allcont + data[[i]] #this is the contact of all shoes
+}
+
+allcont <- (allcont >= 8) * 1 #here we see pixels that appear in more than 8 shoes
+
+#Removing the stamps
+#finding the lower bound of the contact surface
+h_width <- floor(row_shoe / 2) #this is half the width of the shoe
+lb <- rep(NA, h_width)
+j <- 1
+while (allcont[h_width, j] == 0) j <- j + 1
+lb[1] <- j - 1
+for (i in 2:h_width) {
+  j <- lb[i - 1]
+  if (allcont[h_width - i + 1, j] == 0) {
+    while ((allcont[h_width - i + 1, j] == 0) && j < rel_row_shoe) j <- j + 1
+    lb[i] <- j - 1
+  } else {
+    while ((allcont[h_width - i + 1, j] == 1) && j > 0) j <- j - 1
+    lb[i] <- j
+  }
+}
+
+for (i in 1:h_width) allcont[h_width - i + 1, 1:lb[i]] <- 0 #removing the lower stamp
+#the upper bound of the contact surface
+ub <- rep(NA, h_width)
+
+j <- col_shoe
+while (allcont[h_width, j] == 0) j <- j - 1
+ub[1] <- j + 1
+for (i in 2:h_width) {
+  j <- ub[i - 1]
+  if (allcont[h_width - i + 1, j] == 0) {
+    while ((allcont[h_width - i + 1, j] == 0) && j > 0) j <- j - 1
+    ub[i] <- j + 1
+  } else {
+    while ((allcont[h_width - i + 1, j] == 1) && j < rel_row_shoe) j <- j + 1
+    ub[i] <- j
+  }
+}
+
+for (i in 1:h_width) allcont[h_width - i + 1, ub[i]:col_shoe] <- 0 #removing the upper stamp
+
+for (i in 1:num_shoe) {
+  data[[i]] <- data[[i]] * allcont
+}
+
+```
+
+```{r 4.contacts}
+
+###################Working with the locations data##############
+file_name <- paste(ROOT_PATH, "data/locations_data.csv", sep = "")
+acciden<-read.csv(file_name ,header=TRUE)
+acci <- list()
+delx <- 2*rel_x_cord/rel_col_shoe
+dely <- 2*rel_Y_cord/rel_row_shoe
+
+for (i in (c(unique(acciden$shoe)) ))#shoe 127 doesn't have RACs
+{
+  acci[[i]] <- matrix(0,row_shoe,col_shoe)
+  locations <- cbind(acciden$x[acciden$shoe==i],acciden$y[acciden$shoe==i]) # the coordinates of the RAC
+  for(j in 1:nrow(locations)) {
+    xpix <- aspix_x(locations[j,1])
+    ypix<-aspix_y(locations[j,2])
+    acci[[i]][ypix,xpix] <- acci[[i]][ypix,xpix]+1 #if there is more than one RAC (accidental) in a pixel we will count it as well
+  }
+}
+
+
+
+```
+
+```{r 4.contacts_adjust}
+
+###RACs can be observed only on the contact surface, but as we show below, the data has RACs where there is no contact surface
+m <- rep(NA,num_shoe)
+for(i in (c(unique(acciden$shoe))))
+{
+  m[i] <- min(data[[i]][acci[[i]]>=1]) # checking to see if there are RACs where there is no contact surface
+}
+# 0 means that there is at least one RAC that is not on the contact surface
+
+# As noted in Section 4. When RACs are created they may tear the shoe sole such that the location of the RAC appears to be on an area with
+#no contact surface and thus the value of the contact surface is set to 1 in all cases where there are RACs
+data_temp <- list() # a "solution", add contact surface where there is a RAC.
+for(i in (c(unique(acciden$shoe)))) {
+  data_temp[[i]] <- data[[i]]
+  data_temp[[i]][acci[[i]]>=1] <- 1
+}
+
+data_pix<-list()
+# each data_pix[[i]] is a matrix with column 1 indicating the shoe, 2 the x, 3 the y, 4 the amount of RACs in that pixel
+# we include only data where there is contact surface (after adjusting for the case that if there is a RAC there will be contact surface)
+for(i in (c(unique(acciden$shoe))))
+{
+  xcoor <- t(matrix(rep((-col_shoe/2+1:col_shoe)*rel_Y_cord/rel_col_shoe,row_shoe),col_shoe,row_shoe))
+  ycoor <- -matrix(rep((-row_shoe/2+1:row_shoe)*rel_Y_cord/rel_col_shoe,col_shoe),row_shoe,col_shoe)
+  shoe<-rep(i,length(data_temp[[i]][data_temp[[i]]==1]))
+  data_pix[[i]]<-cbind(shoe,xcoor[data_temp[[i]]==1],ycoor[data_temp[[i]]==1],acci[[i]][data_temp[[i]]==1])# the data is only  where there is contact surface
+}
+
+data_pix_use<-numeric()
+for (i in (c(unique(acciden$shoe))))
+{
+  data_pix_use<-rbind(data_pix_use,data_pix[[i]])
+}
+
+```
+
+```{r 5}
+#As noted in Section 4 of the article, the number of RACS is set to 1 in 38 cases where there are 2 RACs.
+#Appearance of two RACs in the same pixel may be due to the way the data were pre-processed and the location was defined.
+n_Acc<-data_pix_use[,4]
+#n=data_pix_use[n_Acc==2,] -> These are the 38 pixels with 2 RACs
+n_Acc[n_Acc>=1] <-1 # more than one RAC in a shoe is considered as 1
+x<- data_pix_use[,2]
+y<- data_pix_use[,3]
+shoe<-as.factor(data_pix_use[,1]) #it should be noted that as factor changes the numbering
+#since shoe 127 doesn't exist, as factor makes the numbering of shoes 128 to 387 to decrease by 1. (shoe 128 is now 127 etc.)
+mydata <- data.frame(cbind(n_Acc, x, y,shoe))  #This is the data that will be used
+###############creating case control data##########################################################################
+# As noted in Section 4.4, estimating the intensity function at a high resolution is computationally challenging
+#and thus case-control sub-sampling techniques are used
+#The calculations were based on within-cluster case-control sub-sampling,
+#which includes all cases (pixels with RACs, nij = 1) and 100 random controls (pixels without RACs, nij = 0) from each shoe
+dataCC <- numeric()
+for(i in 1:length(unique(shoe)))
+{
+  case <- mydata[mydata$shoe==i&mydata$n_Acc>0,]
+  control <- mydata[mydata$shoe==i&mydata$n_Acc==0,]
+  control <- control[sample(nrow(control),size=100,replace=FALSE),]
+  dataCC <- rbind(dataCC,case,control)
+}
+```
+
+
+
+```{r 5_save}
+file_name <- paste(ROOT_PATH,"processed_data/dataCC.csv", sep = "")
+write.csv(dataCC, file_name, row.names = FALSE)
+file_name <- paste(ROOT_PATH, "data/all_cont.csv", sep = "")
+write.csv(allcont, file_name, row.names = FALSE)
+
+```
+
+
+```{r 5_cleanup}
+rm(data)
+rm(data_pix)
+rm(dataCC)
+rm(data_pix_use)
+rm(data_temp)
+rm(d)
+rm(acci)
+rm(acciden)
+rm(allcont)
+rm(case)
+rm(control)
+gc()
+```

@@ -1,0 +1,150 @@
+---
+title: "Model Comparison: NEW_X_NS_XY and CML_MODEL"
+author: "Model Comparison"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+set.seed(313)
+library(fields)
+library(imager)
+library(splines)
+library(lme4)
+
+source("config.R")
+
+col_shoe <- 307 # 307 is the number of columns in each shoe
+row_shoe <- 395 # 395 is the number of rows in each shoe
+num_shoe <- 387  # 387 is the number of shoes but 386 is the number of shoes with RACs - shoe 127 has no RACS
+
+rel_col_shoe <- 150  # out of the 307 columns only 150 are relevant (contain non zero pixels in some shoes)
+rel_row_shoe <- 300  # out of the 395 rows only 300 are relevant (contain non zero pixels in some shoes)
+rel_x_cord <- 0.25 # using coordinates as in the locations_data.CSV file the relevant x coordinates are between -.25 and 0.25
+rel_Y_cord <- 0.5 # the relevant Y coordinates are between -0.5 and 0.5
+```
+
+```{r}
+# Load models for comparison
+# 1. NEW_X_NS_XY (Random Effects Model)
+file_name <- paste(ROOT_PATH, "saved_models/NEW_X_NS_XY.rds", sep = "")
+random_model <- readRDS(file = file_name)
+
+# Get sigma^2 (variance of random effects) from NEW_X_NS_XY
+# VarCorr returns standard deviation, so we square it to get variance
+sigma_sq <- as.numeric(attr(VarCorr(random_model)$shoe, "stddev"))^2
+cat("Random effect variance (sigma^2):", sigma_sq, "\n")
+cat("Scaling factor exp(-sigma^2/2):", exp(-sigma_sq/2), "\n")
+
+# 2. CML_MODEL (CML)
+file_name <- paste(ROOT_PATH, "saved_models/CML_MODEL.rds", sep = "")
+cml_model <- readRDS(file = file_name)
+```
+
+```{r}
+# Load data needed for predictions
+file_name <- paste(ROOT_PATH, "processed_data/dataCC_distance.csv", sep = "")
+dataCC <- read.csv(file_name, header = TRUE)
+
+xcoor <- t(matrix(rep((-col_shoe / 2 + 1:col_shoe) * rel_Y_cord / rel_col_shoe, row_shoe), col_shoe, row_shoe))
+ycoor <- -matrix(rep((-row_shoe / 2 + 1:row_shoe) * rel_Y_cord / rel_col_shoe, col_shoe), row_shoe, col_shoe)
+xy <- expand.grid(xcoor[1, ], ycoor[, 1]) #307 * 395
+colnames(xy)[colnames(xy) == "Var1"] <- "x"
+colnames(xy)[colnames(xy) == "Var2"] <- "y"
+
+img_filled <- t(as.matrix(load.image(paste(ROOT_PATH,"data/freq_min_18.png", sep = ""))))
+```
+
+```{r}
+# Calculate intensity for NEW_X_NS_XY (Random Effects Model)
+nknotsx <- 3
+nknotsy <- 5
+
+# NEW_X_NS_XY uses new_x (standardized x) with splines
+knots_new_x <- as.numeric(quantile(dataCC$new_x,1:nknotsx/(1+nknotsx)))
+knotsy <-as.numeric(quantile(dataCC$y,1:nknotsy/(1+nknotsy)))
+bas_new_x <- ns(dataCC$new_x,knots=knots_new_x)
+basy <- ns(dataCC$y,knots=knotsy)
+
+newdesignmat <- rep(1,length(xy$x))
+for(i in 1:length(predict(basy,1))) {
+  for(j in 1:length(predict(bas_new_x,1))) {
+    newdesignmat <-  cbind(newdesignmat,predict(bas_new_x, xy$x)[,j]*predict(basy, xy$y)[,i])  } }
+
+model_coef <- fixef(random_model)
+pred.case_control <- newdesignmat%*%model_coef+log(0.005)
+
+pred.case_control[t(img_filled)==0] <- NA
+# Calculate mean of random predictions for use in CML adjustment (like original code line 325)
+m <- mean(pred.case_control, na.rm=TRUE)  #for use in the CML
+
+pred.case_control_img <- pred.case_control
+prob.pred_random <- exp(matrix(pred.case_control_img ,row_shoe,col_shoe,byrow=1))/(1+exp(matrix(pred.case_control_img ,row_shoe,col_shoe,byrow=1)))
+intens_random <- -log(1-prob.pred_random) #turning it to intensity
+# intens_random is row_shoe x col_shoe = 395 x 307
+```
+
+```{r}
+# Calculate intensity for CML Model
+# CML uses new_x (standardized x), same as NEW_X_NS_XY
+knots_new_x_cml <- as.numeric(quantile(dataCC$new_x,1:nknotsx/(1+nknotsx)))
+knotsy_cml <-as.numeric(quantile(dataCC$y,1:nknotsy/(1+nknotsy)))
+bas_new_x_cml <- ns(dataCC$new_x,knots=knots_new_x_cml)
+basy_cml <- ns(dataCC$y,knots=knotsy_cml)
+
+newdesignmat_cml <- rep(1,length(xy$x))
+for(i in 1:length(predict(basy_cml,1))) {
+  for(j in 1:length(predict(bas_new_x_cml,1))) {
+    newdesignmat_cml <-  cbind(newdesignmat_cml,predict(bas_new_x_cml, xy$x)[,j]*predict(basy_cml, xy$y)[,i])  } }
+
+model_coef_cml <- c(0, coef(cml_model))
+pred.case_control_cml <- newdesignmat_cml%*%model_coef_cml
+pred.case_control_cml[t(img_filled)==0] <- NA
+
+# Mean adjustment on predictions (log-odds scale) - exactly like original code line 354-355
+m_1 <- mean(pred.case_control_cml, na.rm=TRUE)
+pred.case_control_cml <- pred.case_control_cml - m_1 + m #making the means of random and cml to be equal
+
+pred.case_control_img_cml <- pred.case_control_cml
+prob.pred_cml <- exp(matrix(pred.case_control_img_cml ,row_shoe,col_shoe,byrow=1))/(1+exp(matrix(pred.case_control_img_cml ,row_shoe,col_shoe,byrow=1)))
+intens.pred_cml <- -log(1-prob.pred_cml)
+# intens.pred_cml is row_shoe x col_shoe = 395 x 307
+```
+
+```{r}
+# Figure 2: the 2 estimators intensities on the same scale
+sub <- 40
+cols <- sub:(col_shoe-sub)
+
+# Scale random and CML intensities
+# exp(-sigma_sq/2) brings Random & CML down to the marginal scale
+intens_random_scaled <- exp(-sigma_sq/2)*intens_random[,cols]
+intens_cml_scaled <- exp(-sigma_sq/2)*intens.pred_cml[,cols]
+
+com_2_est <- cbind(intens_random_scaled, intens_cml_scaled)
+image.plot(t(com_2_est[nrow(com_2_est):1,]), axes=FALSE, xlab='Random                     CML')
+```
+
+```{r}
+pdf(file = paste(ROOT_PATH, "model_images/pixel_inten_JASAup.pdf", sep = ""), height=8, width=8)
+image.plot(t(com_2_est[nrow(com_2_est):1,]), axes=FALSE, xlab='Random                     CML')
+dev.off()
+```
+
+```{r}
+# NEW_X_NS_XY (scaled)
+intens_random_scaled_sub <- exp(-sigma_sq/2)*intens_random[,cols]
+intens_random_display <- t(intens_random_scaled_sub[nrow(intens_random_scaled_sub):1,])
+image.plot(intens_random_display, axes=FALSE, main='NEW_X_NS_XY (scaled)')
+```
+
+```{r}
+# CML_MODEL (scaled)
+intens_cml_scaled_sub <- exp(-sigma_sq/2)*intens.pred_cml[,cols]
+intens_cml_display <- t(intens_cml_scaled_sub[nrow(intens_cml_scaled_sub):1,])
+image.plot(intens_cml_display, axes=FALSE, main='CML_MODEL (scaled)')
+```

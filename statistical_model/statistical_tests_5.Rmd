@@ -1,0 +1,246 @@
+---
+title: "Confidence Intervals: Random (NEW_X_NS_XY) and CML"
+author: "CI Analysis"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+set.seed(313)
+library(fields)
+library(imager)
+library(splines)
+library(lme4)
+library(survival)
+library(ggplot2)
+
+source("config.R")
+
+col_shoe <- 307
+row_shoe <- 395
+num_shoe <- 387
+rel_col_shoe <- 150
+rel_row_shoe <- 300
+rel_x_cord <- 0.25
+rel_Y_cord <- 0.5
+```
+
+```{r}
+# Load data
+file_name <- paste(ROOT_PATH, "processed_data/dataCC_distance.csv", sep = "")
+dataCC <- read.csv(file_name, header = TRUE)
+
+# Load saved models
+file_name <- paste(ROOT_PATH, "saved_models/NEW_X_NS_XY.rds", sep = "")
+random_model <- readRDS(file = file_name)
+
+file_name <- paste(ROOT_PATH, "saved_models/CML_MODEL.rds", sep = "")
+cml_model <- readRDS(file = file_name)
+
+# Compute sigma^2 from random model
+sigma_sq <- as.numeric(attr(VarCorr(random_model)$shoe, "stddev"))^2
+cat("Random effect variance (sigma^2):", sigma_sq, "\n")
+cat("Scaling factor exp(-sigma^2/2):", exp(-sigma_sq/2), "\n")
+```
+
+```{r}
+# Build coordinate grids
+xcoor <- t(matrix(rep((-col_shoe/2 + 1:col_shoe) * rel_Y_cord / rel_col_shoe, row_shoe), col_shoe, row_shoe))
+ycoor <- -matrix(rep((-row_shoe/2 + 1:row_shoe) * rel_Y_cord / rel_col_shoe, col_shoe), row_shoe, col_shoe)
+xy <- expand.grid(xcoor[1,], ycoor[,1])
+colnames(xy) <- c("x", "y")
+
+# Load mask
+img_filled <- t(as.matrix(load.image(paste(ROOT_PATH, "data/freq_min_18.png", sep = ""))))
+```
+
+```{r}
+# ============================================================
+# CI for Random (NEW_X_NS_XY)
+# NEW_X_NS_XY uses new_x (standardized x) with splines
+# ============================================================
+
+nknotsx <- 3
+nknotsy <- 5
+
+knots_new_x <- as.numeric(quantile(dataCC$new_x, 1:nknotsx/(1+nknotsx)))
+knotsy <- as.numeric(quantile(dataCC$y, 1:nknotsy/(1+nknotsy)))
+bas_new_x <- ns(dataCC$new_x, knots=knots_new_x)
+basy <- ns(dataCC$y, knots=knotsy)
+
+newdesignmat <- rep(1, length(xy$x))
+for(i in 1:length(predict(basy, 1))) {
+  for(j in 1:length(predict(bas_new_x, 1))) {
+    newdesignmat <- cbind(newdesignmat, predict(bas_new_x, xy$x)[,j] * predict(basy, xy$y)[,i])
+  }
+}
+
+# Covariance matrix from random model
+cov_mat <- matrix(as.numeric(vcov(random_model)), length(fixef(random_model)))
+
+# Predictions (log-odds scale)
+avg <- newdesignmat %*% fixef(random_model) + log(0.005)
+avg[t(img_filled)==0] <- NA
+
+# Standard errors
+std <- as.matrix(sqrt(rowSums((newdesignmat %*% cov_mat) * newdesignmat)))
+
+# Low / Mid / High on intensity scale
+ex <- exp(avg %*% c(1,1,1) + 1.96 * std %*% c(-1,0,1))
+pr <- ex / (1 + ex)
+inte <- -log(1 - pr)
+for(i in 1:3) inte[as.vector(t(img_filled)==0), i] <- NA
+
+CI_r <- list(
+  matrix(inte[,1], row_shoe, col_shoe, byrow=TRUE),
+  matrix(inte[,2], row_shoe, col_shoe, byrow=TRUE),
+  matrix(inte[,3], row_shoe, col_shoe, byrow=TRUE)
+)
+names(CI_r) <- c("Low", "Mid", "High")
+
+# Save m for CML mean adjustment
+m <- mean(avg, na.rm=TRUE)
+cat("Random model mean (log-odds):", m, "\n")
+```
+
+```{r}
+# ============================================================
+# CI for CML
+# CML uses new_x (standardized x), same basis as model fitting
+# ============================================================
+
+knots_new_x_cml <- as.numeric(quantile(dataCC$new_x, 1:nknotsx/(1+nknotsx)))
+knotsy_cml <- as.numeric(quantile(dataCC$y, 1:nknotsy/(1+nknotsy)))
+bas_new_x_cml <- ns(dataCC$new_x, knots=knots_new_x_cml)
+basy_cml <- ns(dataCC$y, knots=knotsy_cml)
+
+newdesignmat_cml <- rep(1, length(xy$x))
+for(i in 1:length(predict(basy_cml, 1))) {
+  for(j in 1:length(predict(bas_new_x_cml, 1))) {
+    newdesignmat_cml <- cbind(newdesignmat_cml, predict(bas_new_x_cml, xy$x)[,j] * predict(basy_cml, xy$y)[,i])
+  }
+}
+
+# CML covariance matrix (no intercept in clogit)
+cov_mat_cml <- matrix(as.numeric(vcov(cml_model)), length(coef(cml_model)))
+
+# CML predictions: intercept = 0 (cancels in conditional logistic)
+avg_cml <- newdesignmat_cml %*% c(0, coef(cml_model))
+avg_cml[t(img_filled)==0] <- NA
+
+# Mean adjustment: make CML mean match random mean (on log-odds scale)
+m_1 <- mean(avg_cml, na.rm=TRUE)
+avg_cml <- avg_cml - m_1 + m
+
+# Standard errors: remove intercept column from design matrix for vcov multiplication
+newdesignmat_cml_no_int <- newdesignmat_cml[,-1]
+std_cml <- as.matrix(sqrt(rowSums((newdesignmat_cml_no_int %*% cov_mat_cml) * newdesignmat_cml_no_int)))
+
+# Low / Mid / High on intensity scale
+ex_cml <- exp(avg_cml %*% c(1,1,1) + 1.96 * std_cml %*% c(-1,0,1))
+pr_cml <- ex_cml / (1 + ex_cml)
+inte_cml <- -log(1 - pr_cml)
+for(i in 1:3) inte_cml[as.vector(t(img_filled)==0), i] <- NA
+
+CI_cml <- list(
+  matrix(inte_cml[,1], row_shoe, col_shoe, byrow=TRUE),
+  matrix(inte_cml[,2], row_shoe, col_shoe, byrow=TRUE),
+  matrix(inte_cml[,3], row_shoe, col_shoe, byrow=TRUE)
+)
+names(CI_cml) <- c("Low", "Mid", "High")
+```
+
+```{r}
+# ============================================================
+# Shoe image with cut lines (Figure 3, left panel)
+# ============================================================
+
+# Crop columns to match File 6 (3-model comparison)
+sub <- 40
+cols <- sub:(col_shoe - sub)
+
+sho <- CI_cml$Mid * exp(-sigma_sq/2)
+sho <- sho[, cols]
+sho[110,] <- 0
+sho[190,] <- 0
+sho[250,] <- 0
+
+# Display: same orientation as file 4/6
+image.plot(t(sho)[, nrow(sho):1], axes=FALSE, xlab="CML probability with cut lines at rows 110, 190, 250")
+
+pdf(file = paste(ROOT_PATH, "model_images/CI_shoe_cuts.pdf", sep = ""), height=8, width=5)
+image.plot(t(sho)[, nrow(sho):1], axes=FALSE, xlab="CML probability with cut lines at rows 110, 190, 250")
+dev.off()
+```
+
+```{r}
+# ============================================================
+# CI ribbon plots (Figure 3, right panels)
+# ============================================================
+
+CI_cut <- function(cut, CI_cml, CI_r, sigma_sq, col_shoe=307) {
+  ran <- 1:col_shoe
+  scale <- exp(-sigma_sq/2)
+
+  CI_plot_cml <- data.frame(
+    x = ran,
+    Low_CI  = CI_cml$Low[cut,]  * scale,
+    Mid_CI  = CI_cml$Mid[cut,]  * scale,
+    High_CI = CI_cml$High[cut,] * scale,
+    Estimator = rep("CML", length(ran))
+  )
+  CI_plot_rand <- data.frame(
+    x = ran,
+    Low_CI  = CI_r$Low[cut,]  * scale,
+    Mid_CI  = CI_r$Mid[cut,]  * scale,
+    High_CI = CI_r$High[cut,] * scale,
+    Estimator = rep("Random", length(ran))
+  )
+  CI_plot <- rbind(CI_plot_cml, CI_plot_rand)
+
+  p <- ggplot(CI_plot) +
+    geom_line(aes(x=x, y=Low_CI, colour=Estimator)) +
+    geom_line(aes(x=x, y=High_CI, colour=Estimator)) +
+    geom_ribbon(aes(x=x, ymin=Low_CI, ymax=High_CI, fill=Estimator), alpha=0.5) +
+    geom_line(aes(x=x, y=Mid_CI, colour=Estimator), linewidth=1) +
+    theme_bw() +
+    theme(plot.title = element_text(color="black", size=14, face="bold")) +
+    scale_fill_brewer(palette="Set1") +
+    scale_color_brewer(palette="Set1") +
+    ylab("Probability") +
+    labs(colour="Estimator", fill="Estimator", title=paste("CI at row", cut)) +
+    coord_cartesian(xlim = c(100, 220)) +
+    theme(axis.title.x = element_blank(), axis.text.x = element_blank())
+  return(p)
+}
+```
+
+```{r}
+CI_cut_110 <- CI_cut(110, CI_cml, CI_r, sigma_sq)
+CI_cut_190 <- CI_cut(190, CI_cml, CI_r, sigma_sq)
+CI_cut_250 <- CI_cut(250, CI_cml, CI_r, sigma_sq)
+
+print(CI_cut_110)
+print(CI_cut_190)
+print(CI_cut_250)
+```
+
+```{r}
+pdf(file = paste(ROOT_PATH, "model_images/CI_cut_110.pdf", sep = ""), height=4, width=8)
+print(CI_cut_110)
+dev.off()
+
+pdf(file = paste(ROOT_PATH, "model_images/CI_cut_190.pdf", sep = ""), height=4, width=8)
+print(CI_cut_190)
+dev.off()
+
+pdf(file = paste(ROOT_PATH, "model_images/CI_cut_250.pdf", sep = ""), height=4, width=8)
+print(CI_cut_250)
+dev.off()
+
+cat("All CI PDFs saved to model_images/\n")
+```

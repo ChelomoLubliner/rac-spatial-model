@@ -1,0 +1,250 @@
+---
+title: "naomi_chelomo"
+author: "Chelomo Lubliner"
+date: "2023-07-17"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(imager)
+
+```
+
+```{r}
+source("config.R")
+
+```
+
+
+```{r}
+
+col_shoe <- 307 # 307 is the number of columns in each shoe
+row_shoe <- 395 # 395 is the number of rows in each shoe
+num_shoe <- 387  # 387 is the number of shoes but 386 is the number of shoes with RACs - shoe 127 has no RACS
+
+rel_col_shoe <- 150  # out of the 307 columns only 150 are relevant (contain non zero pixels in some shoes)
+rel_row_shoe <- 300  # out of the 395 rows only 300 are relevant (contain non zero pixels in some shoes)
+rel_x_cord <- 0.25 # using coordinates as in the locations_data.CSV file the relevant x coordinates are between -.25 and 0.25
+rel_Y_cord <- 0.5 # the relevant Y coordinates are between -0.5 and 0.5
+
+file_name <- paste(ROOT_PATH, "processed_data/dataCC.csv", sep = "")
+dataCC <- read.csv(file_name, header = TRUE)
+
+```
+
+
+```{r contour_distance_}
+
+#get convex hull contours as a list of doubles(395*307) of pixel and convert them to x-y  coordinates
+file_name <- paste(ROOT_PATH, "data/contour_", CONTOUR_ALGORITHM, ".txt", sep = "")
+d <- readChar(file_name, nchars = (col_shoe * row_shoe + 2) * num_shoe) 
+contour_txt <- list() 
+for (i in 1:386) {
+  contour_txt[[i]] <- matrix(
+    as.numeric(unlist(strsplit(substr(d, 1 + (col_shoe * row_shoe + 2) * (i - 1), (col_shoe * row_shoe + 2) * i - 2), split = ""))),
+    row_shoe, col_shoe, byrow = 1
+  )
+}
+#now get the x,y coordinates
+contour_pix <- list() 
+# each data_pix[[i]] is a matrix with column 1 indicating the shoe, 2 the x, 3 the y, 4 the amount of RACs in that pixel
+# we include only data where there is contact surface (after adjusting for the case that if there is a RAC there will be contact surface)
+for (i in 1:386) {
+  xcoor <- t(matrix(rep((-col_shoe / 2 + 1:col_shoe) * rel_Y_cord / rel_col_shoe, row_shoe), col_shoe, row_shoe))
+  ycoor <- -matrix(rep((-row_shoe / 2 + 1:row_shoe) * rel_Y_cord / rel_col_shoe, col_shoe), row_shoe, col_shoe)
+  shoe <- rep(i, length(contour_txt[[i]][contour_txt[[i]] == 1]))
+  contour_pix[[i]] <- cbind(shoe, xcoor[contour_txt[[i]] == 1], ycoor[contour_txt[[i]] == 1]) # the data is only where there is contact surface
+}
+contour_pix_use <- numeric()
+for (i in 1:386) {
+  contour_pix_use <- rbind(contour_pix_use, contour_pix[[i]]) 
+}
+
+# at this stade, in convex_pix_use we have for each shoe, each point of the contour
+```
+
+
+```{r contour_distance_3}
+#convex_poix to dataframe will be easier
+contour_df <- as.data.frame(contour_pix_use)
+colnames(contour_df)[colnames(contour_df) == "V2"] <- "x"
+colnames(contour_df)[colnames(contour_df) == "V3"] <- "y"
+
+#check that min_distance is always < that horiz_distanc
+# for (i in 1:nrow(dataCC)) 
+#   dataCC$diff[i] <- dataCC$min_dist[i]  <= dataCC$horiz_dist[i] 
+# }
+
+
+dataCC$row_number <- seq_len(nrow(dataCC))
+contour_df$row_number <- seq_len(nrow(contour_df))
+
+
+  
+```
+
+
+```{r contour_distance_6}
+#now for each row of dataCC we have to calculate the distance within each point of convex_pix_use
+#convex_pix_use[,5]
+calculate_distance <- function(x1, y1, x2, y2) {
+  sqrt((x1 - x2)^2 + (y1 - y2)^2)
+}
+
+calculate_min_distance <- function(new_data, contour_alg_df) {
+  new_data$row_number <- seq_len(nrow(new_data))
+  for (i in 1:nrow(new_data)) {
+    percentage <- round(100 * i / nrow(new_data), 3)
+    if (i %% 1000 == 0) {
+      message("row N.", i, ": ", percentage, "%\n")
+    }
+    min_distance <- Inf
+    distance <- Inf
+    contour_df2 <- contour_alg_df[contour_alg_df$shoe == new_data$shoe[i], ]
+    for (j in 1:nrow(contour_df2)) {
+      distance <- calculate_distance(new_data$x[i], new_data$y[i], contour_df2$x[j], contour_df2$y[j])
+      if (distance < min_distance) {
+        min_distance <- distance
+      }
+    }
+    new_data$min_dist[i] <- min_distance
+  }
+file_name <- paste(ROOT_PATH, "processed_data/dataCC_distance_temp.csv", sep = "")
+write.csv(new_data, file_name, row.names = FALSE)
+  return(new_data)
+}
+
+
+## MIN HORIZONTALLY DISTANCE
+
+calculate_min_horiz_distance <- function(new_data, contour_alg_df){
+  
+  for (i in 1:nrow(new_data)) {
+    percentage <- round(100 * i / nrow(new_data),3)
+    if (i %% 1000 == 0) {
+        message("row N.", i, ": ", percentage, "%\n")
+    }
+    min_horiz_dist <- Inf
+    contour_df2 <- contour_alg_df[contour_alg_df$shoe==new_data$shoe[i],]
+    for (j in 1:nrow(contour_df2)) {
+      if (abs(new_data$y[i] - contour_df2$y[j]) <0.01){
+        distance <- calculate_distance(new_data$x[i], new_data$y[i],contour_df2$x[j],  contour_df2$y[j])
+        if (distance < min_horiz_dist) {
+          min_horiz_dist <- distance
+        }
+      }
+    }
+    new_data$horiz_dist[i] <- min_horiz_dist
+  }
+  new_data$horiz_dist[is.infinite(new_data$horiz_dist)] <- new_data$min_dist[is.infinite(new_data$horiz_dist)]
+  file_name <- paste(ROOT_PATH, "processed_data/dataCC_distance_temp.csv", sep = "")
+  write.csv(new_data, file_name, row.names = FALSE)
+  return(new_data)
+}
+
+```
+
+
+```{r contour_distance_8    BIG ITERATION HORIZ DIST}
+new_data <- calculate_min_distance(dataCC, contour_df)
+file_name <- paste(ROOT_PATH, "processed_data/dataCC_distance_temp.csv", sep = "")
+new_data <-read.csv(file_name,header=TRUE)
+new_data <- calculate_min_horiz_distance(new_data, contour_df)
+
+
+```
+
+```{r DIST TO BINARY CATEGORY}
+
+# HORIZ DISTANCE
+#horiz_dist_mean <- mean(new_data$horiz_dist)
+file_name <- paste(ROOT_PATH, "processed_data/dataCC_distance_temp.csv", sep = "")
+new_data <- read.csv(file_name,header=TRUE)
+
+#new_data <- new_data %>% mutate(horiz_dist_cat = ifelse(horiz_dist > 0.1, 1, 0))
+
+
+
+```
+
+
+
+```{r }
+
+image <- t(as.matrix(load.image(paste(ROOT_PATH, "data/contour_prototype.png", sep = ""))))
+xcoor <- t(matrix(rep((-col_shoe / 2 + 1:col_shoe) * rel_Y_cord / rel_col_shoe, row_shoe), col_shoe, row_shoe))
+ycoor <- -matrix(rep((-row_shoe / 2 + 1:row_shoe) * rel_Y_cord / rel_col_shoe, col_shoe), row_shoe, col_shoe)
+entire_contour <- data.frame(x = xcoor[image == 1], y = ycoor[image == 1]) # the data 
+distance_per_y <- entire_contour %>% group_by(y) %>% summarise(min_x = abs(min(x)), max_x = max(x))
+
+dist_shape = c()
+for (i in 1:nrow(new_data)) {
+  y_val = new_data$y[i]
+  if (new_data$x[i] <= 0) {
+    new_val <- distance_per_y[(distance_per_y$y >= y_val - 0.01) & (distance_per_y$y <= y_val + 0.01), c("y", "min_x")]
+    if (nrow(new_val) > 0) {
+      closest_row_index <- which.min(abs(new_val$y - y_val))
+      closest_value <- new_val[closest_row_index, ]$min_x
+    } else {
+      # If no match found, use the closest y value from distance_per_y
+      closest_y_index <- which.min(abs(distance_per_y$y - y_val))
+      closest_value <- abs(distance_per_y[closest_y_index, ]$min_x)
+    }
+  } else {
+    new_val <- distance_per_y[(distance_per_y$y >= y_val - 0.01) & (distance_per_y$y <= y_val + 0.01), c("y", "max_x")]
+    if (nrow(new_val) > 0) {
+      closest_row_index <- which.min(abs(new_val$y - y_val))
+      closest_value <- new_val[closest_row_index, ]$max_x
+    } else {
+      # If no match found, use the closest y value from distance_per_y
+      closest_y_index <- which.min(abs(distance_per_y$y - y_val))
+      closest_value <- distance_per_y[closest_y_index, ]$max_x
+    }
+  }
+  #cat(i, '\t', y_val, '\t', closest_value, '\n')
+  dist_shape <- append(dist_shape, closest_value)
+}
+new_data$distance_shape <- dist_shape
+
+new_data$new_x <- (new_data$x * new_data$distance_shape) / (abs(new_data$x) + new_data$horiz_dist)
+file_name <- paste(ROOT_PATH, "processed_data/dataCC_distance.csv", sep = "")
+write.csv(new_data, file_name, row.names = FALSE)
+```
+
+
+
+```{r }
+#file_name <- paste(ROOT_PATH, "processed_data/contour_algorithm.csv", sep = "")
+#write.csv(contour_df, file_name, row.names = FALSE)
+
+rm(contour_pix)
+rm(xcoor)
+rm(ycoor)
+rm(contour_pix_use)
+#rm(contour_df)
+rm(contour_txt)
+rm(dataCC)
+#rm(new_data)
+gc()
+
+
+```
+
+
+
+```{r contour_distance_4}
+library(plotly)
+shoes_to_check <- 200
+
+filtered_df1 <- new_data[new_data$shoe == shoes_to_check, ][,c('shoe','x','y')]
+filtered_df2 <- contour_df[contour_df$shoe == shoes_to_check, ][,c('shoe','x','y')]
+# Create a combined data frame for plotting
+combined_df <- rbind(transform(filtered_df1, source = "new_data"),
+                      transform(filtered_df2, source = "contour_df"))
+
+plot <- plot_ly(combined_df, x = ~y, y = ~x, type = "scatter", mode = "markers")
+plot
+#
+```

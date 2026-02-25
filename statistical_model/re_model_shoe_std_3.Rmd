@@ -1,0 +1,77 @@
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+set.seed(313)
+library(imager)
+library(ggplot2)
+library(plotly)
+library(splines)
+library(spam)
+library(Matrix)
+library(lme4)
+library(rgl)
+library(fields)
+library(survival)
+library(smoothie)
+
+col_shoe <- 307 # 307 is the number of columns in each shoe
+row_shoe <- 395 # 395 is the number of rows in each shoe
+num_shoe <- 387  # 387 is the number of shoes but 386 is the number of shoes with RACs - shoe 127 has no RACS
+
+rel_col_shoe <- 150  # out of the 307 columns only 150 are relevant (contain non zero pixels in some shoes)
+rel_row_shoe <- 300  # out of the 395 rows only 300 are relevant (contain non zero pixels in some shoes)
+rel_x_cord <- 0.25 # using coordinates as in the locations_data.CSV file the relevant x coordinates are between -.25 and 0.25
+rel_Y_cord <- 0.5 # the relevant Y coordinates are between -0.5 and 0.5
+```
+
+```{r }
+
+source("config.R")
+
+# MODEL_FEATURE <- "NEW_X_NS_XY"
+# MODEL_FEATURE <- "CML_MODEL"
+
+```
+
+
+
+```{r }
+
+
+file_name <- paste(ROOT_PATH, "processed_data/dataCC_distance.csv", sep = "")
+dataCC <- read.csv(file_name, header = TRUE)
+dataCC <- subset(dataCC, select = c("n_Acc", "x", "y", "shoe", "row_number", "horiz_dist", "new_x"))
+file_name <- paste(ROOT_PATH, "data/all_cont.csv", sep = "")
+allcont <- read.csv(file_name, header = TRUE)
+```
+
+
+
+
+```{r}
+Random <- function(nknotsx = 3, nknotsy = 5, dat = dataCC, model_feat = MODEL_FEATURE) {
+
+  knotsx <- as.numeric(quantile(dat$x,1:nknotsx/(1+nknotsx)))
+  knots_new_x <- as.numeric(quantile(dat$new_x,1:nknotsx/(1+nknotsx)))
+  knotsy <-as.numeric(quantile(dat$y,1:nknotsy/(1+nknotsy)))
+  shoe<-dat$shoe
+
+  est <- NULL
+  if(model_feat == 'NEW_X_NS_XY'){
+    est<- glmer(n_Acc ~ ns(dat$new_x,knots=knots_new_x):ns(dat$y,knots=knotsy) + (1 | shoe),data = dat, family = binomial(link = "logit"), control =glmerControl(optimizer="nlminbwrap"))
+  }
+  else if(model_feat == 'CML_MODEL'){
+    est<- clogit(dat$n_Acc~  ns(dat$new_x,knots=knots_new_x):ns(dat$y,knots=knotsy)+strata(shoe) , data=dat)
+  }
+  else { stop("Invalid model_feat value. Use 'NEW_X_NS_XY' or 'CML_MODEL'.")}
+
+  cat("file_saving")
+  file_name <- paste(ROOT_PATH, "saved_models/",MODEL_FEATURE,".rds", sep = "")
+  saveRDS(est, file = file_name)
+  return(est)
+}
+
+rand<-Random(dat=dataCC)
+```
