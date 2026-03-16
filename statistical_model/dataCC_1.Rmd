@@ -183,6 +183,16 @@ for(i in (c(unique(acciden$shoe)))) {
   data_temp[[i]][acci[[i]]>=1] <- 1
 }
 
+# Compute per-shoe contact pixel counts for offset calculation
+shoe_ids <- unique(acciden$shoe)
+pixel_counts <- data.frame(
+  shoe = shoe_ids,
+  pixel_count = sapply(shoe_ids, function(i) sum(data_temp[[i]]))
+)
+write.csv(pixel_counts, paste(ROOT_PATH, "processed_data/shoe_pixel_counts.csv", sep = ""), row.names = FALSE)
+cat("Mean pixel count:", mean(pixel_counts$pixel_count), "\n")
+cat("Mean offset log(N_CONTROLS/pixels):", mean(log(N_CONTROLS / pixel_counts$pixel_count)), "\n")
+
 data_pix<-list()
 # each data_pix[[i]] is a matrix with column 1 indicating the shoe, 2 the x, 3 the y, 4 the amount of RACs in that pixel
 # we include only data where there is contact surface (after adjusting for the case that if there is a RAC there will be contact surface)
@@ -217,13 +227,13 @@ mydata <- data.frame(cbind(n_Acc, x, y,shoe))  #This is the data that will be us
 # As noted in Section 4.4, estimating the intensity function at a high resolution is computationally challenging
 #and thus case-control sub-sampling techniques are used
 #The calculations were based on within-cluster case-control sub-sampling,
-#which includes all cases (pixels with RACs, nij = 1) and 100 random controls (pixels without RACs, nij = 0) from each shoe
+#which includes all cases (pixels with RACs, nij = 1) and N_CONTROLS random controls (pixels without RACs, nij = 0) from each shoe
 dataCC <- numeric()
 for(i in 1:length(unique(shoe)))
 {
   case <- mydata[mydata$shoe==i&mydata$n_Acc>0,]
   control <- mydata[mydata$shoe==i&mydata$n_Acc==0,]
-  control <- control[sample(nrow(control),size=100,replace=FALSE),]
+  control <- control[sample(nrow(control), size = N_CONTROLS, replace = FALSE),]
   dataCC <- rbind(dataCC,case,control)
 }
 ```

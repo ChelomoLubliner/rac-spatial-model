@@ -17,6 +17,7 @@ library(splines)
 library(lme4)
 library(survival)
 library(ggplot2)
+library(car)
 
 source("config.R")
 
@@ -83,7 +84,7 @@ for(i in 1:length(predict(basy, 1))) {
 cov_mat <- matrix(as.numeric(vcov(random_model)), length(fixef(random_model)))
 
 # Predictions (log-odds scale)
-avg <- newdesignmat %*% fixef(random_model) + log(0.005)
+avg <- newdesignmat %*% fixef(random_model) + MEAN_OFFSET
 avg[t(img_filled)==0] <- NA
 
 # Standard errors
@@ -105,6 +106,28 @@ names(CI_r) <- c("Low", "Mid", "High")
 # Save m for CML mean adjustment
 m <- mean(avg, na.rm=TRUE)
 cat("Random model mean (log-odds):", m, "\n")
+```
+
+```{r linearHypothesis_test}
+# ============================================================
+# Hypothesis test: all spatial coefficients = 0
+# Ported from naomikap/rac-intensity, Code/pixel analysis.R ~line 370
+# Tests H0: beta_1 = beta_2 = ... = beta_p = 0 (all except intercept)
+# Uses the random effects (glmer) estimator
+# ============================================================
+
+co <- fixef(random_model)
+vc <- vcov(random_model)
+
+# Contrast matrix: identity matrix minus first row (intercept)
+matr <- diag(length(co))[-1, ]
+
+testing <- linearHypothesis(random_model,
+                            hypothesis.matrix = matr,
+                            rhs = rep(0, length(co) - 1),
+                            test = c("Chisq", "F"),
+                            vcov. = vc, coef. = co)
+print(testing)
 ```
 
 ```{r}

@@ -76,7 +76,7 @@ for(i in 1:length(predict(basy,1))) {
     newdesignmat <-  cbind(newdesignmat,predict(bas_new_x, xy$x)[,j]*predict(basy, xy$y)[,i])  } }
 
 model_coef <- fixef(random_model)
-pred.case_control <- newdesignmat%*%model_coef+log(0.005)
+pred.case_control <- newdesignmat%*%model_coef+MEAN_OFFSET
 
 pred.case_control[t(img_filled)==0] <- NA
 # Calculate mean of random predictions for use in CML adjustment (like original code line 325)

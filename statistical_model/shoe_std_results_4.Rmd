@@ -80,7 +80,7 @@ for(i in 1:length(predict(basy,1))) {
 img_filled <- t(as.matrix(load.image(paste(ROOT_PATH,"data/freq_min_18.png", sep = ""))))
 
 # Compute Random model mean (needed for CML mean adjustment)
-pred_random <- newdesignmat %*% fixef(random_model) + log(0.005)
+pred_random <- newdesignmat %*% fixef(random_model) + MEAN_OFFSET
 pred_random[t(img_filled)==0] <- NA
 m <- mean(pred_random, na.rm=TRUE)
 
@@ -94,7 +94,7 @@ if(MODEL_FEATURE == 'CML_MODEL'){
   pred.case_control <- pred.case_control - m_1 + m
 } else if(MODEL_FEATURE == 'NEW_X_NS_XY'){
   model_coef <- fixef(rand)
-  pred.case_control <- newdesignmat %*% model_coef + log(0.005)
+  pred.case_control <- newdesignmat %*% model_coef + MEAN_OFFSET
   pred.case_control[t(img_filled)==0] <- NA
 } else { stop("Invalid MODEL_FEATURE value. Use 'NEW_X_NS_XY' or 'CML_MODEL'.")}
 
