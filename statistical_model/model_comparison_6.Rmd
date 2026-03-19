@@ -126,12 +126,18 @@ intens_random_scaled <- exp(-sigma_sq/2)*intens_random[,cols]
 intens_cml_scaled <- exp(-sigma_sq/2)*intens.pred_cml[,cols]
 
 com_2_est <- cbind(intens_random_scaled, intens_cml_scaled)
-image.plot(t(com_2_est[nrow(com_2_est):1,]), axes=FALSE, xlab='Random                     CML')
+par(mar = c(2, 0, 0, 4))  # bottom, left, top, right (right margin for color bar)
+image.plot(t(com_2_est[nrow(com_2_est):1,]), axes=FALSE, xlab='')
+mtext("Random", side=1, at=0.25, line=0.5, cex=2)
+mtext("CML", side=1, at=0.75, line=0.5, cex=2)
 ```
 
 ```{r}
 pdf(file = paste(ROOT_PATH, "model_images/pixel_inten_JASAup.pdf", sep = ""), height=8, width=8)
-image.plot(t(com_2_est[nrow(com_2_est):1,]), axes=FALSE, xlab='Random                     CML')
+par(mar = c(2, 0, 0, 4))
+image.plot(t(com_2_est[nrow(com_2_est):1,]), axes=FALSE, xlab='')
+mtext("Random", side=1, at=0.25, line=0.5, cex=2)
+mtext("CML", side=1, at=0.75, line=0.5, cex=2)
 dev.off()
 ```
 
