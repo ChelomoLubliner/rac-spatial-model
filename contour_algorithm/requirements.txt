@@ -1,0 +1,12 @@
+numpy
+pandas
+plotly
+matplotlib
+scipy	
+Pillow
+scikit-image
+#imageio
+opencv-python	
+tqdm
+alphashape
+#kaleido==0.2.1
