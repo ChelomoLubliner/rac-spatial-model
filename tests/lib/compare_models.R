@@ -4,12 +4,21 @@
 #   tab <- compare_dumps(a, b)   # a, b = lists from dump_models()
 # returns one row per field: identical() (with attributes), all.equal with
 # tolerance 0 (values only), max |a - b|, max |a - b| / max |a|, and the
-# number of elements.
+# number of elements. Stops if a field is present in only one dump.
 # CLI: Rscript tests/lib/compare_models.R <dump_a.rds> <dump_b.rds>
 #   prints the table; exit 0 if every numeric field is identical().
 
 compare_dumps <- function(a, b) {
-  fields <- intersect(names(a), names(b))
+  # Both dumps must have the same fields: a field missing from one side
+  # must not let a comparison pass unnoticed (T1 review).
+  only_a <- setdiff(names(a), names(b))
+  only_b <- setdiff(names(b), names(a))
+  if (length(only_a) || length(only_b)) {
+    stop("compare_dumps: the dumps have different fields; only in a: ",
+         paste(only_a, collapse = ", "), "; only in b: ",
+         paste(only_b, collapse = ", "))
+  }
+  fields <- names(a)
   rows <- lapply(fields, function(f) {
     x <- a[[f]]
     y <- b[[f]]

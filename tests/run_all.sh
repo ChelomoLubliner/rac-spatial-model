@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Fast test suite (plan section 4.5): committed checksums, every Python unit
-# test under tests/python/ and every R test under tests/r/. Old-regression
-# mode: nothing is written to the repository. Exit 0 only if all pass.
+# test under tests/python/, every R test under tests/r/, and the code-style
+# rules (flake8 on every Python file, shellcheck on every shell script;
+# user rule 5). Old-regression mode: nothing is written to the repository.
+# Exit 0 only if all pass.
 #
 # Usage: bash tests/run_all.sh
 # Optional: RAC_VENV_PY = the Python with numpy, scikit-image, opencv
@@ -34,12 +36,47 @@ run_check() {
   fi
 }
 
-# Every file of the work tree (path, size, mtime), .git excluded: the tests
-# must not create, change or delete anything.
+# Every file of the work tree (path, size, mtime): the tests must not
+# create, change or delete anything. Excluded: .git and .claude (the
+# Claude Code harness may write its local settings there during a run).
 tree_state() {
-  find . -path ./.git -prune -o -type f -printf '%p %s %T@\n' | LC_ALL=C sort
+  find . \( -path ./.git -o -path ./.claude \) -prune -o -type f \
+    -printf '%p %s %T@\n' | LC_ALL=C sort
 }
 before=$(tree_state)
+
+# Tracked and new (not ignored) files matching a pattern that exist.
+# shellcheck disable=SC2317  # called by the lint functions below
+code_files() {
+  local f
+  git ls-files -co --exclude-standard -- "$1" | LC_ALL=C sort -u |
+    while IFS= read -r f; do
+      if [[ -f "$f" ]]; then printf '%s\n' "$f"; fi
+    done
+}
+# shellcheck disable=SC2317  # invoked indirectly through run_check
+lint_python() {
+  local -a files=()
+  local f
+  while IFS= read -r f; do
+    # contour_algorithm/ is the verbatim thesis code (106 findings, A-058);
+    # the T2c style-only commit fixes it and must delete this exclusion
+    # (A-064).
+    if [[ "$f" != contour_algorithm/* ]]; then files+=("$f"); fi
+  done < <(code_files '*.py')
+  echo "flake8: ${#files[@]} files (contour_algorithm/ excluded until T2c)"
+  # with no file argument flake8 would lint "." (contour_algorithm too)
+  if [[ ${#files[@]} -eq 0 ]]; then return 1; fi
+  flake8 -- "${files[@]}"
+}
+# shellcheck disable=SC2317  # invoked indirectly through run_check
+lint_shell() {
+  local -a files=()
+  mapfile -t files < <(code_files '*.sh')
+  echo "shellcheck: ${#files[@]} files"
+  if [[ ${#files[@]} -eq 0 ]]; then return 1; fi
+  shellcheck -- "${files[@]}"
+}
 
 run_check "sha256 committed_79247d8 (Tier A, 24 files)" \
   sha256sum --quiet -c tests/baseline/committed_79247d8.sha256
@@ -50,6 +87,9 @@ run_check "python unittest discover tests/python" \
 for t in tests/r/test_*.R; do
   run_check "Rscript $t" Rscript "$t"
 done
+run_check "flake8 (all Python except contour_algorithm/ until T2c)" \
+  lint_python
+run_check "shellcheck (all shell scripts)" lint_shell
 # shellcheck disable=SC2317  # invoked indirectly through run_check
 tree_unchanged() {
   local after

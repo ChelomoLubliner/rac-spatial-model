@@ -16,6 +16,11 @@ stopifnot(length(car_line) == 1)
 first <- which(grepl("^testing <- linearHypothesis\\(random_model,", x))
 last <- which(trimws(x) == "print(testing)")
 stopifnot(length(first) == 1, length(last) == 1, last > first)
+# The splice below is correct only if library(car) comes before the chunk
+# (its index is then unchanged by the splice) and print(testing) is not the
+# last line ((last + 1):length(x) would count down otherwise). Both hold for
+# the committed statistical_tests_5.Rmd; refuse anything else (T1 review).
+stopifnot(car_line < first, last < length(x))
 
 replacement <- c(
   "# T1 scratch variant: manual Wald test (car is not installed here).",
