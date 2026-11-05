@@ -408,3 +408,39 @@ Chronological; newest entry at the bottom. Each entry: what was done, results (r
 **What is good.** Tier A comes from the blobs, not the work tree. The legacy code runs only in `mktemp` scratch copies, and inputs are copied, not linked. The work-tree-unchanged gate is real. Both platform root causes are proven down to the package version (lme4 1.1-38 derivative rule; the zlib-ng build of the Pillow wheels; Windows reproduces 386/386 and the GLMM bit for bit). Two independent WSL R chains are identical. The docs paste real output.
 
 **Required before T2 sources `scratch.sh`:** finding 1 (code and tests), plus the wording of finding 2. Findings 3-6 can go into the T2 commits; finding 3 is needed before T5.
+
+## 2026-11-06 01:23, T1-baseline review (reviewer:reproducibility)
+
+**Verdict: approve** for the reproducibility lens. I re-ran the OLD regression with my own scripts (not `tests/legacy/*`), in fresh `mktemp` folders under `<scratch>/review_t1_repro/`. Every reproducibility claim I tested holds to the digit, including both platform root causes. My runs are second, independent full runs, so they also supply the non-circular evidence that engineer finding 2 asks for.
+
+**Re-run, with results.**
+- **Tier A:** the 24 sha256 values I recomputed from the `79247d8` blobs equal `committed_79247d8.sha256`; `old_baseline.sha256` matches; the work tree equals the blobs. No commit since `79247d8` touched the committed data, models, figures, any Rmd or `config.R`.
+- **RNG:** the only random call is `sample()` (`dataCC_1.Rmd:236`) after `set.seed(313)` (line 12), and it is unchanged. `parallel`/`doParallel` are loaded but never used.
+- **R steps 1-6 on WSL** (from `git archive 79247d8`, every output deleted first, my own car-free step 5):
+  - step 1 (113 s): the 3 CSVs equal Tier B raw and Tier A after LF -> CRLF;
+  - step 2 (1,051 s): both CSVs are byte-identical to Tier A;
+  - GLMM (247 s): `identical()` to Tier B in fixef, both vcovs, theta, sigma^2, logLik, deviance and u;
+  - CML (189 s): `identical()` to Tier A and to Tier B;
+  - the 8 PDFs equal Tier B once the dates are removed, and step 5 prints W = 427.7804, df 24;
+  - `RAC_REGRESS_R_RUN=<my run>`: ALL PASS.
+  - This makes three independent WSL chains with identical results.
+- **Windows R 4.4.3 / lme4 1.1-37:** I ran `knitr::knit` on the unmodified `re_model_shoe_std_3.Rmd` (that R has no pandoc; 605 s). fixef, both vcovs, theta, logLik, u, the stored Hessian and the whole `optinfo` are `identical()` to the committed GLMM. Only the frame's formula environments differ (`all.equal` TRUE).
+- **Wald:** my own code gives W = 428.6933350011 with the committed default vcov (the stored Hessian), 427.7674 with RX, and 420.6712 for the CML. The verbatim step-5 `car::linearHypothesis` chunk (Windows R, car 3.1-3) gives Chisq 428.69333500107, equal to 15 digits.
+- **Python, full legacy run on WSL:** thesis code from the `109f30a` blobs, inputs from the `79247d8` blobs, the venv copy (33 numeric library files checked equal to the original venv). Exit 0, 921 s.
+  - The contour's sha256 values `d43fda7e...` (LF) and `e18d50df...` (CRLF) equal Tier B.
+  - The same 30 records (19,027 px) differ from Tier A.
+  - All 1,556 of 1,556 intermediates equal Tier B, so the full WSL run is deterministic.
+  - The four pre-snake npy files are byte-identical to the thesis run, and the committed contour equals the thesis `active-contour_all.npy` (386/386).
+- **Platform:** my own driver on shoes 1, 11, 26, 62, 203, 340 and 382. Under venv-wind all 7 give 0 differing px against the committed records; under WSL they give 0, 855, 946, 1,304, 1,361, 1,359 and 1,189 px, equal to `contour_linux_diff.csv`. Windows Pillow re-encodes the committed `freq_min_18.png` pixels to its exact 767 bytes; Linux Pillow gives 807.
+- **Other:** `bash tests/run_all.sh` gives ALL PASS (82 s, under load). `requirements-lock.txt` equals `pip freeze`. Nothing in the thesis repo changed in the T1 window.
+
+**Findings.**
+1. **Major (engineering lens, confirmed here): engineer finding 1.** In a throwaway folder, `rac_scratch_remove "$RAC_SCRATCH/"` returned 0 and deleted the root together with an unrelated subfolder; a nested `$RAC_SCRATCH/a/b` was deleted too. For reproducibility this would wipe the verified venv copy (A-056, the only WSL platform for the legacy Python run) and the Tier B run folders. Fix it before T2's `regress_old.sh` sources `scratch.sh`.
+2. **Minor:** on WSL the GLMM gate can only be Tier B. Windows R reproduces Tier A exactly with `knitr::knit` (shown above), so T2 should add a Windows-R step-3 check against Tier A, next to the venv-wind contour check of A-060.
+3. **Minor (the same as engineer findings 2, 4 and 5):**
+   - the results doc should cite non-circular evidence for "deterministic"; that evidence now exists (this review);
+   - `contour_algorithm/` overwrites `data/contour_Active_Contour.txt` if it is run in place, so T2d must remove that path first;
+   - section 4.3's "0-based records" above 126 are image indices.
+4. **Outside T1:** in the T0 window, the thesis repo's `.git/index` (2026-11-05 18:25) and `contour_algorithm/__pycache__/` (20:15) were modified. T1 wrote nothing there.
+
+**Timings (WSL, with 3-4 jobs in parallel):** step 1 113 s, step 2 1,051 s, GLMM 247 s, CML 189 s, steps 4-6 12-23 s; Python 921 s; Windows R step-3 knit 605 s.
