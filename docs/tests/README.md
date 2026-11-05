@@ -16,10 +16,13 @@ The test code is created from T1 on; this page fixes the conventions every task 
 | `tests/python/test_*.py` [T1-T4] | `python -m unittest discover -s tests/python -t .` from the repo root |
 | `tests/r/test_*.R` [T1-T7] | `Rscript tests/r/test_<name>.R` from the repo root |
 | `tests/baseline/` [T1] | Tier A: checksums, EOL table and model dumps of the files committed at `79247d8`. `local/` = Tier B: outputs of the unmodified code re-run on this machine. Never edited after T1, except to add a file that was missing, with a LOG entry |
-| `tests/lib/` [T1-T2] | Helpers: `dump_models.R`, `compare_models.R`, `pdf_normalize.py` |
-| `tests/legacy/` [T1] | Scripts that run the unmodified code in scratch copies (`run_legacy_python.sh`, `run_legacy_r.sh`) |
+| `tests/lib/` [T1-T2] | Helpers: `scratch.sh` (RAC_SCRATCH guards), `make_tier_a.sh`, `dump_models.R`, `compare_models.R`, `pdf_normalize.py`, `compare_legacy_python.py`, `contour_platform_diff.py`, `write_environment.sh` |
+| `tests/legacy/` [T1] | Scripts that run the unmodified code in scratch copies (`run_legacy_python.sh`, `run_legacy_r.sh`, `step5_without_car.R`), T1 diagnostics (`diag_glmm_refit.R`, `diag_wald_car.R`, `diag_snake_platform.py`, `compare_figure_matrices.R`) and the OLD gallery (`old_snake_gallery.py`, `old_snake_metrics.py`) |
 | `tests/regress_old.sh` [T2] | The old-regression gate: copies the working tree to the scratch dir, runs the requested steps with `RAC_DATASET=old`, compares with Tier A / Tier B, prints a summary table |
 | `tests/e2e/` [T8] | `test_old_full.sh` (all old steps), `test_new_rerun.sh` (new steps re-run reproduce the committed new outputs) |
+
+## Platforms (T1)
+The committed OLD contour was computed with the thesis Windows venv and the committed GLMM with the Windows R 4.4.3 (lme4 1.1-37); both are reproduced bit for bit there, while WSL differs in 30 of 386 contour records (about 1 px) and in the GLMM (fixef within 7.7e-4, no stored Hessian). Tests that re-run the snake are platform-aware (`test_snake_old_regression.py`), and Tier B is the WSL result (decisions A-055, A-060).
 
 ## Regression tiers
 - **Tier A** (committed at `79247d8`): the contour txt and the R CSVs must match by raw sha256.

@@ -340,3 +340,25 @@ Chronological; newest entry at the bottom. Each entry: what was done, results (r
 **Running.** R chain A (`<scratch>/t1/legacy_r_oTZO3x`, all steps 1-6): step 1 done in 141.8 s (exit 0), step 2 (the slow double loop) started 23:42.
 
 **Next.** Python rerun from the venv copy; compare step-1/2 CSVs and chain-A models; Tier B files; gallery `docs/qa/sheets_old/`; `docs/qa/snake-qa.md`; results doc. `<scratch>` = `/tmp/claude-1000/-home-mehes-projects-rac-spatial-model/1d789329-e60a-4147-af28-9c8214affef3/scratchpad`.
+
+## 2026-11-06 00:58, T1-baseline (implementer), done
+
+**What.** Captured the OLD baseline and re-ran the unmodified code on this machine, in scratch copies only. Tier A = the files committed at `79247d8` (`tests/baseline/`); Tier B = the WSL reruns (`tests/baseline/local/`). Copied the thesis contour code verbatim into `contour_algorithm/` with `requirements-lock.txt`. Created `statistical_model/R/wald.R` (manual Wald). Built the OLD snake reference gallery (`docs/qa/sheets_old/`, 9 sheets, 68 shoes) and wrote `docs/qa/snake-qa.md` after opening every sheet; opened all 8 committed PDFs and their Tier B twins. Results with commands and outputs: `docs/tests/T1-baseline-results.md`. Decisions A-054 to A-061. Plan Revision 3: facts F40-F44, K11 completed, T1 ticked, a T1 note on the T2 gate.
+
+**Results.**
+- Step 1: same content as Tier A; R on Linux writes LF, and LF -> CRLF gives the committed bytes (A-005 confirmed). Step 2: byte-identical. CML: `identical()` in every field.
+- GLMM: not identical on WSL (max |fixef diff| 7.666e-4, sigma^2 0.95979590 vs 0.95977909); two WSL reruns are `identical()` to each other. **Root cause:** the committed model is reproduced bit for bit by the Windows R 4.4.3 with lme4 1.1-37 and Matrix 1.7-2 (`identical()` fixef, both vcovs, Hessian, `u`). lme4 1.1-38 on WSL stores no Hessian when nobs > 10,000, so its default vcov is the RX one: W = 427.7804 vs the committed 428.6933. The Hessian vcov is fragile (431.19 for a WSL refit with `calc.derivs = TRUE`); the RX vcov is stable across platforms (to 8.5e-6). Proposal for T5/T6 in A-055.
+- Wald 428.69 proven: the verbatim step-5 `linearHypothesis` chunk (Windows R, car 3.1-3) gives 428.6933350010699; `wald_all_spatial()` gives 428.69333500107194 (relative difference 4.8e-15).
+- Contour: the WSL legacy run reproduces 356 of 386 records; 30 differ by about 1 px (19,027 px; mean distance per record at most 1.50 px). The same code under the thesis Windows venv reproduces **386 of 386**. Cause: float differences of about 1e-8 px between the numeric builds, amplified by `np.int32` truncation and the snake iterations; each platform is deterministic. Everything before the snake is identical (byte-identical npys, pixel-identical PNGs). PNG bytes differ only because of the zlib-ng build of the Pillow wheels (Windows re-encodes the committed pixels to the committed bytes).
+- Gallery: all 67 re-run records equal the committed ones (built with venv-wind, A-061). Stickers appear on 31 of the 68 shoes (beside the toe; two squares below the heel), all outside the prototype mask and removed; no sticker inside the mask was seen. Defects of the committed contours, kept: shoe 9 (K1, sole strip cut by the mask), partial prints 11, 153, 183, 187, 349, a heel notch on 100. OLD metrics: coverage min 0.9775, p1 0.9886; contour 614-742 px; no contour touches the border.
+- Gate: `bash tests/run_all.sh` ALL PASS (41 s): 20 Python tests (1 skipped by design), 3 R test scripts, checksums, unchanged work tree. The optional live checks also pass (Python full-run folder; R chain A).
+
+**Timings.** Legacy Python 509 s (snakes 339 s); Windows snake for 386 shoes 377 s; step 1 141.8 s; step 2 1,133.8 s; GLMM 281-305 s on WSL (388 s with `calc.derivs`), 548 s on Windows R; CML 228-230 s; steps 4-6 14-32 s; venv copy 1,144 s plus 682 s verification; gallery 95-112 s.
+
+**Side effects outside the repo.** Only `<scratch>/t1/` (runs, venv copy). The Windows interpreters were run through interop for diagnostics; they read the repo and wrote to `<scratch>/t1`, except the gallery, written into `docs/qa/sheets_old/`. The thesis repo was only read (`-B`, `git --no-optional-locks`); R used its own session temp folders under `/tmp` (removed at exit; none left).
+
+**Next.** T2 (profiles refactor). Its step-0 gate on WSL compares with Tier B (contour CRLF sha `e18d50df...`) and, under venv-wind, with Tier A (A-060). Its printed W is 428.69 only when step 5 reads the committed GLMM (A-055). `tests/python/test_snake_old_regression.py` imports the legacy modules by their current names; T2's port must update that import and keep the test green.
+
+**Open for people.** A-055 (vcov method for T5/T6, statistics expert) and A-060 (platform of the official NEW contour, T4) are agent proposals; nothing blocks T2.
+
+**Blockers.** None.
