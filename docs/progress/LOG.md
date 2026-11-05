@@ -362,3 +362,49 @@ Chronological; newest entry at the bottom. Each entry: what was done, results (r
 **Open for people.** A-055 (vcov method for T5/T6, statistics expert) and A-060 (platform of the official NEW contour, T4) are agent proposals; nothing blocks T2.
 
 **Blockers.** None.
+
+## 2026-11-06 01:05, T1-baseline review (reviewer:engineer)
+
+**Verdict: changes required** (engineering lens). The baseline work is solid, and every headline claim I checked reproduces. One defect in the T1 code is a real safety bug: the scratch-deletion guard that T2's `regress_old.sh` will source can delete the whole shared scratchpad. A few doc statements also present circular checks as independent evidence. All of these are small fixes. Nothing blocks the science conclusions of T1.
+
+**Verified by re-running, not by reading.**
+- `bash tests/run_all.sh`: ALL PASS in 48 s (20 Python tests, 1 skipped by design; 3 R scripts; work tree unchanged).
+- flake8 is clean on `tests/` and shellcheck on all 7 tracked `.sh` files. Changed text files have 0 CR bytes, and no commit since `79247d8` carries an attribution line.
+- The 24 lines of `committed_79247d8.sha256` equal `git cat-file blob 79247d8:<path> | sha256sum`, and the file list equals `git ls-tree` minus the README files. `old_baseline.sha256` is a subset. No file under `data/`, `processed_data/`, `saved_models/` or `model_images/` changed since `79247d8`. Outside `docs/`, `tests/` and `contour_algorithm/`, only `.gitignore`, `.shellcheckrc` and the new `statistical_model/R/wald.R` changed.
+- The 12 files in `contour_algorithm/` are `cmp`-identical to the thesis blobs at `109f30a`, and the thesis HEAD is still `109f30a`.
+- Spot checks by hand:
+  - Wald recomputed without `wald.R` (eigen inverse, intercept dropped by name): 428.6933350011, df 24; RX 427.7674; CML 420.6712.
+  - Contour, from the raw WSL run file: 30 differing records, 19,027 px. Its sha256 values `d43fda7e...` (LF) and `e18d50df...` (CRLF) match Tier B.
+  - Chain A CSVs: step 1 LF -> CRLF equals the committed bytes, and step 2 is byte-identical.
+  - Models: dumps of chain A and chain B are `identical()` to each other and to `models_local.rds`. The WSL GLMM has no Hessian. The Windows R 4.4.3 refit in scratch is `identical()` to the committed GLMM (fixef, theta, Hessian, u, vcov, logLik).
+  - `tests/lib/compare_models.R` (Tier A vs Tier B) reproduces the section 5.3 table. 3 normalized PDF hashes reproduce (A == B).
+- I ran `tests.python.test_snake_old_regression` under venv-wind: OK. Shoes 176 and 354 equal the committed records on Windows and Tier B on Linux, so A-060 is confirmed independently. The tree stayed clean.
+- Images I opened: `sheet_old_01.png` and `sheet_old_06.png` match `snake-qa.md` (sticker positions on 3/7/12/24/221/239/241; 201 and 239 bulge past the mask; shoe 9's removed strip). `model_images/difference_random_cml.pdf` matches its description.
+
+**Findings.**
+1. **Major: `rac_scratch_remove` (`tests/lib/scratch.sh:59-70`) deletes the scratch root itself.**
+   - It accepts `"$RAC_SCRATCH/"`, because `*` matches the empty string after the slash. I verified this in a throwaway folder: the call returned 0 and removed the root together with an unrelated `keep_me/` folder.
+   - It also deletes nested paths (`$RAC_SCRATCH/a/b`), against its own comment ("only a folder directly created under RAC_SCRATCH").
+   - This is exactly the R30/A-034 scenario: `rac_scratch_remove "$RAC_SCRATCH/$name"` with an empty `$name` would wipe the shared scratchpad, including other agents' runs, the verified venv copy and the T1 run folders. `test_scratch_lib` does not cover it.
+   - Fix: strip trailing slashes, then require `dirname == $RAC_SCRATCH` and a basename matching the mktemp pattern `^[A-Za-z0-9_.-]+_[A-Za-z0-9]{6}$`. Add tests for `$tmp/`, `$tmp//`, `$tmp/.` and `$tmp/a/b`.
+2. **Minor: circular "live" checks are reported as evidence.**
+   - `RAC_REGRESS_PY_RUN=legacy_py_MXmkvc` and `RAC_REGRESS_R_RUN=legacy_r_oTZO3x` point at the very folders Tier B was written from, so "0 of 386 records differ from Tier B" and "models identical to Tier B" are tautologies. They are cited in results section 3.2 and in the LOG ("The optional live checks also pass").
+   - WSL determinism of the full Python run is not shown for all 386 records: there was one full run, plus a 10-shoe diagnostic run twice, the 67-shoe gallery and the 8 test shoes. Yet F40, A-060 and `snake-qa.md` say "each platform is deterministic".
+   - Fix: label those checks as hash-file consistency checks. Then either reword the claim to the evidence, or run a second full WSL legacy run (about 9 min, in the background) and compare it with Tier B. The T2 gate rests on Tier B being reproducible.
+3. **Minor: `wald_all_spatial()` silently accepts a misordered `V`.**
+   - A permuted copy of the committed vcov, whose dimnames show the permutation, gives W = 2650.46 instead of 428.69, with no error.
+   - The intercept is also dropped by position (`[-1]`), not by name.
+   - T5/T6 will pass bootstrap covariances. Fix: check `rownames(V)` and `colnames(V)` against `names(co)` when present, drop `"(Intercept)"` by name (stop if it is absent for a merMod), and add a permuted-V test.
+4. **Minor: `contour_algorithm/` at HEAD has 106 flake8 findings (rule 5) and still runs in place.** Run in place, it overwrites `data/contour_Active_Contour.txt` with LF bytes. A-058 documents both, and the checksum test would catch an overwrite, but only a README guards it. T2c (the style-only commit) should be the first T2 commit. Until then, do not import or run it except from the test, which redirects `FOLDER`.
+5. **Minor: doc fidelity.**
+   - Results section 5.3 drops the `varcorr` and `optimizer` rows of the pasted comparison without the `[... omitted ...]` marker its preamble promises. The values are real: I re-ran it.
+   - Section 4.3 calls "7, 10, ..., 141, 151, ..." "0-based records". For shoes of 128 and above those are 0-based image indices (0-based records 140, 150, ...). This matters given review focus 4 (shoe indexing).
+6. **Minor robustness.**
+   - `compare_dumps()` ignores fields missing from one dump (`intersect`), so a live check could pass with a field absent.
+   - `step5_without_car.R` assumes that `library(car)` comes before the chunk and that `print(testing)` is not the last line. Both hold today; assert them.
+   - The `run_all.sh` tree snapshot includes `.claude/`, which the harness may write to during a run.
+   - The `W, H = 307, 395` constants and `read_records` are duplicated in 4-5 OLD-only helpers. That is fine for baseline tools, but T2's `test_no_hardcoding` must scope out `tests/`.
+
+**What is good.** Tier A comes from the blobs, not the work tree. The legacy code runs only in `mktemp` scratch copies, and inputs are copied, not linked. The work-tree-unchanged gate is real. Both platform root causes are proven down to the package version (lme4 1.1-38 derivative rule; the zlib-ng build of the Pillow wheels; Windows reproduces 386/386 and the GLMM bit for bit). Two independent WSL R chains are identical. The docs paste real output.
+
+**Required before T2 sources `scratch.sh`:** finding 1 (code and tests), plus the wording of finding 2. Findings 3-6 can go into the T2 commits; finding 3 is needed before T5.
