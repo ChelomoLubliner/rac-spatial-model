@@ -374,3 +374,34 @@ Append new decisions at the end of the right section; never rewrite an old entry
 - **Date:** 2026-11-06. **Who:** agent call (on the engineering reviewer's minor finding 4). **Status:** accepted (T2, T5). **Extends:** A-031.
 - **Decision:** T2 replaces `1:386` in `dataCC_distance_2.Rmd` by `seq_along(rac_analysis_shoes(P))`; step 2 reads exactly that many records and stops unless the file size equals n_records x (W x H + 2); T5's `test_new_outputs.R` checks the same.
 - **Why:** the earlier T2 instruction (`seq_len(num_shoe - length(shoes_without_racs))`) ignored `excluded_shoes`, so after one exclusion step 2 would read a record past the end. R then returns an all-NA matrix with no error or warning, and `xcoor[m == 1]` gives a full-length vector of NA (checked with the reader's exact expression; results doc section 6).
+
+### A-054 PNG files are compared by pixels across platforms, by bytes only within one platform
+- **Date:** 2026-11-06. **Who:** agent call (T1). **Status:** accepted.
+- **Decision:** a PNG written by the pipeline on another platform is compared with its decoded pixels (`np.array_equal`); its sha256 is compared only between runs on the same platform (Tier B). `data/freq_min_18.png` and `data/contour_prototype.png` are shared read-only inputs and are never rewritten.
+- **Why:** the regenerated `freq_min_18.png` has the committed pixels but 807 instead of 767 bytes; the decompressed image data are equal (sha 87cc00e7...). Windows Pillow 12.0.0 ("1.3.1.zlib-ng") re-encodes the committed pixels to exactly the committed 767 bytes, Linux Pillow 12.0.0 ("1.3", zlib-ng) to 807 bytes: the two wheels bundle different zlib-ng builds. Evidence: `docs/tests/T1-baseline-results.md` section 4.2.
+
+### A-055 The committed GLMM is a Windows R 4.4.3 / lme4 1.1-37 result; on WSL its vcov comes from RX
+- **Date:** 2026-11-06. **Who:** agent call (T1). **Status:** accepted for the regression; the vcov proposal for T5/T6 is **proposed** (statistics expert). **Refines:** known issue K11 and plan F37.
+- **Decision:** the committed GLMM stays the OLD baseline (Tier A). It is reproduced bit for bit (fixef, both vcovs, theta, logLik, the stored 26 x 26 Hessian, `u`) by the Windows R 4.4.3 with lme4 1.1-37 and Matrix 1.7-2 from the committed `dataCC_distance.csv` and the step-3 code. On WSL (R 4.3.3, lme4 1.1.38, Matrix 1.6.5) the refit differs (max |fixef diff| 7.7e-4, sigma^2 0.95979590 vs 0.95977909, logLik diff 1.2e-6) and stores no Hessian, because lme4 1.1-38 skips derivatives when nobs > `check.conv.nobsmax` = 10,000 and `calc.derivs` is NULL (lme4 NEWS); `vcov()` then uses RX: W = 427.7804 instead of 428.6933. On WSL the Tier B gate is exact (two independent reruns `identical()`). Step 5 prints W = 428.69 only when it reads the committed GLMM; after a WSL refit it prints 427.7804 (relevant for the T2 gate wording).
+- **Proposal for T5/T6:** state the vcov method of every model-based CI and Wald test and use the same one for both datasets, preferably the RX-based vcov. The finite-difference Hessian vcov is numerically fragile here: the same data give W = 428.69 (Windows Hessian), 431.19 (WSL refit with `calc.derivs = TRUE`) and 427.77/427.78 with RX on both platforms, whose RX vcovs agree to 8.5e-6. The NEW GLMM (about 83,000 rows) will also have no Hessian by default. The step-5 figures change little: GLMM band widths at rows 110, 190 and 250 differ by 0.7-1.4% between the two vcov types.
+- **Why:** exact OLD regression must hold on the machine where the work runs, and the root cause must be known before T5 compares variances across datasets. Evidence: results doc section 5.
+
+### A-056 The legacy Python run reads its packages from a byte-identical copy of the thesis venv
+- **Date:** 2026-11-06. **Who:** agent call (T1). **Status:** accepted.
+- **Decision:** `tests/legacy/run_legacy_python.sh` takes the interpreter from `RAC_VENV_PY`; the T1 Tier B run used `<scratch>/t1/venv_copy/bin/python`, a `cp -a` copy of the thesis `venv/` on the Linux filesystem, verified identical with `diff -rq --no-dereference` (1,144 s copy, 1,826 s with the check). The packages, versions and interpreter (`/usr/bin/python3.12` through the venv symlink) are the same; only the file location differs.
+- **Why:** the first run with the venv on `/mnt/c` failed after 139 s with `OSError: [Errno 12] Cannot allocate memory` while plotly re-read its 4.6 MB `plotly.min.js` for the 270th HTML file; 7.7 GB of RAM was free, so this is a WSL drvfs read failure, not the code.
+
+### A-057 The manual Wald test is created in T1, ahead of T2e
+- **Date:** 2026-11-06. **Who:** agent call (T1, as the task requires). **Status:** accepted.
+- **Decision:** `statistical_model/R/wald.R` (`wald_all_spatial()`) and `tests/r/test_wald.R` are created in T1; no Rmd sources them yet (T2e wires the function into step 5 and writes `processed_data/wald_test.csv`). The T1 scratch variant of step 5 replaces the car chunk by this function.
+- **Why:** car is not installed on WSL. Proof of equality: the verbatim step-5 `linearHypothesis` chunk, run with the Windows R 4.4.3 that has car 3.1-3, gives Chisq = 428.6933350010699 on the committed GLMM; the manual W = 428.69333500107194 (relative difference 4.8e-15); `test_wald.R` passes its car branch there.
+
+### A-058 The verbatim thesis contour code is committed in T1
+- **Date:** 2026-11-06. **Who:** agent call (T1, as the task requires). **Status:** accepted. **Precedes:** A-022 (the T2 port happens in the same folder).
+- **Decision:** `contour_algorithm/*.py` and `requirements.txt` are the git blobs of the thesis repo at `109f30a` (LF); `requirements-lock.txt` is the venv's `pip freeze`. flake8 (106 findings) is not applied until the T2c style-only commit, so that T2c and T2d show as reviewable diffs against the code that produced the committed contour.
+- **Why:** the plan's T1 rule "no pipeline code changes" allows a verbatim copy, and the copy makes the port auditable. The legacy code must never run in place (it overwrites `../data/contour_Active_Contour.txt`); `contour_algorithm/README.md` says so.
+
+### A-059 Task-required names next to the plan's names
+- **Date:** 2026-11-06. **Who:** agent call (T1). **Status:** accepted.
+- **Decision:** `tests/baseline/old_baseline.sha256` (the 11 OLD artifacts a rerun must reproduce) sits next to the plan's `committed_79247d8.sha256` (all 24 tracked files); `old_model_summary.txt` and `.csv` are the plan's `models_committed.txt`; the results document is `docs/tests/T1-baseline-results.md` (plan name) and `docs/tests/T1-results.md` points to it; the task's tests `tests/python/test_snake_old_regression.py` and `tests/r/test_old_regression.R` sit next to the plan's `test_baseline_raw_data.py` and `test_baseline_committed.R`.
+- **Why:** the computed task and the plan name the same artifacts differently; both sets are kept so that neither the plan's later tasks nor the workflow's checks miss a file.
