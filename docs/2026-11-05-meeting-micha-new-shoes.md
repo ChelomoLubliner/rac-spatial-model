@@ -7,6 +7,11 @@
 
 > This note records what was understood in the meeting. Where something is **Micha's request**, it says so. Where something is **our proposal** (Shlomo/Claude), it is marked as such and still needs Micha's agreement.
 
+> **Corrections found after the meeting (added 2026-11-05 by the T0 review pass; the meeting text below is unchanged):**
+> 1. "A different dataset from the 387 shoes (**no overlap**)" (sections 3.2 and 5) is **unverified**: about 30 new shoes look like reprints of old shoes (same sole, same print position, RACs at the same places). See plan fact F25 and decision D-012 (question for Micha and Yoram); Part 2 excludes them from its primary analysis (A-024).
+> 2. The old dataset has **13,287** RACs; the CSV's 13,288 lines include the header (plan F1).
+> 3. Section 7: the fixed contour output path is at `active_contour_snake.py:175` and the `i == 126` skip at `:177` (not 172 and 175).
+
 ---
 
 ## 1. Context: the revise-and-resubmit

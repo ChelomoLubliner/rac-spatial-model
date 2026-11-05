@@ -104,3 +104,52 @@ Chronological; newest entry at the bottom. Each entry: what was done, results (r
 **Reviewer scripts and outputs** (scratch, not committed): `<scratchpad>/review_stat/verify1.R` to `verify9.py`, `overlap_screen.csv`, `overlap_sym.csv`, `pair_469_212.png`. Total runtime about 7 min.
 
 **Blockers.** None for T1/T2. Findings 1, 2, 3 and 6 must be settled before T7, and the rules for 1 and 6 must be fixed before any NEW Part 2 number is computed.
+
+## 2026-11-05 21:55, T0-architecture review fixes (implementer)
+
+**What.** Checked every finding of the two T0 reviews against the data and code before changing anything. For that I wrote four new read-only probes (`docs/qa/T0/probes/t0_review.py`, `t0_review_pairs.py`, `t0_review.R`, `t0_review_cml.R`), fixed the two probes the reviewers named (`t0_probe.py` section D, the float window in `t0_probe.R`) and re-ran them. I then revised the plan, the decision register (D-012, D-013, A-024 to A-040), the QA README, the docs index and the tests README. The meeting note got a marked correction box; its text is unchanged. No pipeline code or data changed. Results with exact commands and outputs: `docs/tests/T0-review-fixes-results.md`.
+
+**Findings verified (all reproduced).**
+- **Critical, overlap.** My own screen compares every NEW shoe with all 386 OLD shoes; the reviewer compared only with the image-best ones. It uses a symmetric RAC match within 1 px at the best rigid shift, found by Hough voting.
+  - It flags 26 NEW shoes (1,006 RACs). These include all 16 of the statistician's shoes, with the same OLD partners.
+  - Prints deform by 1-4 px between toe and heel. With one shift per half, the threshold must rise to that statistic's NEW-NEW null maximum (0.400), and the rule then flags 8 more shoes: **34 candidates, 1,309 NEW RACs (6.5%)**.
+  - Four consecutive NEW pairs map onto consecutive OLD pairs.
+  - I looked at all 34 pair images and 2 controls: 30 are likely the same physical shoe, 3 uncertain, 1 unlikely.
+  - Inside OLD, 236/237 and 277/278 look like one pair of shoes printed twice (K10).
+  - Within NEW, the best match never exceeds 0.286, so there are no duplicates. Of the 15 shoes with an image partner at r >= 0.95, 13 have a partner with a consecutive id and unrelated RACs.
+- **Regional X^2.** A regional theta fitted on the test partition gives X^2 = 7e-24 in a toy check (Poisson score equations).
+- **phi.** With the real NEW n_i, independence with shoe-specific pi gives phi 0.959, against an exact phi_0 of 0.968 (< 1). Heterogeneity alone gives phi 3.44, clumps alone 1.84.
+- **K8.** eta = -2.271582 at every tested point of both edges, and the rebuilt X equals `getME(X)`.
+- **Variance.** Efron + `cluster(shoe)`: SE ratio median 1.132, max 1.373; W 394.20 -> 234.41. `survival` refuses a robust variance and score residuals for the exact method. An exact refit takes 189 s and is `identical()` to the committed CML in coefficients, `vcov` and `loglik`.
+- **Quality.** All of the statistician's per-shoe numbers reproduce. NEW 599 is a different image type: rim band, dot texture.
+- **Minor findings.**
+  - F14: 160/161 of 392 (NEW lattice 152/151 of 364).
+  - F6: 0.847821; shoes 46 and 239 map differently.
+  - P(500-RAC sample misses both) = 0.9262.
+  - Empty `RAC_DATASET` returns "" in R and Python.
+  - The thesis lines are 175/177.
+  - Offsets: 0.0954 vs 0.1210 raw, maximum 0.0335.
+  - Calibration: flat in x, sharp in y. The suggested distance criterion is **not** sharper, so it stays a cross-check.
+
+**Plan changes.**
+- Facts: F5, F6 and F14 corrected; F25-F33 added; known issues K8-K10 added.
+- T3: an overlap screen, a quality rule and a frozen Part 2 shoe set, all pre-registered, plus the fixed tests.
+- T5: robust variances; T6: robust equality Wald and offset-adjusted sigma^2.
+- Section 9 rewritten: named primary analyses, log score as the primary model comparison against the real 2022 model, phi vs phi_0, a within-shoe pair test, effect sizes, the CML as a secondary model, K8 sensitivity.
+- Engineering: `excluded_shoes`, `RAC_SCRATCH`, sentinel tests, empty env var, narrow `.gitignore`.
+- New risks R24-R30.
+
+**Timings.**
+- verify7 re-run 5 s; exact CML check 191 s (scratch) and 192 s (committed probe).
+- `t0_review.py` 261 s (run 1) and 541 s (run 2, with R8). Run 2 reproduces run 1's R1-R7 output and all 29 PNGs byte for byte.
+- `t0_review_pairs.py` 21 s, `t0_review.R` 26 s, `t0_probe.R` 10 s, `t0_probe.py` 62 s. The four T0 PNGs are byte-identical; the two NEW ones moved to `docs/qa/T0/new/` with a `_new` suffix.
+
+**Old regression.** Not re-executed, because nothing outside `docs/` changed: 0 files differ from `79247d8` outside `docs/`, and 32 of 32 tracked files under `data/`, `processed_data/`, `saved_models/`, `model_images/`, `statistical_model/` and `reports/` are byte-identical to their `79247d8` blobs. The manual Wald re-prints W = 428.6933 (df 24).
+
+**Checks.** flake8 and shellcheck clean; `t0_doc_checks.py` PASS (25/25 artifacts, 67 NEW paths compliant, mermaid 32 nodes, 44 edges); 0 CR bytes; table column counts consistent.
+
+**Also.** Updated the basic-memory plan note (project `main`, `plans/Plan - Run the full RAC pipeline on the new 631-shoe dataset and validate it`): corrected the F14 fact and added a revision section. The user's global instructions ask for a summary note for every finalized plan, and the earlier T0 run created this one. This is the only write outside the repo (the rule-8 tension of T0). Scratch files are in `<scratchpad>/t0fix/`. `git add -N docs` was used to list new files; all of them are committed.
+
+**Next.** T1: baseline. The new T1 items are `tests/lib/scratch.sh` (`RAC_SCRATCH`) and the GLMM fit time for the T5 bootstrap budget.
+
+**Blockers.** None for T1-T6. Open for people: D-012 (Micha, Yoram: which NEW shoes are reprints) and D-013 (Micha: quality rule). Until they answer, the provisional rules A-024 and A-029 apply; they must be frozen in T3 before any Part 2 number.

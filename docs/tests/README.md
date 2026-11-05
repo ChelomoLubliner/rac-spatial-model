@@ -27,10 +27,10 @@ The test code is created from T1 on; this page fixes the conventions every task 
 - Model and PDF differences between Tier A and Tier B are platform differences (committed files came from Windows R 4.4.3); T1 reports them once, with the maximum absolute differences, and they are restated in the final report.
 
 ## Running long checks
-Slow gates (`tests/regress_old.sh`, `tests/e2e/*`, the legacy runs) exceed the 10-minute foreground limit: start them in the background (`run_in_background`, or `nohup ... > logs/<name>.log 2>&1 &`), poll until they exit, then paste the summary.
+Slow gates (`tests/regress_old.sh`, `tests/e2e/*`, the legacy runs) exceed the 10-minute foreground limit: start them in the background (`run_in_background`, or `nohup ... > logs/<name>.log 2>&1 &`), poll until they exit, then paste the summary. Every script that copies or deletes needs `RAC_SCRATCH` (your own scratch directory; there is no default) and works in a fresh `mktemp -d "$RAC_SCRATCH/<name>_XXXXXX"` folder (plan section 4.5, decision A-034).
 
 ## Results documents
-One file per task: `docs/tests/T<n>-<short-name>-results.md` (T0-architecture, T1-baseline, T2-profiles, T3-new-data, T4-snake, T5-new-pipeline, T6-compare, T7-validation, T8-report). For every check: the exact command in a code block, then its **real** output (trim only with an explicit `[... N lines omitted ...]` marker), then one line of interpretation. A skipped test says why. Images are described by the agent who opened them.
+One file per task: `docs/tests/T<n>-<short-name>-results.md` (T0-architecture, T0-review-fixes, T1-baseline, T2-profiles, T3-new-data, T4-snake, T5-new-pipeline, T6-compare, T7-validation, T8-report). For every check: the exact command in a code block, then its **real** output (trim only with an explicit `[... N lines omitted ...]` marker), then one line of interpretation. A skipped test says why. Images are described by the agent who opened them.
 
 ## Naming
 Python: `tests/python/test_<area>.py`, classes `<Thing>`, methods `test_<behaviour>`; R: `tests/r/test_<area>.R` with one `stopifnot` block per named check. The plan refers to Python tests as `module.Class.method`.

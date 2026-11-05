@@ -2,6 +2,8 @@
 
 **Date:** 2026-11-05. **Task:** architecture plan (no pipeline code changed). **Agent:** T0 architect.
 
+> **Revision note (2026-11-05, T0 review pass).** This file records the first T0 run (probes from 20:17) and is kept as it was. Afterwards `t0_probe.py` section D (exact R division form) and the float-window section of `t0_probe.R` (both directions) were corrected and re-run, and the two NEW images were renamed to `docs/qa/T0/new/superposition_new.png` and `docs/qa/T0/new/sheet_16_racs_new.png` (same bytes, same sha256 as in section 2 below). The current `.out` files therefore differ from section 4 below exactly in those sections; the diffs, the new probes and the verification of every review finding are in `docs/tests/T0-review-fixes-results.md`.
+
 T0 ships documents, so the checks below are (a) the read-only probes whose output backs every number in the plan, and (b) checks of the documents themselves. All outputs are pasted from the saved files or from the terminal, unedited. `<scratchpad>` stands for the session scratch directory `/tmp/claude-1000/-home-mehes-projects-rac-spatial-model/1d789329-e60a-4147-af28-9c8214affef3/scratchpad`.
 
 ## 1. Restore the thesis repo (side effect of the interrupted first T0 run)

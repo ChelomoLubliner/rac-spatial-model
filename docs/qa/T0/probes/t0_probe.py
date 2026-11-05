@@ -1,13 +1,15 @@
 """T0 read-only probes (part 1): raw formats, RACs, calibration, masks.
 
 Evidence for docs/plans/2026-11-05-new-shoes-pipeline.md. Reads data only
-and writes four evidence PNGs into <out_dir>. Never writes into the repo's
+and writes four evidence PNGs into <out_dir> (the two NEW ones in
+<out_dir>/new/ with a _new suffix). Never writes into the repo's
 data folders or into the thesis repo. Run with the thesis venv python and
 -B, so that importing the thesis module does not write bytecode there:
 
     VENV/bin/python -I -B t0_probe.py <repo_root> <thesis_contour_dir> \
         <out_dir>
 """
+import os
 import sys
 
 import numpy as np
@@ -82,10 +84,18 @@ print('new smallest 8 (shoe, px):',
 
 section('D. pixel calibration feasibility')
 xo, yo, so = old_loc.x.values, old_loc.y.values, old_loc.shoe.values
-c1 = 307 - (np.floor((xo + 0.25) * 300) + 79)
-r1 = 395 - (np.floor((yo + 0.5) * 300) + 48)
+# exact R aspix_x / aspix_y (dataCC_1.Rmd:40-64): division by delx, dely
+c1 = 307 - (np.floor((xo + 0.25) / ((2 * 0.25) / 150)) + 79)
+r1 = 395 - (np.floor((yo + 0.5) / ((2 * 0.5) / 300)) + 48)
 legacy = OLD[so - 1, (r1 - 1).astype(int), (c1 - 1).astype(int)].mean()
-print(f'old legacy R aspix mapping: RACs on contact = {legacy:.4f}')
+print(f'old legacy R aspix mapping (exact R division form): RACs on '
+      f'contact = {legacy:.6f}')
+c1m = 307 - (np.floor((xo + 0.25) * 300) + 79)
+r1m = 395 - (np.floor((yo + 0.5) * 300) + 48)
+approx = OLD[so - 1, (r1m - 1).astype(int), (c1m - 1).astype(int)].mean()
+print(f'old multiply form (x + 0.25) * 300 (an approximation of R; maps '
+      f'{int(((c1 != c1m) | (r1 != r1m)).sum())} RACs differently): RACs on '
+      f'contact = {approx:.6f}')
 
 
 def rate(recs, shoe, x, y, sx, sy, cx, cy, mirror_x, flip_y):
@@ -218,9 +228,10 @@ img[fm & ~ac & ~ge8] = (0, 0, 255)
 save('old_rmask_stamps.png', img)
 sepn = np.full((367, 6), 128, u8)
 dens = np.clip(tot / tot.max() * 255 * 3, 0, 255).astype(u8)
-save('new_superposition.png', np.hstack([(tot >= 1) * u8(255), sepn,
-                                         (tot >= 18) * u8(255), sepn,
-                                         (tot >= 29) * u8(255), sepn, dens]))
+os.makedirs(f'{OUT}/new', exist_ok=True)
+save('new/superposition_new.png',
+     np.hstack([(tot >= 1) * u8(255), sepn, (tot >= 18) * u8(255), sepn,
+                (tot >= 29) * u8(255), sepn, dens]))
 rng = np.random.default_rng(1)
 pick = [int(i + 1) for i in order[:8]]
 pick += sorted(int(v) for v in rng.choice(np.arange(1, 632), 8,
@@ -238,5 +249,5 @@ for s in pick:
            fill=(0, 255, 0))
     tiles.append(np.array(im))
 sheet = np.vstack([np.hstack(tiles[:8]), np.hstack(tiles[8:])])
-save('new_sheet_16_racs.png', sheet, scale=1)
+save('new/sheet_16_racs_new.png', sheet, scale=1)
 print('sheet shoes:', pick)

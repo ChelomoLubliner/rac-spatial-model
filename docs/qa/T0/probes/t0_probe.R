@@ -73,14 +73,34 @@ cat("logical(0) && TRUE  ->", format(logical(0) && TRUE), "\n")
 cat("logical(0) && FALSE ->", format(logical(0) && FALSE), "\n")
 
 cat("\n=== float semantics of abs(dy) < 0.01 in dataCC_distance_2.Rmd\n")
-# data y values pass through write.csv (15 significant digits); contour y
-# values are computed in memory, exactly as in the Rmd.
-ys <- -((-395 / 2 + 1:395) * 0.5 / 150)
-ys_csv <- as.numeric(sprintf("%.15g", ys))
-for (k in 2:4) {
-  dk <- abs(ys_csv[1:(395 - k)] - ys[(1 + k):395])
-  cat(sprintf("|drow| = %d: pairs with abs(dy) < 0.01: %d of %d\n",
-              k, sum(dk < 0.01), length(dk)))
+# Data y values are written by write.csv in step 1 (dataCC.csv) and read
+# back by read.csv in step 2 (then once more through the temp CSV); contour
+# y values are computed in memory. Same expressions as the Rmds. The round
+# trip is a real write.csv/read.csv through a text connection, and both
+# directions are counted: the data row above the contour row (data row r,
+# contour row r + k) and below it (data row r + k, contour row r).
+csv_round_trip <- function(v) {
+  txt <- character()
+  tc <- textConnection("txt", "w", local = TRUE)
+  write.csv(data.frame(y = v), tc, row.names = FALSE)
+  close(tc)
+  read.csv(text = txt)$y
+}
+for (rows in c(395, 367)) {
+  ys <- -((-rows / 2 + 1:rows) * 0.5 / 150)
+  ys_csv <- csv_round_trip(ys)
+  cat(sprintf(paste("row_shoe = %d: y values changed by the round trip:",
+                    "%d of %d; second round trip identical: %s\n"),
+              rows, sum(ys_csv != ys), rows,
+              identical(csv_round_trip(ys_csv), ys_csv)))
+  for (k in 2:4) {
+    above <- abs(ys_csv[1:(rows - k)] - ys[(1 + k):rows])
+    below <- abs(ys_csv[(1 + k):rows] - ys[1:(rows - k)])
+    cat(sprintf(paste("  |drow| = %d: pairs with abs(dy) < 0.01: data row",
+                      "above the contour row %d of %d, below %d of %d\n"),
+                k, sum(above < 0.01), length(above), sum(below < 0.01),
+                length(below)))
+  }
 }
 
 cat("\n=== legacy stamp sweep (dataCC_1.Rmd lines 93-136) on NEW dims\n")

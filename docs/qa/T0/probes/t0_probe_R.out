@@ -59,9 +59,14 @@ logical(0) && TRUE  -> NA
 logical(0) && FALSE -> FALSE 
 
 === float semantics of abs(dy) < 0.01 in dataCC_distance_2.Rmd
-|drow| = 2: pairs with abs(dy) < 0.01: 393 of 393
-|drow| = 3: pairs with abs(dy) < 0.01: 160 of 392
-|drow| = 4: pairs with abs(dy) < 0.01: 0 of 391
+row_shoe = 395: y values changed by the round trip: 263 of 395; second round trip identical: TRUE
+  |drow| = 2: pairs with abs(dy) < 0.01: data row above the contour row 393 of 393, below 393 of 393
+  |drow| = 3: pairs with abs(dy) < 0.01: data row above the contour row 160 of 392, below 161 of 392
+  |drow| = 4: pairs with abs(dy) < 0.01: data row above the contour row 0 of 391, below 0 of 391
+row_shoe = 367: y values changed by the round trip: 245 of 367; second round trip identical: TRUE
+  |drow| = 2: pairs with abs(dy) < 0.01: data row above the contour row 365 of 365, below 365 of 365
+  |drow| = 3: pairs with abs(dy) < 0.01: data row above the contour row 152 of 364, below 151 of 364
+  |drow| = 4: pairs with abs(dy) < 0.01: data row above the contour row 0 of 363, below 0 of 363
 
 === legacy stamp sweep (dataCC_1.Rmd lines 93-136) on NEW dims
 new t=8: >=t px=29536 | sweep with legacy bound 300: ERROR: subscript out of bounds | with bound col_shoe=255: kept px=29532 removed=4

@@ -17,7 +17,8 @@ new: min=1343 median=8924.0 max=19145
 new smallest 8 (shoe, px): [(428, 1343), (163, 1376), (8, 2016), (375, 2963), (359, 2965), (112, 2988), (165, 3070), (286, 3154)]
 
 === D. pixel calibration feasibility
-old legacy R aspix mapping: RACs on contact = 0.8479
+old legacy R aspix mapping (exact R division form): RACs on contact = 0.847821
+old multiply form (x + 0.25) * 300 (an approximation of R; maps 2 RACs differently): RACs on contact = 0.847896
 old best (rate, s, mirror_x, flip_y, dc, dr): (np.float64(0.8816), 300, True, False, -1, -1)
 new coarse best (rate, s, mirror_x, flip_y, dc, dr): (np.float64(0.7534), 300, True, False, 0, 0)
 new fine top5 (rate, sx, sy, dc, dr): [(np.float64(0.8352), 298, 300, -1, -1), (np.float64(0.8345), 296, 300, -1, -1), (np.float64(0.8343), 300, 300, -1, -1), (np.float64(0.8328), 294, 300, -1, -1), (np.float64(0.8318), 298, 302, -1, -1)]
@@ -46,6 +47,6 @@ new t=29: px=27881 components=1 outside main=0
 === I. evidence images written
 /home/mehes/projects/rac-spatial-model/docs/qa/T0/old_prototypes.png (2492, 790)
 /home/mehes/projects/rac-spatial-model/docs/qa/T0/old_rmask_stamps.png (614, 790)
-/home/mehes/projects/rac-spatial-model/docs/qa/T0/new_superposition.png (2076, 734)
-/home/mehes/projects/rac-spatial-model/docs/qa/T0/new_sheet_16_racs.png (2040, 734)
+/home/mehes/projects/rac-spatial-model/docs/qa/T0/new/superposition_new.png (2076, 734)
+/home/mehes/projects/rac-spatial-model/docs/qa/T0/new/sheet_16_racs_new.png (2040, 734)
 sheet shoes: [428, 163, 8, 375, 359, 112, 165, 286, 22, 91, 296, 320, 473, 519, 596, 599]

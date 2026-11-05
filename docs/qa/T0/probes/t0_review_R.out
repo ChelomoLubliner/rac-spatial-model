@@ -1,0 +1,39 @@
+=== S1. K8: ns(new_x):ns(y) without main effects
+columns: 25; max |rebuilt X - getME(X)| = 0
+boundary knots new_x: -0.1916667  0.2416667 | y: -0.5016667  0.5116667 
+ns basis at its left boundary: new_x 0  y 0 
+intercept = -2.271582
+eta on the edge new_x = min (5 y values): -2.271582 -2.271582 -2.271582 -2.271582 -2.271582 
+eta on the heel edge y = min (5 new_x values): -2.271582 -2.271582 -2.271582 -2.271582 -2.271582 
+eta on the edge new_x = max (same 5 y): -2.271582 -1.07811 -1.221581 -1.21372 -3.607891 
+eta on the toe edge y = max (same 5 new_x): -2.271582 -2.554992 -2.658025 -2.421676 -3.607891 
+eta over the 51,849 dataCC rows: quantiles 1/10/50/90/99%: -2.238 -1.9 -1.491 -1.277 -1.166 
+rows within 0.03 of the new_x = min edge: 200 (37 cases); within 0.03 of the heel edge: 569 (89 cases)
+eta on those rows, quantiles 10/50/90%: new_x edge -2.067 -1.969 -1.918 | heel edge -2.211 -2.146 -2.088 
+fixed effects of the full tensor (main effects + interaction): 35 
+
+=== S2. regional theta fitted on the test partition: in-sample X^2
+toy (40 shoes, 6 areas, N = 661): max |O_k - E~R_k| = 1.71e-11; X^2 = 7.26e-24; max |E~R - fitted(glm)| = 1.56e-09
+
+=== S3. phi under independent multinomials; heterogeneity vs dependence
+631 shoes with the real NEW n_i (N = 20013), K = 15, 2000 replicates:
+  (a) independent, shoe-specific pi_i (Dirichlet, alpha = 30), X^2 with the true pi_i: mean 13.429, exact E[X^2] = 13.550, K - 1 = 14, phi = 0.9592, exact phi_0 = 0.9679
+  (b) the same independent data, X^2 with the common pi0 (heterogeneity ignored): mean 48.19, phi = 3.44
+  (c) clumped RACs (dependence), common pi0, no heterogeneity: mean 25.71, phi = 1.84
+
+=== S4. CML: cluster-robust variance needs Efron ties
+committed CML method: exact 
+exact + cluster(shoe): robust variance plus the exact method is not supported 
+efron + cluster(shoe) fit: 1.9 s
+max |coef(efron) - coef(committed exact)| = 0.5891
+robust / model SE ratio (efron): min 0.999 median 1.132 max 1.373 
+Wald all 24 = 0 (efron fit): model-based W = 394.20, cluster-robust W = 234.41; committed exact CML model-based W = 420.67
+
+=== S5. offsets
+OLD var(log(100/px)) (committed cleaned counts) = 0.0978
+OLD max |log(100/px) - log(100/(px - cases))| = 0.0335 (shoe 385: px 9321, cases 307)
+raw (uncleaned) contact px: var(log(100/px)) OLD (386) = 0.0954, NEW (631) = 0.1210
+
+=== S6. Sys.getenv() for RAC_DATASET
+unset: [old]
+set to the empty string: []

@@ -1,0 +1,4 @@
+committed CML method: exact 
+exact refit: 189.3 s; coefficients identical() to committed: TRUE; vcov identical(): TRUE | loglik identical(): TRUE 
+score residuals of the exact fit: ERROR: score residuals are not available for the exact method 
+exact method + cluster(shoe): ERROR: robust variance plus the exact method is not supported 
