@@ -206,3 +206,96 @@ Chronological; newest entry at the bottom. Each entry: what was done, results (r
 **Reviewer scripts** (scratch, not committed): `<scratchpad>/review_eng2/symcheck.py`, `compare_rerun.sh`, `out_review/`, `t0_review_rerun.out`.
 
 **Blockers.** None. Findings 1-3 belong to T3's overlap work, and finding 1's text fix should be made before D-012 is sent.
+
+## 2026-11-05 22:20, T0-architecture review of the fix pass f65911c (reviewer:statistician)
+
+**Verdict: changes required** (statistics lens). The fixes for my first review are real and mostly right. The overlap screen, K8, phi_0, the regional X^2 identity, the Efron-cluster numbers and the quality rule all reproduce, and the change is docs-only (0 files outside `docs/` differ from `79247d8`). But the revised Part 2 method has a new critical gap, and three more items would bias T3, T5 and T6. All fixes are plan text, to be made before those tasks; none touches Part 1 or the OLD regression.
+
+**Verified by re-running.**
+- `t0_review.py` re-run into scratch (556 s): the CSV, all 31 PNGs and stdout (after path normalization) are identical to the committed ones.
+- Algebra:
+  - E[X^2] = K' - sum_k sum_i n_i pi_ik^2 / E_k <= K' - 1 (Cauchy-Schwarz) holds for known pi.
+  - Under independence the section-9 bootstrap phi has expectation phi_0 (1 - 1/m), so comparing phi with phi_0 is valid.
+- Images opened:
+  - `pair_359_357`, `pair2h_92_103`, `pair_203_6`, `pair_452_113` and `old/pair_old_236_277`;
+  - 8 pairs of my own (finding 2).
+
+  92-103 shows the same round-lug design with four heel pads, as in the engineer's finding 1.
+- Finding 1 is something my first T0 review also missed: there I endorsed "df = K' - 1, the chi-square reference is conservative".
+
+**Findings.**
+1. **Critical: the Part 2 goodness-of-fit treats the OLD-fitted expectations as known.** Section 9 says "nothing is estimated on NEW data" and calls the chi-square reference conservative, and the shoe bootstrap resamples NEW shoes only. But E~_k depends on beta_old, which was estimated from about as many RACs as NEW has. A delta method on the committed GLMM gives the size of the effect (controls weighted by (px - cases)/100 as the pixel proxy, the 15-cell grid of section 9, model-based vcov):
+   - Per cell, Var(E~_k due to beta_old) / multinomial Var(O_k) has median 1.12 and max 1.28 at N = 13,249.
+   - A **correct** model is therefore rejected by the nominal 5% pooled test with probability 0.80 at N_new = 18,000 (E[X^2] = 34.9, not about 14).
+   - With V x 1.132^2 (the robust SE ratio) the probability is 0.88; without the parameter term it is 0.046.
+   - The bootstrap p has the same problem. T7's calibration tests use known expectations, so they cannot catch it.
+
+   Fix: propagate the OLD uncertainty with the T5 OLD shoe-bootstrap draws.
+   - Use either a Wald-type statistic D' (Sigma_NEW + G V_OLD G')^- D with df K' - 1, or a two-sample bootstrap (each replicate an OLD refit draw plus a NEW shoe resample).
+   - Add a calibration test in which E is re-estimated from a simulated OLD sample.
+   - Label the fixed-E test "test of the published fitted surface, estimation error included".
+   - Do the same for the grid Delta X^2, the effect-size noise floor and the log-score intervals. For the log score the effect is first-order only under dataset shift.
+2. **Major: the overlap rule is not calibrated by n, so it misses heavy reprints.** It uses sym = min(share) with a fixed 0.30 threshold and a 0.15 margin.
+   - The NEW-NEW null maximum of the best sym depends strongly on n: 0.286 for n in [5, 10), 0.120 for n in [80, 300).
+   - A shoe printed again after more wear gains RACs, which dilutes sym.
+   - "Max share >= 0.4 with >= 8 matched" occurs in 0 of 198,765 NEW-NEW pairs, but in 5 NEW-OLD pairs that T0 did not flag. A matched-count z score adds 3 more.
+   - For all 8, the T0 CSV already has the same best OLD partner, with image r 0.80-0.99 and sym 1.9-3.4 times the second best.
+
+   I opened all 8 pair images:
+   - very likely the same shoe: 240-320 and 239-321 (a consecutive NEW pair onto a consecutive OLD pair), 604-134 and 84-26. NEW has 3-4 times more RACs: 121 vs 29, 105 vs 36, 130 vs 40;
+   - likely: 192-105;
+   - uncertain: 57-177 (NEW 57 is one of the two T0 "controls"), 99-167 and 198-371.
+
+   Together they hold 668 NEW RACs, mostly in heavy shoes, which weigh most in the RAC-weighted log score.
+
+   Fix (T3):
+   - Use an n-calibrated statistic: the matched count against a NEW-NEW null model of k given (n_a, n_b), or max share with a minimum matched count.
+   - Set thresholds per n stratum.
+   - Add a synthetic test of a reprint with 3 times extra RACs.
+   - Do not use `.test_matches_t0` to lock in the 26.
+   - Add the 8 to the D-012 list before it is sent.
+3. **Major: the offset of the T6 refit has the wrong sign.** `offset(log(100 / (px - cases)))` appears in T6 `fit_offset`, its test, section 5, A-037 and D-008. It adds log(control fraction) where it should subtract it.
+   - Simulation: 300 shoes, true sigma^2 0.64, true intercept -6.20.
+
+     | Fit | sigma^2 | intercept |
+     |---|---|---|
+     | no offset | 0.72 | |
+     | plan's sign | 1.05 | +2.81 |
+     | flipped, `offset(log((px - cases) / 100))` | 0.61 | -6.20 |
+   - Fix: use the flipped sign. Test that the OLD refit's intercept is about -2.27 + mean(log(100 / (px - cases))). Never add `MEAN_OFFSET` when predicting from an offset refit.
+4. **Major: the bootstrap-V Wald with B = 200 and p = 24 rejects too often** (T5 robust Wald, T6 primary equality Wald).
+   - E[W] = p (B - 1) / (B - p - 2) = 27.45 (inverse-Wishart bias).
+   - Simulated under H0, the rejection rate at nominal 5% is 0.141 (B = 500: 0.076; B = 1,000: 0.064).
+   - The equality Wald with V1 + V2, each from B = 200, rejects 0.090.
+   - With the Hotelling reference W (B - p) / (p (B - 1)) ~ F(p, B - p) the rate is 0.0495.
+
+   Fix: use the F reference (or B >= 1,000 where affordable); for the equality test, bootstrap b1 - b2 directly. The CI bands are not affected.
+5. **Minor:**
+   - (a) Wording that contradicts A-026. A-028 says "evidence that dependence affects the variance" and T8 says "dependence widens the CIs". The widening is extra-multinomial variation, which within-shoe dependence and between-shoe heterogeneity both produce.
+   - (b) Pair test. Probe F compares pairs within r px with uniform placement on each shoe's own contact pixels:
+     - NEW ratio 0.63 at 1 px and 0.93 at 2 px, against a peak of 1.48 at 6 px;
+     - OLD ratio 1.05 at 1 px, against a peak of 1.65 at 4-6 px.
+
+     This is short-range inhibition (RAC size or marking resolution) plus clustering at 3-12 px, and r = 4 mixes the two.
+     - Use annuli, for example (2, 4] and (4, 8], and report r <= 2 separately.
+     - State that contagion and inhomogeneity below the scale h (for example tread edges) cannot be separated.
+     - E_1 counts ordered pairs.
+     - The top 10% of shoes hold 62% (NEW) and 69% (OLD) of the pairs, so add a shoe-weighted version.
+   - (c) A common misfit also raises the bootstrap phi, because residual means scale with n_i (var/mean of n_i: NEW 29.8, OLD 41.3). Centre the residuals on the pooled observed shares.
+   - (d) A percentile bootstrap of a grid argmax of a step function is unreliable for rule (ii). Bootstrap rate(opt) - rate(300) instead.
+   - (e) The F31 phi values (3.44, 1.84) come from arbitrary simulation settings. Label them as illustrations.
+   - (f) The interpretation guard should also name dataset shift: collection, marking and wear (one reprint has 4 times the RACs).
+
+**Reviewer scripts** (scratch, not committed): `<scratchpad>/review_stat2/`:
+- `probeA_param_uncertainty.R` (8 s);
+- `probeB_offset_sign.R` (16 s);
+- `probeC_boot_wald.R` (353 s);
+- `probeD_overlap_counts.py` (170 s), `probeD_analyze.py`, `probeD_render.py`, with the images in `pairs/`;
+- `probeF_pairs_small_r.py` (162 s);
+- their `*.out` files and the re-run in `rerun_py/`.
+
+**Blockers.** None for T1/T2. Each finding must be settled before a later task starts:
+- finding 2: before T3 step 3b and the D-012 list;
+- finding 4: before T5 step 3b;
+- finding 3: before T6;
+- finding 1: before T7.
