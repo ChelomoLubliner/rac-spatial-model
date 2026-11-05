@@ -1,0 +1,69 @@
+shoe,reason,contact_px,cleaned_px,removed_by_mask_px,coverage,contour_px,rerun_diff_px,first_snake_rows,init_rows
+3,random (seed 20261105),10667,10115,552,1.0,704,0,49-346,38-362
+7,sticker or label beside the sole (F25),9634,9150,484,0.9998,715,0,46-341,38-362
+9,"left shoe not flipped (K1, F9, F17); most pixels removed by the mask",11017,9885,1132,1.0,688,0,51-344,38-362
+11,lowest snake coverage; fewest contour px,9825,9825,0,0.9922,621,0,87-335,38-362
+12,sticker or label beside the sole (F25),12086,11755,331,0.9972,688,0,49-340,38-362
+21,smallest contact area,3835,3809,26,0.9968,671,0,50-336,38-362
+23,random (seed 20261105),8573,8573,0,0.996,662,0,60-340,38-362
+24,sticker or label beside the sole (F25),14787,14549,238,0.9998,683,0,48-340,38-362
+29,sticker or label beside the sole (F25),11151,10452,699,1.0,718,0,48-344,38-362
+35,lowest RAC on-contact rate (F27),10667,10667,0,1.0,716,0,43-345,38-362
+38,possible duplicate 38-299 (F26),9633,9633,0,1.0,712,0,62-344,38-362
+55,sticker or label beside the sole (F25),9871,9501,370,1.0,714,0,47-343,38-362
+56,sticker or label beside the sole (F25),8572,8016,556,0.9989,719,0,56-344,38-362
+61,random (seed 20261105),15814,15799,15,1.0,709,0,43-344,38-362
+66,sticker or label beside the sole (F25),8932,8557,375,1.0,687,0,57-345,38-362
+73,random (seed 20261105),13875,13875,0,1.0,727,0,47-348,38-362
+78,random (seed 20261105),10811,10811,0,1.0,735,0,47-346,38-362
+80,random (seed 20261105),9075,8753,322,1.0,726,0,53-348,38-362
+90,random (seed 20261105),10221,10221,0,0.9997,719,0,50-340,38-362
+94,sticker or label beside the sole (F25),10342,10027,315,0.9992,712,0,51-347,38-362
+100,lowest snake coverage,6334,5925,409,0.9848,674,0,60-343,38-362
+110,sticker or label beside the sole (F25),9276,8830,446,1.0,716,0,54-345,38-362
+113,sticker or label beside the sole (F25),6713,6661,52,1.0,691,0,50-343,38-362
+116,sticker or label beside the sole (F25),4098,3852,246,0.9948,692,0,47-341,38-362
+121,sticker or label beside the sole (F25),9535,9291,244,1.0,704,0,44-342,38-362
+127,"no RACs, no contour record; most pixels removed by the mask",7305,6602,703,,,,65-336,38-362
+144,largest contact area,19248,19231,17,1.0,707,0,41-342,38-362
+150,most pixels removed by the mask,6519,5799,720,0.9993,684,0,46-334,38-362
+152,largest contact area,19672,19127,545,1.0,713,0,46-343,38-362
+153,lowest RAC on-contact rate (F27); lowest snake coverage; fewest contour px; smallest contact area,3729,3729,0,0.9775,614,0,91-333,38-362
+160,sticker or label beside the sole (F25),8185,7722,463,0.9997,721,0,45-345,38-362
+165,random (seed 20261105),8337,8337,0,1.0,714,0,44-341,38-362
+168,random (seed 20261105),9591,9591,0,1.0,687,0,48-340,38-362
+175,lowest snake coverage,6389,6174,215,0.9891,632,0,50-330,38-362
+176,largest contact area,19156,18977,179,0.9997,712,0,44-338,38-362
+177,most contour px,7944,7944,0,1.0,737,0,45-346,38-362
+183,random (seed 20261105),7174,7174,0,0.9974,688,0,52-343,38-362
+187,lowest snake coverage,3998,3998,0,0.9855,626,0,71-338,38-362
+194,square sticker below the heel (F25),16217,16007,210,1.0,725,0,46-343,38-362
+196,most contour px,7179,7179,0,1.0,739,0,44-345,38-362
+201,lowest snake coverage,8032,8032,0,0.9897,700,0,52-349,38-362
+209,random (seed 20261105),8970,8883,87,0.9995,722,0,44-342,38-362
+221,random (seed 20261105),14352,13970,382,0.9999,717,0,49-345,38-362
+229,random (seed 20261105),9018,9013,5,1.0,689,0,48-343,38-362
+236,"printed twice inside OLD (K10, pair 236-277)",8420,8420,0,1.0,705,0,44-346,38-362
+237,"printed twice inside OLD (K10, pair 237-278)",8512,8512,0,1.0,702,0,44-347,38-362
+239,sticker or label beside the sole (F25),5199,4781,418,0.9975,699,0,58-345,38-362
+241,lowest snake coverage,7643,7068,575,0.9857,653,0,70-349,38-362
+263,most contour px,13038,12553,485,1.0,742,0,47-353,38-362
+264,sticker or label beside the sole (F25); most pixels removed by the mask,10170,9413,757,1.0,700,0,48-343,38-362
+267,sticker or label beside the sole (F25),6757,6571,186,0.9956,688,0,51-346,38-362
+277,"printed twice inside OLD (K10, pair 236-277)",8434,8434,0,1.0,697,0,43-346,38-362
+278,"printed twice inside OLD (K10, pair 237-278)",7849,7849,0,1.0,698,0,45-344,38-362
+285,random (seed 20261105),7960,7960,0,1.0,696,0,52-350,38-362
+289,random (seed 20261105),10650,10650,0,1.0,714,0,55-345,38-362
+295,random (seed 20261105),17911,17908,3,1.0,709,0,39-343,38-362
+299,sticker or label beside the sole (F25),10629,10180,449,1.0,706,0,48-343,38-362
+308,random (seed 20261105),11173,10844,329,1.0,704,0,49-346,38-362
+311,smallest contact area,3926,3628,298,1.0,684,0,47-341,38-362
+332,random (seed 20261105),11051,11051,0,1.0,721,0,47-344,38-362
+335,random (seed 20261105),8815,8815,0,1.0,695,0,54-342,38-362
+343,random (seed 20261105),12814,12814,0,1.0,714,0,48-339,38-362
+348,random (seed 20261105),12969,12585,384,1.0,692,0,50-346,38-362
+349,lowest snake coverage; fewest contour px,4231,4231,0,0.9905,615,0,73-309,38-362
+351,random (seed 20261105),8994,8994,0,1.0,693,0,51-347,38-362
+354,random (seed 20261105),6777,6777,0,0.9999,694,0,51-346,38-362
+371,sticker or label beside the sole (F25),10575,10488,87,1.0,701,0,46-343,38-362
+378,random (seed 20261105),15474,15474,0,1.0,698,0,45-345,38-362
