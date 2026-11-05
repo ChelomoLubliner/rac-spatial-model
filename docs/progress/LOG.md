@@ -153,3 +153,56 @@ Chronological; newest entry at the bottom. Each entry: what was done, results (r
 **Next.** T1: baseline. The new T1 items are `tests/lib/scratch.sh` (`RAC_SCRATCH`) and the GLMM fit time for the T5 bootstrap budget.
 
 **Blockers.** None for T1-T6. Open for people: D-012 (Micha, Yoram: which NEW shoes are reprints) and D-013 (Micha: quality rule). Until they answer, the provisional rules A-024 and A-029 apply; they must be frozen in T3 before any Part 2 number.
+
+## 2026-11-05 22:15, T0-architecture review of the fix pass f65911c (reviewer:engineer)
+
+**Verdict: changes required** (engineering lens). The change touches `docs/` only, the OLD paths and the old regression are untouched, and every headline overlap number reproduces. Two things are wrong, though. One committed evidence statement about an image is false, because of a labelling bug in a probe. And two pre-registered T3 tests conflict with the probe that T3 is told to start from. Both are small fixes, but they should be made before the D-012 list goes to Micha and Yoram and before T3 starts.
+
+**Verified by re-running, not by reading.**
+- Nothing outside `docs/` differs from `79247d8`, and the 32 tracked pipeline files match their `79247d8` blobs. No commit since `0979022` carries an attribution line.
+- flake8 is clean on all probe `.py` files and shellcheck on `t0_probe.sh`. All 22 changed text files have 0 CR bytes and end with a newline.
+- `t0_doc_checks.py` passes. I also scanned every path token in the whole plan, not only the section-5 table: no NEW artifact path lacks the `new` folder or the `_new` suffix. The only hits are bare file names in prose, `compare/` artifacts, the exempt raw inputs, test names and the legacy OLD name `images/saved/locations_new.csv`. Every mermaid edge endpoint is defined.
+- The outputs pasted in `docs/tests/T0-review-fixes-results.md` equal the `.out` files: `t0_review.out` verbatim, the others plus their exit line.
+- I re-ran the probes into scratch:
+  - `t0_review.py` (563 s): the CSV and all 31 PNGs are byte-identical to the committed files, and `t0_review.out` is identical after path normalization.
+  - `t0_review_pairs.py` (15 s): its 8 PNGs and its output are identical.
+  - `t0_review.R` (25 s): identical except the Efron fit-time line (1.8 s vs 1.9 s).
+  - The repo tree stayed clean.
+- From the committed CSV:
+  - rigid rule 26 shoes (1,006 RACs), two-half rule 26, union 34 (1,309 RACs);
+  - 19 of the 26 rigid partners are at image rank 1;
+  - exactly 4 consecutive NEW pairs map onto consecutive OLD pairs;
+  - 47 shoes have < 5 RACs (120 RACs).
+- In R itself, `aspix` maps OLD shoe 46 to (125, 138) and shoe 239 to (175, 340). The Python division form equals R on all 13,287 OLD RACs, and pandas' default float parse equals a round-trip parse on both location files.
+- Thesis lines 175/177 confirmed (read-only). In the committed `dataCC`, codes 127-386 are shoes 128-387, so plan 4.3 holds.
+- Images I opened:
+  - accurate: `pair_469_212`, `pair_531_67`, `pair_501_12` (the sticker bar beside OLD 12's toe), `pair_294_24`, `control_354_219`, `old/pair_old_236_277` and `new/low_contact_shoes_new` (all 6 shoes);
+  - not accurate: `pair2h_92_103` (finding 1).
+
+**Findings.**
+1. **Major: the NEW 92 evidence is mislabelled, and the docs describe the image wrongly.**
+   - In `t0_review_pairs.py`, the tile label "rigid sym" and the printed `image r`/`rank` use `f.sym`, `f.r` and `f.img_rank`. Those belong to the rigid partner `f.old`, while the image draws the two-half partner `f.old2h`. NEW 92 is the only union shoe whose two partners differ: rigid OLD 63, two-half OLD 103.
+   - So "image r = 0.497, rank 226" describes OLD 63. NEW 92 vs OLD 103 actually has r = 0.851 and rank 5 (recomputed with the probe's own features). The image shows the same round-lug design with four round heel pads.
+   - Plan F25, `docs/qa/T0/README.md`, results doc section 7 and the LOG justify "unlikely" with "different-looking print (image rank 226)", which is false.
+   - Fix: print and label r and rank for `old2h`, and re-judge 92. With 2 of 5 RACs matched it is probably `uncertain`. Then update the 30/3/1 tally everywhere.
+2. **Minor: `sym_match` depends on argument order** (Hough-vote ties are broken by candidate order, and only two shifts are tried).
+   - 2,800 of the 243,566 NEW-OLD pairs give sym(a, b) != sym(b, a). Among the flagged pairs: 241-380 0.463 vs 0.439, 245-91 0.333 vs 0.389, 531-67 0.417 vs 0.389.
+   - The plan pre-registers `test_overlap.Overlap.test_symmetric` (50 random pairs, exact equality) and tells T3 to start from this probe. A port would fail that test with probability about 1 - 0.9885^50 = 44%.
+   - Good news: the symmetrized statistic (max of both orders) flags the same 26 shoes with the same partners, so `.test_matches_t0` survives.
+   - Fix: define the statistic order-free in the T3 interface (max over both orders, or over all tied top-vote shifts). Also compute the NEW-NEW null with the same definition.
+3. **Minor: the two-half rule uses `>=` at the NEW-NEW null maximum.** NEW 92 (5 RACs, 2 matched) and NEW 556 both sit exactly at 0.400. For small n the statistic is coarse (multiples of 0.2 for n = 5). Fix: use a strict `>`, or require a minimum matched count, in T3 step 3b. Note too that the two-half value can be lower than the rigid one (531: 0.361 vs 0.417; 34: 0.328 vs 0.373), because matches across the half line are dropped. If the two-half statistic is meant as a refinement, define it as max(rigid, two-half).
+4. **Minor: A-031 did not reach the T2 Modify list.**
+   - Plan line 318 still says `1:386 -> seq_len(num_shoe - length(shoes_without_racs))`, which ignores `excluded_shoes`.
+   - With one exclusion, step 2 would read one record past the end of the file. I checked that R silently returns an all-NA matrix for it, with no error or warning.
+   - Fix: `seq_along(rac_analysis_shoes(P))`, plus a check that the number of records read equals file size / stride.
+5. **Minor: the sentinel tests (A-035) and the literal grep do not cover `coords.*` (150/300/0.25/0.5) or the data-vs-prototype frame split.** These are exactly the fields the OLD regression cannot catch, because the OLD values coincide, and T3 may add a NEW `coords.px_per_unit_*` path. Fix: give the sentinel fixture coords values and a data size that differs from the prototype size.
+6. **Nits:**
+   - Results doc 6.2 uses `git show HEAD:...` for the pre-fix `$SCRATCH` count; HEAD has moved, so it should be `42af8dd:`.
+   - The empty-string rule of A-033 is not applied to `RAC_PROFILE_FILE` (its 4.4 default has the same behaviour), `RAC_MODEL_FEATURE` or `RAC_DISTANCE_IMPL`.
+   - The runners should refuse to run when the test hook `RAC_PROFILE_FILE` is set.
+   - The "10.5 CPU-hours per dataset" CML bootstrap budget uses the OLD fit time. NEW has 631 strata against 386, so time one NEW fit first.
+   - The basic-memory write outside the repo is disclosed (rule-8 tension); no objection from this lens.
+
+**Reviewer scripts** (scratch, not committed): `<scratchpad>/review_eng2/symcheck.py`, `compare_rerun.sh`, `out_review/`, `t0_review_rerun.out`.
+
+**Blockers.** None. Findings 1-3 belong to T3's overlap work, and finding 1's text fix should be made before D-012 is sent.
