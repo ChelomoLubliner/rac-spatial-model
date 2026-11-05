@@ -2,6 +2,14 @@
 two-half statistic of t0_review.py (section R8), with RACs marked as
 matched under the per-half shifts (green) or not (red).
 
+Fix of 2026-11-06 (second T0 review, engineer finding 1): the OLD tile
+label and the printed image r and rank now belong to the drawn two-half
+partner (old2h). Before, they came from the CSV columns sym, r and
+img_rank of the rigid partner (old), which differs for NEW 92 (rigid OLD
+63, two-half OLD 103). The image correlation is recomputed here exactly
+as in t0_review.py (blur 2 px, subsample 2, unit norm, all 387 OLD
+images, OLD cropped to the NEW frame).
+
 Reads the committed data and docs/qa/T0/compare/
 overlap_screen_t0_old_vs_new.csv (written by t0_review.py); writes PNGs
 to <out_dir>/compare/overlap_pairs/:
@@ -13,6 +21,7 @@ import sys
 import numpy as np
 import pandas as pd
 from PIL import Image, ImageDraw
+from scipy import ndimage
 
 REPO, OUT = sys.argv[1], sys.argv[2]
 
@@ -35,6 +44,18 @@ LOC['new'] = pd.DataFrame({'shoe': _raw.shoe, 'x': _raw.x / 2,
                            'y': _raw.y / 2})
 PTS = {ds: {s: np.c_[g.x, g.y].astype(float) * 300
             for s, g in LOC[ds].groupby('shoe')} for ds in ('old', 'new')}
+
+
+def feats(a):
+    """Image features of t0_review.py section R5."""
+    f = np.stack([ndimage.gaussian_filter(x.astype(np.float32), 2.0)[::2, ::2]
+                  for x in a]).reshape(len(a), -1)
+    f -= f.mean(1, keepdims=True)
+    f /= np.linalg.norm(f, axis=1, keepdims=True)
+    return f
+
+
+C_NO = feats(NEW) @ feats(OLD).T
 
 
 def sym_match(a, b, box=8.0, tol=1.0):
@@ -102,14 +123,22 @@ for _, f in only.iterrows():
     sn, so = int(f.new), int(f.old2h)
     a, b = PTS['new'][sn], PTS['old'][so]
     m, ma, mb, sh = two_halves(a, b)
+    r2h = float(C_NO[sn - 1, so - 1])
+    rank2h = int(np.flatnonzero(np.argsort(-C_NO[sn - 1]) == so - 1)[0]) + 1
+    rig = sym_match(a, b)[0]
     t1 = tile(NEW[sn - 1], LOC['new'][LOC['new'].shoe == sn], ma,
               f'NEW {sn} n={len(a)} two-half sym={m:.3f}')
     t2 = tile(OLD[so - 1], LOC['old'][LOC['old'].shoe == so], mb,
-              f'OLD {so} n={len(b)} rigid sym={f.sym:.3f}')
+              f'OLD {so} n={len(b)} r={r2h:.3f} rank={rank2h}')
     pair = np.hstack([t1, np.full((367, 4, 3), 128, np.uint8), t2])
     path = (f'{OUT}/compare/overlap_pairs/pair2h_{sn}_{so}_old_vs_new.png')
     Image.fromarray(pair).resize((pair.shape[1] * 2, pair.shape[0] * 2),
                                  Image.NEAREST).save(path)
     desc = ', '.join(f'{k} ({v[0]:.2f}, {v[1]:.2f})' for k, v in sh.items())
+    other = ''
+    if int(f.old) != so:
+        other = (f' | rigid partner OLD {int(f.old)}: rigid sym='
+                 f'{f.sym:.3f}, image r={f.r:.3f} rank={int(f.img_rank)}')
     print(f'{path} NEW {sn} vs OLD {so}: two-half sym={m:.3f} '
-          f'shifts {desc}; image r={f.r:.3f} rank={int(f.img_rank)}')
+          f'shifts {desc}; rigid sym of this pair={rig:.3f}; image '
+          f'r={r2h:.3f} rank={rank2h}{other}')

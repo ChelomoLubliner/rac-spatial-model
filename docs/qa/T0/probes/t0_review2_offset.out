@@ -1,0 +1,25 @@
+OLD: 51849 rows, 386 shoes, 13249 cases; mean log(100/(px - cases)) = -4.610889, var = 0.0981
+
+=== committed GLMM (written by R 4.4.3 on Windows)
+intercept -2.271582 | sigma^2 0.9597791 | logLik -25819.2839
+
+=== fits on this machine (R version 4.3.3 (2024-02-29))
+no offset (committed form, local refit)      fit  245.8 s | intercept -2.271598 | sigma^2 0.9597959 | logLik -25819.2839 | conv 0
+  refit vs committed: identical(fixef) FALSE, max |diff fixef| 0.000767, identical(vcov) FALSE, max |diff vcov| 2.12, |diff sigma^2| 1.68e-05
+  relative: max |diff fixef| / |fixef| 0.00189, max |diff vcov| / max |vcov| 0.248, max |diff SE| / SE 0.121
+  manual Wald (24 spatial coefficients = 0): committed W = 428.6933, local refit W = 427.7804
+  committed model: max |vcov(use.hessian = TRUE) - vcov(use.hessian = FALSE)| / max |vcov| = 0.248
+Warning message:
+In vcov.merMod(m_comm, use.hessian = FALSE) :
+  variance-covariance matrix computed from finite-difference Hessian
+and from RX differ by >1e-04: consider 'use.hessian=TRUE'
+offset(log((px - cases) / 100)) [corrected]  fit  231.0 s | intercept -6.883741 | sigma^2 0.9793341 | logLik -25821.7980 | conv 0
+offset(log(100 / (px - cases))) [plan T6]    ERROR with default starting values: (maxstephalfit) PIRLS step-halvings failed to reduce deviance in pwrssUpdate
+  retry from the implied starting values: ERROR: (maxstephalfit) PIRLS step-halvings failed to reduce deviance in pwrssUpdate
+
+=== checks
+expected corrected intercept = intercept(no offset) + mean(log(100/(px - cases))) = -6.882487; fitted -6.883741; difference -0.0013
+max |spatial coefficients (corrected) - (no offset)| = 0.0184
+cor(predicted random effect, log(1/f)): no-offset fit 0.130, corrected fit -0.178; var(log(1/f)) = 0.0981
+sigma^2: no offset 0.9598, corrected 0.9793 (< 0.96: FALSE)
+t0_review2_offset.R exit 0 in 484s

@@ -4,13 +4,13 @@ Work on branch `feature/new-shoes-pipeline`: run the RAC pipeline on the second 
 
 | Document | What it is |
 |---|---|
-| [2026-11-05-meeting-micha-new-shoes.md](2026-11-05-meeting-micha-new-shoes.md) | Meeting notes: the R&R, Micha's two requests (Part 1: complete pipeline on the new shoes; Part 2: validation), data facts, known code issues. The source of the requirements. Read its correction box first: the "no overlap" statement is unverified (decision D-012) |
+| [2026-11-05-meeting-micha-new-shoes.md](2026-11-05-meeting-micha-new-shoes.md) | Meeting notes: the R&R, Micha's two requests (Part 1: complete pipeline on the new shoes; Part 2: validation), data facts, known code issues. The source of the requirements. Read its correction box first: the "no overlap" statement is contradicted by the data (about 67 NEW shoes look like reprints of OLD shoes; decision D-012) |
 | [plans/2026-11-05-new-shoes-pipeline.md](plans/2026-11-05-new-shoes-pipeline.md) | **The plan**: facts, big-picture diagram, dataset profiles, file-naming table, tasks T1-T8 with tests and regression gates, the Part 2 method, risks |
 | [decisions.md](decisions.md) | Decision register: who decided what and why (`D-` people, `A-` agent calls) |
 | [progress/LOG.md](progress/LOG.md) | Chronological log of every task: what was done, results, timings, blockers. Read the last entry first when resuming |
 | [tests/README.md](tests/README.md) | How tests are organized, how to run them, the regression tiers, the results-document convention |
-| `tests/T<n>-<task>-results.md` | Per-task results: exact commands and their real output ([T0](tests/T0-architecture-results.md), [T0 review fixes](tests/T0-review-fixes-results.md)) |
-| `qa/T<n>/` | Visual QA evidence per task (`old/`, `new/`, `compare/` subfolders); each committed image is described in the task's results doc. [T0](qa/T0/README.md): probe scripts and evidence images, including the overlap screen of the review pass |
+| `tests/T<n>-<task>-results.md` | Per-task results: exact commands and their real output ([T0](tests/T0-architecture-results.md), [T0 review fixes](tests/T0-review-fixes-results.md), [T0 second review fixes](tests/T0-review2-fixes-results.md)) |
+| `qa/T<n>/` | Visual QA evidence per task (`old/`, `new/`, `compare/` subfolders); each committed image is described in the task's results doc. [T0](qa/T0/README.md): probe scripts and evidence images, including the overlap screens of both review passes; the list of NEW shoes judged reprints of OLD shoes, with a note per shoe, is `qa/T0/compare/overlap_verdicts_t0_old_vs_new.csv` |
 
 Project-level documents (repo root): [README.md](../README.md) (pipeline overview), [PIPELINE_DETAILS.md](../PIPELINE_DETAILS.md) (technical details of the six R steps; some numbers are wrong, see known issue K6 in the plan), [CHANGELOG_feb_mar_2026.md](../CHANGELOG_feb_mar_2026.md), [data/new_shoes/README.md](../data/new_shoes/README.md) (the new dataset's files and format).
 

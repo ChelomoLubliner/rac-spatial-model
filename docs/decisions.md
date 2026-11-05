@@ -54,6 +54,7 @@ Append new decisions at the end of the right section; never rewrite an old entry
 - **Date:** 2026-11-05. **Who:** team. **Status:** open.
 - **Context:** the GLMM is fitted without the offset log(100 / pixels_i) (meeting 8, issue 1). Not urgent for Part 2 (it cancels after D-003).
 - **Source:** meeting 9 question 4, meeting 10 question 4.
+- **Update (2026-11-06, A-044):** if the GLMM is refitted with the per-shoe offset, the offset is log((px - cases) / 100), minus the log of the control sampling fraction; the sign written in A-037 and in the plan was wrong (plan F35). On OLD the corrected refit has intercept -6.884 (population scale) and sigma^2 0.979.
 
 ### D-009 exp(-sigma^2/2) or exp(+sigma^2/2)?
 - **Date:** 2026-11-05. **Who:** Naomi (to be asked). **Status:** open.
@@ -74,6 +75,7 @@ Append new decisions at the end of the right section; never rewrite an old entry
 - **Question for Micha and Yoram:** were some shoes printed (or collected) again for the second dataset? Is there a list linking the two numberings?
 - **Until answered:** A-024 (the overlap screen and a primary Part 2 set without the reprints).
 - **Evidence:** `docs/qa/T0/probes/t0_review.out` (R5, R6, R8), `t0_review_pairs.out`, `docs/qa/T0/compare/overlap_pairs/*.png`, `docs/qa/T0/old/pair_old_*.png`.
+- **Update (2026-11-06, second T0 review; A-041, A-042):** the overlap is larger. An order-free, n-calibrated screen and a visual review of 91 NEW shoes give **67 NEW shoes judged the same shoe as an OLD shoe (3,158 RACs, 15.8% of all NEW RACs) and 22 uncertain (755 RACs)**; 31 single-statistic candidates are not reviewed yet (T3). Independently of the visual review, among the 121 NEW shoes flagged by the screen, 16 of the 57 pairs of consecutive NEW ids map onto consecutive OLD ids (0.30 expected if the partners were unrelated), so whole pairs of shoes seem to have been printed again. NEW 92 was mislabelled in T0 and is now uncertain. The list for Micha and Yoram, with a note per shoe: `docs/qa/T0/compare/overlap_verdicts_t0_old_vs_new.csv` (statistics in `overlap_candidates_t0_old_vs_new.csv`; images in `docs/qa/T0/compare/overlap_pairs/` and `overlap_pairs2/`). Until answered: A-024 as revised by A-042.
 
 ### D-013 Per-shoe quality rule for Part 2
 - **Date:** 2026-11-05. **Who:** Micha (to confirm the agent call A-029). **Status:** proposed.
@@ -130,6 +132,7 @@ Append new decisions at the end of the right section; never rewrite an old entry
 - **Date:** 2026-11-05. **Who:** agent call (T0 architect). **Status:** accepted (statistics expert reviews in T7).
 - **Decision:** centered shoe bootstrap of the pooled X^2: B = 2000, seed 20261105, resample the 631 shoes with replacement, statistic computed on the per-shoe residual vectors minus the observed discrepancy; p_boot = (1 + #{X^2* >= X^2}) / (B + 1); report the dispersion ratio mean(X^2*) / (K' - 1).
 - **Why:** gives the null distribution of X^2 under the observed within-shoe dependence without assuming independent RACs (plan section 9).
+- **Superseded in part (2026-11-06):** by A-043 (the p-value comes from a two-sample shoe bootstrap that adds the OLD estimation error) and A-051 (residual centring).
 
 ### A-010 2022 regional model refit on the old shoes
 - **Date:** 2026-11-05. **Who:** agent call (T0 architect). **Status:** provisional (answers meeting open question 3; Micha/Naomi may prefer the published values).
@@ -204,6 +207,7 @@ Append new decisions at the end of the right section; never rewrite an old entry
 - **Why:** on a reprinted shoe the OLD-fitted model has seen the same RACs, so the "out-of-sample" test would partly measure memory. The T0 screen found 34 candidates (1,309 NEW RACs, 6.5%), 30 likely the same shoe by eye (plan F25). A rigid-only rule under-counts because prints deform by 1-4 px between toe and heel (8 of the 26 rigid pairs), hence the second statistic.
 - **Alternatives rejected:** trusting the meeting statement (contradicted by the data); excluding only the statistician's 16 (the all-OLD search and the two-half statistic find more; both are listed); an image-only screen (misses reprints whose prints differ, e.g. NEW 531 vs OLD 67, image rank 43).
 - **Evidence:** `docs/qa/T0/probes/t0_review.out` R5-R8, `t0_review_pairs.out`, 36 pair images in `docs/qa/T0/compare/overlap_pairs/` (described in `docs/tests/T0-review-fixes-results.md`).
+- **Superseded in part (2026-11-06):** by A-041 (NEW 92) and A-042 (order-free, n-calibrated rule; review of every candidate).
 
 ### A-025 Model comparison: the pixel log score is primary, the comparator is the real 2022 model
 - **Date:** 2026-11-05. **Who:** agent call (T0 fix pass). **Status:** accepted as working rule; Micha to be told. **Supersedes:** the "Delta X^2 on the same partition" element of the D-006 implementation, and A-010 as the main comparator (A-010's new_x refit becomes a sensitivity).
@@ -216,6 +220,7 @@ Append new decisions at the end of the right section; never rewrite an old entry
 - **Decision:** phi > 1, or a pooled/bootstrap disagreement, is reported as extra-multinomial variation (within-shoe dependence **or** between-shoe heterogeneity of the spatial pattern), against its exact expectation under independent multinomials phi_0 = [K' - sum_k sum_i n_i pi_ik^2 / E_k] / (K' - 1) <= 1 from the same pi_ik. A within-shoe pair-count test (pairs within r px against the fitted model and against a heterogeneity-adjusted null; plan section 9) answers the editor's independence demand directly. T7's "clustered" Dirichlet simulation is relabelled heterogeneity, and a clumped-RAC simulation is added.
 - **Why:** with one pattern per shoe the two mechanisms give the same cell counts (T0 simulation with the real NEW n_i: heterogeneity alone phi = 3.44, clumps alone phi = 1.84, independence with shoe-specific pi phi = 0.96 vs exact phi_0 = 0.968; plan F31); under independence phi <= 1, not "about 1". They differ in spatial scale, which the pair test uses.
 - **Evidence:** `docs/qa/T0/probes/t0_review_R.out` S3.
+- **Superseded in part (2026-11-06):** by A-046 (annuli, unordered pairs, primary annulus (2, 8] px) and A-051 (phi centring).
 
 ### A-027 Known issue K8: the fitted surface is pinned to the intercept on two edges
 - **Date:** 2026-11-05. **Who:** agent call (T0 fix pass, on the statistics reviewer's finding). **Status:** accepted; Naomi and Micha to be told (paper limitation).
@@ -229,6 +234,7 @@ Append new decisions at the end of the right section; never rewrite an old entry
 - **Why:** every CI and Wald test assumes RACs independent given the shoe effect; an indicative Efron + `cluster(shoe)` refit gives robust/model SE ratios median 1.13, max 1.37, and W 394 -> 234 (df 24). `survival` refuses a robust variance for the exact method ("robust variance plus the exact method is not supported"), so the exact CML needs the bootstrap; an exact refit takes 189 s here (plan F29).
 - **Alternatives rejected:** Efron + cluster only (its coefficients differ from the exact fit by up to 0.59, so it is a different estimator); a hand-coded sandwich from numerical per-stratum scores of the exact likelihood (possible, but slower to validate than the bootstrap; can be added if the bootstrap fails).
 - **Evidence:** `docs/qa/T0/probes/t0_review_R.out` S4, `t0_review_cml.out`.
+- **Superseded in part (2026-11-06):** by A-045 (Hotelling F reference, paired-difference equality test), A-047 (wording) and A-052 (budget).
 
 ### A-029 Per-shoe quality rule for Part 2 (pre-registered in T3)
 - **Date:** 2026-11-05. **Who:** agent call (T0 fix pass). **Status:** provisional (D-013, Micha).
@@ -240,6 +246,7 @@ Append new decisions at the end of the right section; never rewrite an old entry
 - **Date:** 2026-11-05. **Who:** agent call (T0 fix pass). **Status:** accepted; Micha to be told.
 - **Decision:** before any NEW Part 2 number: (1) goodness of fit = Naomi's 14 areas on (-new_x, y), continuous GLMM, bootstrap p, primary shoe set, with Cramer's w; (2) model comparison = RAC-weighted log-score difference continuous minus 2022 model with its shoe-bootstrap interval; (3) dependence = the within-shoe pair test at r = 4 px against the heterogeneity-adjusted null. Effect sizes: Cramer's w = sqrt(X^2 / N) and an RMSEA-type index. The OLD CML is a secondary model (relative intensity exp(eta)). Calibration of the tests in T7 is checked with binomial rejection rates at alpha 0.05 and 0.10, not with a KS test on discrete B = 200 p-values.
 - **Why:** 2 partitions x 2 models x 2 tests x several sensitivities would otherwise invite choosing after the fact; with N about 20,000 p-values alone say little; the CML is shown in the paper and was not validated; KS on tied discrete p-values is weak.
+- **Superseded in part (2026-11-06):** by A-043 (analysis 1: two-sample bootstrap p; effect sizes net of the noise floor; two-sample intervals for analysis 2) and A-046 (analysis 3: annulus (2, 8] px).
 
 ### A-031 Excluded shoes: indexing and records
 - **Date:** 2026-11-05. **Who:** agent call (T0 fix pass, on the engineering reviewer's finding). **Status:** accepted (T2 implements, T4 may use).
@@ -251,6 +258,7 @@ Append new decisions at the end of the right section; never rewrite an old entry
 - **Decision:** the OLD legacy rate is **0.8478** (exact R division form; the multiply form `(x + 0.25) * 300` gave 0.8479 and maps 2 RACs differently); F5 (2023 COL/ROW) is not calibration evidence; rule (ii) becomes "the shoe-bootstrap 95% interval of the NEW optimum scale (B = 200) contains 300 on both axes and the point optimum lies in [294, 306]"; the mean distance from each RAC to the nearest contact pixel is reported as a cross-check.
 - **Why:** the T0 probe's label was inaccurate; the 2023 values only show that 2023 used the same formula; the on-contact criterion is flat in the x scale (NEW 296-302 within 0.0024) and sharp in y, so a fixed band sits at the limit of what it resolves, while a bootstrap interval states that resolution. The distance criterion was checked and is not sharper (plan F30), so it does not replace the rate.
 - **Evidence:** `docs/qa/T0/probes/t0_probe.out` D, `t0_review.out` R1, R2.
+- **Superseded in part (2026-11-06):** by A-048 (rule (ii) by a smooth rate difference).
 
 ### A-033 An empty RAC_DATASET means old, in both languages
 - **Date:** 2026-11-05. **Who:** agent call (T0 fix pass, on the engineering reviewer's finding). **Status:** accepted (T2).
@@ -277,6 +285,7 @@ Append new decisions at the end of the right section; never rewrite an old entry
 - **Decision:** T6 states that the GLMM sigma^2 absorbs var(log(100/px)) and compares offset-adjusted refits (offset log(100/(px - cases)), both datasets, new files) as the comparable sigma^2 pair; if D-008 leads to a refit for the paper, it uses log(100/(px - cases)).
 - **Why:** var(log(100/px)) differs between the datasets (raw contact: OLD 0.095, NEW 0.121); controls are sampled only from pixels without RACs, so the exact case-control fraction is 100/(px - cases), up to 0.0335 away in log from 100/px (OLD shoe 385; plan F32).
 - **Evidence:** `docs/qa/T0/probes/t0_review_R.out` S5.
+- **Superseded in part (2026-11-06):** by A-044 (the offset is log((px - cases) / 100); the formula in this entry has the wrong sign).
 
 ### A-038 Log score weights and pair resampling
 - **Date:** 2026-11-05. **Who:** agent call (T0 fix pass, on the statistics reviewer's finding). **Status:** accepted (T7).
@@ -292,3 +301,76 @@ Append new decisions at the end of the right section; never rewrite an old entry
 - **Date:** 2026-11-05. **Who:** agent call (T0 fix pass). **Status:** done.
 - **Decision:** `t0_probe.py` section D now uses the exact R division form (the multiply form is printed and labelled as an approximation) and `t0_probe.R` computes the float window in both directions; both were re-run and their outputs replaced (diffs in `docs/tests/T0-review-fixes-results.md`). The two NEW evidence images moved to `docs/qa/T0/new/superposition_new.png` and `docs/qa/T0/new/sheet_16_racs_new.png` (rule: a `new` folder and a `_new` suffix); their bytes are unchanged (same sha256 as recorded in `docs/tests/T0-architecture-results.md`). New probes: `t0_review.py`, `t0_review_pairs.py`, `t0_review.R`, `t0_review_cml.R`.
 - **Why:** the reviewers asked for the probe fixes; the renamed images were the only NEW-dataset files without the naming rule.
+
+### A-041 NEW 92 re-judged uncertain (mislabelled T0 evidence)
+- **Date:** 2026-11-06. **Who:** agent call (second T0 fix pass, on the engineering reviewer's finding 1, confirmed by the statistics reviewer). **Status:** accepted. **Supersedes:** the "unlikely" verdict for NEW 92 in the evidence of A-024 and D-012.
+- **Decision:** `t0_review_pairs.py` labels the OLD tile and prints the image r and rank of the drawn two-half partner (OLD 103), not of the rigid partner (OLD 63); re-run. NEW 92 vs OLD 103 is `uncertain`: same round-lug design with four heel pads (r 0.851, rank 5), but only 2 of 5 NEW and 2 of 4 OLD RACs match, at large and inconsistent per-half shifts (about 5 and 6 px), exactly at the NEW-NEW null maximum. The T0 tally becomes 30 likely, 4 uncertain, 0 unlikely.
+- **Why:** "different-looking print (image rank 226)" described OLD 63, not the image shown. `uncertain` is excluded from the primary set like `same_shoe` (5 RACs).
+- **Evidence:** `docs/qa/T0/probes/t0_review_pairs.out`; `docs/qa/T0/compare/overlap_pairs/pair2h_92_103_old_vs_new.png` (looked at; only the label region of the 8 `pair2h_*` images changed); `docs/tests/T0-review2-fixes-results.md` section 2.
+
+### A-042 Overlap screen v2: order-free statistics, n-calibrated thresholds, five statistics, every candidate reviewed
+- **Date:** 2026-11-06. **Who:** agent call (on the statistics reviewer's finding 2 and the engineering reviewer's findings 2 and 3). **Status:** provisional (T3 applies it; D-012). **Supersedes:** rule (2) of A-024 (fixed threshold 0.30, margin 0.15, two statistics) and the use of `.test_matches_t0` as a lock-in.
+- **Decision:** (1) `pair_stats` is order-free: T0's two shifts taken in both argument orders, inlier means as exactly rounded sums, and every front x back combination for the two halves, so (a, b) and (b, a) give the same values bit for bit; (2) five statistics: rigid and two-half shares (`sym`, `sym2h`), rigid and two-half matched counts (`k`, `k2h`), and the larger share at the shift of `k` (`msh`); (3) thresholds = the pair-level NEW-NEW maximum per stratum of (n bin, n bin), bins [1, 5), [5, 10), [10, 20), [20, 40), [40, 80), [80, inf); a pair is flagged if strictly above, with at least 3 RACs matched; (4) a NEW shoe with >= 5 RACs is a candidate if any pair is flagged; no margin over the second-best partner; every flagged partner and the number of flagging statistics are recorded; (5) every candidate is reviewed visually, plus every shoe of the T0 verdict list and 20 random non-candidates; (6) false positives are estimated by the same thresholds on OLD-OLD pairs outside K10; (7) the T3 port test checks the T0 values and the 26 shoes under the T0 rule, not the candidate rule; a synthetic heavy-reprint test (3 times extra RACs) is added.
+- **Why:** the T0 rule is not calibrated by n (the NEW-NEW null maximum of the best `sym` is 0.286 for n in [5, 10) and 0.120 for n >= 80) and missed heavy reprints whose NEW print has 3-4 times the RACs; the T0 value of 2,800 NEW-OLD pairs depended on the argument order; ">= the null maximum" flagged a chance-level small-n pair (NEW 92); the two-half statistic can be below the rigid one, so it is a separate test in a union, not a refinement. A margin rule would miss a NEW reprint of an OLD shoe that is itself duplicated inside OLD (K10). The prototype flags 121 NEW shoes (59 by all five statistics); the same thresholds flag 3-6 OLD-OLD pairs per statistic, 2 of them the K10 duplicates.
+- **Alternatives rejected:** the reviewer's count z-score with 20 quantile bins of n_a x n_b (its threshold, 12.02, comes from one heavy same-design NEW pair, 72-73, and the top bins mix very different n); "max share >= 0.4 with >= 8 matched" alone (cannot flag small-n reprints); keeping a margin over the second-best partner (fails for OLD duplicates).
+- **Evidence:** `docs/qa/T0/probes/t0_review2_overlap.out`; `docs/qa/T0/compare/overlap_candidates_t0_old_vs_new.csv`, `overlap_verdicts_t0_old_vs_new.csv`; 57 images in `docs/qa/T0/compare/overlap_pairs2/` (looked at, plan F25).
+
+### A-043 Part 2 propagates the OLD estimation error (two-sample shoe bootstrap primary)
+- **Date:** 2026-11-06. **Who:** agent call (on the statistics reviewer's critical finding). **Status:** accepted (T5 stores the draws and their shoe ids; T7 implements; the statistics expert signs off). **Supersedes:** "df = K' - 1 (nothing is estimated on NEW data)" and "the chi-square reference is conservative" of plan section 9 (the D-004 implementation); the bootstrap p of A-009 and named primary analysis (1) of A-030; the interval method of A-025 and A-038.
+- **Decision:** (1) the primary goodness-of-fit p comes from a two-sample shoe bootstrap: each replicate pairs one T5 OLD GLMM draw beta* with one resample of the NEW shoes, and its centred discrepancy includes E~(beta*) - E~(beta_old); (2) secondary: the parameter-corrected pooled Wald W_mult = D' (Sigma_mult + G V_mod G')^+ D against chi^2_{K' - 1}, valid under independence; (3) the fixed-surface X^2 against chi^2_{K' - 1} is reported only as a labelled descriptive ("test of the published fitted surface: OLD estimation error alone makes a correct model fail it"); (4) effect sizes net of the bootstrap noise floor E0; (5) Delta X^2 and the log-score intervals by the two-sample bootstrap, with the same OLD resample for every model in a replicate (the 2022 theta refitted on the stored OLD resample ids); (6) T5 keeps the resampled shoe ids and runs B = 1,000 OLD GLMM draws if the measured budget allows (else 500, never below 200); (7) T7 tests calibration with E re-estimated from a simulated OLD sample.
+- **Why:** beta_old was estimated from about as many RACs as NEW has; the delta method on the committed GLMM gives a parameter variance as large as the multinomial one (per-cell ratio median 1.12, max 1.28), so a correct model fails the fixed-E test with probability 0.80 at N_new = 18,000 (plan F34). An independent toy reproduces this (fixed-E 0.787, NEW-only bootstrap 0.795, Wald without the parameter term 0.812) and shows the fixes hold their size (Wald with the parameter term 0.045, two-sample bootstrap 0.050; under heterogeneity the two-sample bootstrap 0.035, while the independence-based Wald rejects 0.470).
+- **Alternatives rejected:** a Wald statistic with the bootstrap covariance Sigma_NEW + G V_boot G' as primary (it inverts an estimated covariance, the problem of A-045, with G V G' estimated from at most 1,000 draws); keeping the fixed-E test as primary with a footnote (it tests whether the published coefficients are exactly true, which nobody claims).
+- **Evidence:** plan F34; `docs/qa/T0/probes/t0_review2_param.out` P1; the reviewer's probe A re-run with identical output.
+
+### A-044 Offset of GLMM refits: offset(log((px - cases) / 100))
+- **Date:** 2026-11-06. **Who:** agent call (on the statistics reviewer's finding 3). **Status:** accepted (T6). **Supersedes:** the offset formula of A-037, of the D-008 context and of plan section 5 and T6.
+- **Decision:** refits use offset log((px - cases) / 100) = -log f_i, with f_i = 100 / (px_i - cases_i) the control sampling fraction. The T6 test checks the intercept relation (no-offset intercept + mean(log(100 / (px - cases))), within 0.01) and the spatial coefficients (within 0.05 of the no-offset fit), and reports sigma^2 without asserting it; a prediction from an offset refit never adds `MEAN_OFFSET`.
+- **Why:** the case-control logit is logit p + log(1 / f_i); the plan had log f_i. On the committed OLD data the corrected refit has intercept -6.883741 against the predicted -6.882487, and the plan's sign does not converge; the reviewer's simulation gives sigma^2 1.05 for the plan's sign against a true 0.64 (corrected 0.61). The reviewer's proposed check "sigma^2 below 0.96" is not adopted: on the real data the corrected sigma^2 is 0.979, above the no-offset 0.960, because the true shoe effect correlates negatively (-0.18) with log(1 / f).
+- **Evidence:** plan F35; `docs/qa/T0/probes/t0_review2_offset.out`; the reviewer's probe B re-run with identical output.
+
+### A-045 Wald tests with a bootstrap covariance: Hotelling F reference, paired-difference draws
+- **Date:** 2026-11-06. **Who:** agent call (on the statistics reviewer's finding 4). **Status:** accepted (T5, T6). **Supersedes:** the chi^2_24 reference of the bootstrap-V Wald tests in A-028, T5 and T6, and the V1 + V2 form of the bootstrap equality test.
+- **Decision:** W with a bootstrap covariance from B draws is referred to F(p, B - p) via W (B - p) / (p (B - 1)); the equality test uses one covariance of paired difference draws d_b = b1*_b - b2*_b with the same reference; model-based Wald tests keep chi^2; T5 and T6 test the rejection rate under H0 with an estimated V; B >= 1,000 where affordable (the OLD GLMM, A-043).
+- **Why:** with B = 200 and p = 24, E[W] = 27.45 and the chi^2 test rejects 0.142 at nominal 5% (F reference 0.045); for the equality test, V1 + V2 from separate draws with chi^2 rejects 0.097, paired differences with F 0.0507 (plan F36).
+- **Evidence:** plan F36; `t0_review2_param.out` P3; the reviewer's probe C re-run with identical output.
+
+### A-046 Within-shoe dependence test by annuli; primary annulus (2, 8] px
+- **Date:** 2026-11-06. **Who:** agent call (on the statistics reviewer's minor finding 5b). **Status:** accepted (T7). **Supersedes:** "r = 4 px" in named primary analysis (3) of A-030 and the cumulative distance of A-026's test.
+- **Decision:** unordered pairs in both P_obs and E; annuli (0, 2], (2, 4], (4, 8], (8, 16], (16, 32]; primary: (2, 8] px against null 2; (0, 2] reported separately as short-range repulsion; pooled and shoe-weighted ratios; the conclusion is worded as small-scale clustering relative to the fitted intensity, whatever its mechanism; a T7 test case with heterogeneity at scales below h.
+- **Why:** against uniform placement, OLD ratios are 1.045 at r <= 1 px, 1.756 in (2, 4], 1.564 in (4, 8] and 1.277 in (8, 16]; NEW 0.629 at r <= 1: inhibition at <= 2 px and clustering at 2-8 px, which a cumulative r <= 4 mixes (plan F38); the old E_1 counted ordered pairs; the top 10% of shoes hold 62-69% of the pairs. The scale is justified from OLD; the reviewer's probe also showed NEW counts against a uniform baseline, so the choice is not blind to NEW (said in the plan).
+- **Evidence:** plan F38; the reviewer's probe F re-run with identical output; annulus ratios and pair shares in `docs/tests/T0-review2-fixes-results.md`.
+
+### A-047 Wording: what the robust variances show
+- **Date:** 2026-11-06. **Who:** agent call (on the statistics reviewer's minor finding 5a). **Status:** accepted (T5, T8). **Supersedes:** A-028's "The report cites the widening as evidence that dependence affects the variance" and T8's "the robust variances show that dependence widens the CIs".
+- **Decision:** the report says that the RACs of a shoe are not conditionally independent draws from the common fitted surface (within-shoe dependence or shoe-specific spatial patterns), and that this widens the CIs.
+- **Why:** consistency with A-026: cluster-robust and shoe-bootstrap widening measures extra-multinomial variation, which both mechanisms produce; marginally they are the same Cox-type clustering.
+
+### A-048 Mapping rule (ii) by a smooth rate difference
+- **Date:** 2026-11-06. **Who:** agent call (on the statistics reviewer's minor finding 5d). **Status:** accepted (T3; the statistics expert signs off before running). **Supersedes:** rule (ii) of A-032.
+- **Decision:** the NEW point optimum lies in [294, 306] on both axes, and the upper bound of the shoe-bootstrap 95% percentile interval (B = 200, seed 20261107) of Delta = rate(s*) - rate(300), both settings fixed from the full sample, is below 0.005.
+- **Why:** a percentile interval of a grid argmax of a step-function criterion is unreliable (a non-smooth M-estimator), so "contains 300" could pass or fail for the wrong reason and trigger a new NEW-only code path; Delta is a difference of two means at fixed settings; 0.005 is a practical margin (T0 point difference 0.0009).
+
+### A-049 Every RAC_* variable: empty means the default; RAC_PROFILE_FILE is test-only
+- **Date:** 2026-11-06. **Who:** agent call (on the engineering reviewer's minor finding 6). **Status:** accepted (T2). **Extends:** A-033 and A-035.
+- **Decision:** both languages read every `RAC_*` variable through one helper (`rac_env()` in R, `profiles.env()` in Python) that maps unset and `""` to the default; `RAC_SCRATCH` has no default (unset or empty is an error); `tools/run_pipeline.sh`, `tests/regress_old.sh`, the e2e scripts and `contour_algorithm.main` refuse to run when `RAC_PROFILE_FILE` is set.
+- **Why:** `Sys.getenv("RAC_PROFILE_FILE", "config/datasets.json")` returns `""` for a set-but-empty variable, like F33, and the test hook is read by production code, so a leaked value would silently drive a real run with a fixture profile.
+
+### A-050 Sentinel tests cover the coordinates and the frame split
+- **Date:** 2026-11-06. **Who:** agent call (on the engineering reviewer's minor finding 5). **Status:** accepted (T2). **Extends:** A-035.
+- **Decision:** the sentinel fixture has `coords` at 20 px per unit and a 44 x 66 px prototype for 40 x 60 px data; the tests assert that step 1's RAC pixels and the control coordinates follow `P$coords` and that step 2's `distance_shape` uses `P$prototype` (with a mutation check).
+- **Why:** OLD's values coincide in both frames and equal the legacy 150/300/0.25/0.5, so the OLD regression can never catch a leftover literal there, and T3 may add a NEW `coords.px_per_unit_*` path.
+
+### A-051 Dispersion centring, F31 as illustrations, dataset shift in the interpretation guard
+- **Date:** 2026-11-06. **Who:** agent call (on the statistics reviewer's minor findings 5c, 5e and 5f). **Status:** accepted (T7, T8).
+- **Decision:** the bootstrap residuals are r''_ik = O_ik - E~_ik - n_i D_k / N (each shoe's residual minus its share of the pooled misfit) for phi and for the two-sample p; phi's interpretation adds "or a systematic misfit"; the phi values of F31 are labelled illustrations of mechanisms; dataset shift (collection, marking protocol, wear, registration) is named in the interpretation guard and in the T8 limitations.
+- **Why:** a common misfit leaks into phi because residual means scale with n_i (var/mean of n_i: NEW 29.8, OLD 41.3); in the T0 toy a misfit with X^2 about 200 gives phi 1.008 against phi_0 0.968, and the r'' centring halves the leak (0.987; plan F39). The reviewer's alternative O_ik - n_i O_k / N is not adopted as written: it drops the shoe-specific expectations, so differences in contact surface between shoes would count as dispersion; r'' keeps the model's shoe-specific centring and removes only the pooled misfit. The reprints carry 3-4 times the RACs in NEW, a direct sign of dataset shift.
+
+### A-052 The bootstrap budget is measured per dataset before B is fixed
+- **Date:** 2026-11-06. **Who:** agent call (on the engineering reviewer's minor finding 6). **Status:** accepted (T5). **Supersedes:** the "about 10.5 CPU-hours per dataset" CML budget of T5, which applied the OLD fit time to NEW.
+- **Decision:** T5 times one GLMM fit and one exact CML fit per dataset first and records the budget; the OLD GLMM gets B = 1,000 if that fits in about 10 wall-hours (about 69 CPU-hours at 250 s per fit), else 500, never below 200; the other bootstraps B = 200 or more.
+- **Why:** NEW has 631 strata (up to 281 RACs per shoe) against 386, so its fit times are unknown; T7's two-sample bootstrap needs many OLD GLMM draws (A-043); T0 measured 231-281 s per OLD GLMM fit (plan F37).
+
+### A-053 Step-2 contour indexing and a record-count check
+- **Date:** 2026-11-06. **Who:** agent call (on the engineering reviewer's minor finding 4). **Status:** accepted (T2, T5). **Extends:** A-031.
+- **Decision:** T2 replaces `1:386` in `dataCC_distance_2.Rmd` by `seq_along(rac_analysis_shoes(P))`; step 2 reads exactly that many records and stops unless the file size equals n_records x (W x H + 2); T5's `test_new_outputs.R` checks the same.
+- **Why:** the earlier T2 instruction (`seq_len(num_shoe - length(shoes_without_racs))`) ignored `excluded_shoes`, so after one exclusion step 2 would read a record past the end. R then returns an all-NA matrix with no error or warning, and `xcoor[m == 1]` gives a full-length vector of NA (checked with the reader's exact expression; results doc section 6).

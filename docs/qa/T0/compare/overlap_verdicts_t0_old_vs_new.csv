@@ -1,0 +1,92 @@
+new,old,verdict,visual,reviewed,note
+469,212,same_shoe,very_likely,T0 pass 1,same tread with heel logo text; same outline and position; matched RACs from toe to heel
+453,267,same_shoe,likely,T0 pass 1,boot with diamond or square lugs; matched forefoot clusters; OLD 267 has a sticker bar beside the toe
+452,113,uncertain,uncertain,T0 pass 1,boot family of 453/501; only 9 NEW RACs (5 matched; 2 more within about 3 px)
+501,12,same_shoe,likely,T0 pass 1,boot with diamond or square lugs; matched forefoot clusters; OLD 12 has a sticker bar beside the toe
+241,380,same_shoe,very_likely,T0 pass 1,military-style boot (chevrons and central circles); consecutive NEW 241/242 onto consecutive OLD 380/379
+242,379,same_shoe,very_likely,T0 pass 1,partner of 241-380; matched forefoot clusters
+547,85,same_shoe,likely,T0 pass 1,horizontal toe bars and square blocks; one cluster at the found shift and 4 toe RACs 1-4 px away (deformation); consecutive onto 85/84
+548,84,same_shoe,likely,T0 pass 1,partner of 547-85; about 7 heel RACs in the same configuration at a shift 1-4 px away
+96,194,same_shoe,likely,T0 pass 1,round lugs and round heel pads; matched heel and midfoot clusters; forefoot lines up at a slightly different shift
+34,217,same_shoe,likely,T0 pass 1,round lugs and round heel pads; matched clusters in the heel pads and midfoot
+20,299,same_shoe,likely,T0 pass 1,round lugs; forefoot RACs line up at a slightly different shift; OLD 299 has a large label beside the toe
+87,337,same_shoe,likely,T0 pass 1,round lugs; consecutive NEW 86/87 onto consecutive OLD 338/337
+86,338,same_shoe,likely,T0 pass 1,round lugs and round heel pads; matched clusters
+58,322,same_shoe,likely,T0 pass 1,round lugs and round heel pads; matched clusters
+531,67,same_shoe,very_likely,T0 pass 1,same forefoot; OLD 67 heel not printed (image rank 43); 14 RAC pairs at one offset of about (0; -3) px
+359,357,same_shoe,likely,T0 pass 1,faint prints of a square-dot sole; about 8 RAC pairs at one shift (-3.3; 5.6) px
+204,5,same_shoe,very_likely,T0 pass 1,same sole; about 100 RACs each; large matched clusters on the heel pads; consecutive onto 6/5
+203,6,same_shoe,very_likely,T0 pass 1,same sole; large matched forefoot clusters; partner of 204-5
+214,148,same_shoe,likely,T0 pass 1,same design side by side with matched clusters
+238,198,same_shoe,likely,T0 pass 1,same design with matched clusters; consecutive NEW 237/238 onto consecutive OLD 199/198
+245,91,same_shoe,likely,T0 pass 1,same design with matched clusters
+294,24,uncertain,uncertain,T0 pass 1,one cluster only; OLD 24 heavily inked and carries a sticker beside the toe
+297,121,same_shoe,likely,T0 pass 1,same design with matched clusters; OLD 121 carries a sticker beside the toe
+556,247,same_shoe,likely,T0 pass 1,same design with matched clusters
+619,81,same_shoe,likely,T0 pass 1,same design with matched clusters
+532,335,uncertain,uncertain,T0 pass 1,one matched cluster only
+342,166,same_shoe,likely,T0 pass 1,found with one shift per half; same design; matched RACs in both halves
+358,116,same_shoe,likely,T0 pass 1,found with one shift per half; same design; OLD 116 carries a sticker beside the toe
+14,87,same_shoe,likely,T0 pass 1,found with one shift per half; same design; matched RACs in both halves
+295,189,same_shoe,likely,T0 pass 1,found with one shift per half; same design; matched RACs in both halves
+100,73,same_shoe,likely,T0 pass 1,found with one shift per half; same design; matched RACs in both halves
+15,94,same_shoe,likely,T0 pass 1,found with one shift per half; same design; OLD 94 carries a sticker beside the toe
+213,180,same_shoe,likely,T0 pass 1,found with one shift per half; same design; matched RACs in both halves
+92,103,uncertain,uncertain,T0 pass 2,re-judged (was 'unlikely' from a mislabelled image rank): same round-lug design with four heel pads (r 0.851; rank 5); but only 2 of 5 NEW and 2 of 4 OLD RACs match; at large and inconsistent per-half shifts (about 5 and 6 px); exactly at the NEW-NEW null maximum; lug and heel-pad details differ (rings and cross holes in OLD; solid discs in NEW)
+240,320,same_shoe,very_likely,T0 pass 2,chevron-lug boot with central channel and framed heel pads; 19 of the 29 OLD RACs matched over forefoot lug edges and heel; NEW has 121 RACs; consecutive NEW 239/240 onto consecutive OLD 321/320
+239,321,same_shoe,very_likely,T0 pass 2,same boot as 240-320; 15 rigid + 4 per-half matches of 36 OLD RACs on the right forefoot and heel; NEW has 105 RACs
+604,134,same_shoe,very_likely,T0 pass 2,distinctive oval forefoot with outer ring and bars and a teardrop heel hole; 20 of 40 OLD RACs matched at the toe and lower forefoot; NEW has 130 RACs
+84,26,same_shoe,very_likely,T0 pass 2,round lugs and four heel pads; both heavy (122 and 112 RACs); 32 rigid + 12 per-half matches over forefoot and heel pads; consecutive NEW 84/85 onto consecutive OLD 26/25
+192,105,same_shoe,likely,T0 pass 2,square-lug running shoe with four heel pads; 15 of 37 OLD RACs coincide down the left column of forefoot lugs; consecutive NEW 192/193 onto consecutive OLD 105/106
+57,177,same_shoe,likely,T0 pass 2,round lugs and cross-holed heel pads; about 7 matches at consistent offsets in the lower forefoot and lower heel pads (10 of 21 OLD); the same-design OLD 196 (T0 control) has unrelated RACs; the reviewer judged it uncertain
+99,167,same_shoe,likely,T0 pass 2,round lugs and cross-holed heel pads (a common design); 10 + 3 matches including a 4-RAC cluster on the lower-right heel pad at identical relative positions; the reviewer judged it uncertain
+198,371,uncertain,uncertain,T0 pass 2,square-lug running shoe; 9 of 27 OLD RACs coincide in the central forefoot at one but larger shift (about 4 px); many unmatched; OLD 371 has a sticker above the toe; image rank 5
+193,106,same_shoe,likely,T0 pass 2,square-lug running shoe; 18 matches along the left forefoot edge; central lugs and two heel pads; consecutive pair with 192-105
+627,326,same_shoe,very_likely,T0 pass 2,large irregular forefoot lugs and a segmented striped heel; 15 forefoot matches at one shift and 11 heel matches at another (toe-heel deformation)
+196,56,same_shoe,likely,T0 pass 2,square-lug running shoe; 13 forefoot matches + 9 per-half in arch and heel; OLD 56 has a large sticker above the toe; consecutive NEW 195/196 onto consecutive OLD 55/56
+626,300,same_shoe,very_likely,T0 pass 2,same large-lug design as 627-326; 13 forefoot matches at one shift and 13 heel matches at another
+21,38,same_shoe,likely,T0 pass 2,round-dot forefoot and two upper heel pads joined to a striped heel; dense matched clusters on both upper heel pads (about 6 + 5); 9 forefoot matches at another shift; image rank 13
+195,55,same_shoe,likely,T0 pass 2,square-lug running shoe; 11 rigid forefoot matches; OLD 55 has a sticker above the toe; partner of 196-56
+10,306,same_shoe,very_likely,T0 pass 2,round-dot forefoot with a vertical bar; about 9 RACs at the upper-left forefoot lugs coincide at one offset; 7 heel matches at another
+9,345,same_shoe,likely,T0 pass 2,round-dot forefoot design; heel clusters coincide (upper-left pad 4; lower heel 4); 3 forefoot RACs at another shift
+3,29,same_shoe,likely,T0 pass 2,round-dot design; a 3-RAC cluster on one right forefoot dot and a 7-RAC cluster on the upper-left heel pad (second shift); OLD 29 has a large sticker beside the toe
+468,296,same_shoe,likely,T0 pass 2,distinctive rectangular lugs with circles and diagonal arch elements; a midfoot cluster of 9 coincides; more per-half matches at toe and heel
+577,135,same_shoe,very_likely,T0 pass 2,rounded-square forefoot lugs and a J-shaped run of square lugs; a tight cluster of 5-6 RACs on the heel tip coincides exactly; 4 toe RACs at another shift
+11,30,same_shoe,likely,T0 pass 2,round-dot design; NEW heel partly printed; a dense cluster of about 6-7 RACs on the upper-right heel pad coincides
+533,336,same_shoe,likely,T0 pass 2,square-lug forefoot and barred midfoot and heel; print quality differs (image rank 6); a cluster of 7 on the lateral bars at one shift; weakest of this group
+180,196,same_shoe,likely,T0 pass 2,round lugs and cross-holed heel pads; 7 + 4 matches including an adjacent RAC pair at the top of the upper-right heel pad; consecutive NEW 179/180 onto consecutive OLD 197/196
+194,7,same_shoe,likely,T0 pass 2,square-lug running shoe; 7 forefoot RACs coincide at about 1 px offset; OLD 7 has a sticker above the toe
+426,99,uncertain,uncertain,T0 pass 2,diamond and triangle lug boot; NEW print partial (image rank 57); 6 forefoot RACs coincide only at a large vertical shift of about 5 px; 4 heel matches
+314,161,same_shoe,likely,T0 pass 2,chevron-lug boot; a 3-RAC cluster on the central heel lug among the 5 rigid matches and 3 right forefoot RACs at another shift; consecutive NEW 314/315 onto consecutive OLD 161/162
+315,162,same_shoe,likely,T0 pass 2,same boot as 314-161; 5 heel RACs around the central heel lug; an adjacent RAC pair at the toe in both at a second shift
+389,382,same_shoe,likely,T0 pass 2,rectangular forefoot lugs and a heel ring; 5 of the 8 OLD RACs coincide at about 1 px
+101,332,same_shoe,likely,T0 pass 2,large forefoot circles and cross-holed heel pads; a cluster of about 6 on the lower-left heel pad; 4 upper forefoot RACs at another shift
+355,220,same_shoe,likely,T0 pass 2,smooth sole with a dark shank opening (r 0.981); a column of forefoot RACs and a 5-RAC heel-centre cluster coincide; consecutive NEW 354/355 onto consecutive OLD 219/220
+97,119,same_shoe,likely,T0 pass 2,overlapping forefoot circles and a band of round lugs; about 7 RACs on the lower forefoot band coincide; NEW heel heavily inked with almost no RACs; lower confidence
+179,197,same_shoe,likely,T0 pass 2,round lugs; faint NEW print with partial heel; a cluster of 5 on the upper-right heel pad; 4 forefoot RACs at another shift; partner of 180-196
+4,110,uncertain,uncertain,T0 pass 2,round-dot design with a vertical bar; 5 left forefoot RACs at one shift and a 3-RAC heel-pad cluster; just above the stratum null maxima; OLD 110 has a sticker above the toe
+218,239,uncertain,uncertain,T0 pass 2,square-lug running shoe; 4 of only 8 OLD RACs coincide on the lateral forefoot edge; OLD 239 has a sticker beside the toe
+61,224,uncertain,uncertain,T0 pass 2,very dense NEW print (202 RACs) of the overlapping-circle design; 13 of 37 OLD RACs coincide at one shift (above the stratum null maximum of 9) but chance coincidences are frequent at this density
+237,199,same_shoe,likely,T0 pass 2,chevron boot; 5 forefoot RACs at one shift and a consistent 5-RAC heel cluster at another; consecutive NEW 237/238 onto consecutive OLD 199/198
+85,25,same_shoe,likely,T0 pass 2,dense round-lug design (120 and 156 RACs); 18 scattered rigid matches; above the heaviest null on the share statistic but not on the count; likely mainly because its consecutive partner 84 is a reprint of OLD 26
+147,37,different_shoe,unlikely,T0 pass 2,dense round-lug design (137 and 126 RACs); forefoot prints differ (image rank 30); the 16 matches all sit inside dense heel-pad RAC clusters; below the heavy-heavy count null
+30,50,uncertain,uncertain,T0 pass 2,round lugs and cross-holed heel pads; 11 scattered matches just above the stratum null maximum (9); no tight cluster
+29,49,uncertain,uncertain,T0 pass 2,round lugs and cross-holed heel pads; 7 scattered forefoot matches at one shift and 8 more at a second shift; most of these form a coherent cluster on the lower-right heel pad
+343,188,same_shoe,likely,T0 pass 2,rare distinctive sole (scalloped outline; lettering in the arch; U-shaped heel bands); about 6 central lug RACs and a 5-RAC heel cluster coincide
+470,95,same_shoe,likely,T0 pass 2,checkerboard forefoot and an oval heel cut-out; a tight group of 5-6 RACs in the lower-left forefoot coincides (6 of 19 OLD)
+74,209,same_shoe,likely,T0 pass 2,round lugs and cross-holed heel pads; clusters of 3 and 2 RACs on the upper heel pads; consecutive NEW 74/75 onto consecutive OLD 209/210
+75,210,same_shoe,likely,T0 pass 2,partner of 74-209; 2 forefoot matches and 3 on the right edge of the upper-right heel pad
+578,96,uncertain,uncertain,T0 pass 2,same design as 577-135; 5 forefoot lug RACs at a large vertical shift and 4 at the heel tip; OLD 96 is not the neighbour of OLD 135
+344,77,different_shoe,different,T0 pass 2,different designs (herringbone against leaf veins); 4 chance matches; image r from the outline only
+471,264,uncertain,uncertain,T0 pass 2,same design as 470-95; 4 forefoot RACs at consistent positions; OLD 264 has a sticker beside the toe and is not the neighbour of OLD 95
+246,39,uncertain,uncertain,T0 pass 2,chevron boot with round central lugs; all 3 RACs of OLD 39 coincide with NEW RACs at one shift; too few OLD RACs to decide
+386,192,uncertain,uncertain,T0 pass 2,small square-lug grid with a logo in the arch on both; 3 heel and 2 forefoot RACs coincide out of 13-15
+427,228,uncertain,uncertain,T0 pass 2,diamond-lug boot; 3 forefoot and 3 heel RACs coincide (one shift per half) out of 19 and 14
+500,97,uncertain,uncertain,T0 pass 2,lug-grid running shoe with a U-shaped heel opening; 4 of the 6 OLD RACs coincide; too few RACs
+498,131,same_shoe,likely,T0 pass 2,a 5-RAC cluster at the upper-left forefoot and a row of 4 RACs at the lower forefoot edge coincide; the row is on contact in OLD 131 but in the unprinted gap of the faint NEW 498 (explains its low on-contact rate)
+354,219,same_shoe,likely,T0 pass 2,smooth sole (r 0.974); 6 forefoot RACs at one shift and 3 heel RACs at another; consecutive NEW 354/355 onto consecutive OLD 219/220; so the T0 control 354-219 is not a valid different-shoe control
+605,145,uncertain,uncertain,T0 pass 2,same design as 604-134; 5 RACs in a row on the lower forefoot at a fairly large shift and 3 heel RACs; OLD 145 is not the neighbour of OLD 134
+530,66,uncertain,uncertain,T0 pass 2,toe bars and square lugs; 4 of the 10 NEW RACs coincide; OLD 66 has a sticker beside the toe
+217,160,uncertain,uncertain,T0 pass 2,square-lug running shoe; 3 + 2 matches out of 20 and 10 RACs; OLD 160 has a sticker beside the toe
+159,288,uncertain,uncertain,T0 pass 2,round lugs; an adjacent RAC pair at the right forefoot edge and one heel RAC; only 5 NEW RACs
+575,351,uncertain,uncertain,T0 pass 2,square lugs and triangles with a striped heel; 2 + 1 matches out of 7 and 10 RACs

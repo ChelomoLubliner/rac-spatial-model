@@ -1,0 +1,23 @@
+n_i: OLD 386 shoes, 13287 RACs; NEW 631 shoes, 20013 RACs
+
+=== P1. Part 2 goodness of fit with OLD-estimated expectations
+independent RACs (H0 true): 400 replicates, B = 199, 192 s
+  mean X^2 (fixed E) = 33.65 (K - 1 = 14); mean two-sample bootstrap X^2* = 34.09
+  rejection at nominal 5% (binomial SE 0.011): fixed-E pooled 0.787 | Wald, multinomial only 0.812 | Wald + parameter term 0.045 | NEW-only bootstrap 0.795 | two-sample bootstrap 0.050
+between-shoe heterogeneity, Dirichlet(100 pi): 400 replicates, B = 199, 196 s
+  mean X^2 (fixed E) = 57.08 (K - 1 = 14); mean two-sample bootstrap X^2* = 56.79
+  rejection at nominal 5% (binomial SE 0.011): fixed-E pooled 0.968 | Wald, multinomial only 0.968 | Wald + parameter term 0.470 | NEW-only bootstrap 0.787 | two-sample bootstrap 0.035
+
+=== P2. dispersion phi under a common misfit (NEW n_i, model known)
+indep  (200 replicates): mean X^2 13.6 | phi centred on the model 0.966 | phi centred on the model minus the pooled misfit 0.965 | phi_0 0.968
+misfit (200 replicates): mean X^2 207.4 | phi centred on the model 1.008 | phi centred on the model minus the pooled misfit 0.987 | phi_0 0.968
+het    (200 replicates): mean X^2 20.9 | phi centred on the model 1.543 | phi centred on the model minus the pooled misfit 1.538 | phi_0 0.968
+var(n)/mean(n): NEW 29.8, OLD 41.3
+
+=== P3. Wald tests with a bootstrap covariance, p = 24
+one dataset, B =  200: mean W 27.38 (theory p (B - 1) / (B - p - 2) = 27.45); rejection chi^2_24 0.1421, F(p, B - p) 0.0449
+one dataset, B = 1000: mean W 24.55 (theory p (B - 1) / (B - p - 2) = 24.62); rejection chi^2_24 0.0622, F(p, B - p) 0.0485
+equality, B = 200 per dataset (V2 = 2.25 V1): V1 + V2 from separate draws, chi^2_24: 0.0971 | one covariance of the paired differences: chi^2_24 0.1425, F(p, B - p) 0.0507
+
+total 500 s
+t0_review2_param.R exit 0 in 500s

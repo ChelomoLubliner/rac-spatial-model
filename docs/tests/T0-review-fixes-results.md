@@ -345,6 +345,8 @@ rigid rule: 26 shoes; two-half rule: 26; union: 34 NEW shoes, 1309 RACs (0.065 o
 /home/mehes/projects/rac-spatial-model/docs/qa/T0/compare/overlap_pairs/pair2h_92_103_old_vs_new.png NEW 92 vs OLD 103: two-half sym=0.400 shifts front (-1.95, 5.27), back (6.23, -0.38); image r=0.497 rank=226
 ```
 
+> **Correction (2026-11-06, second T0 review; A-041):** the `image r` and `rank` printed on every line above, and the "rigid sym" in the OLD tile label of every `pair2h_*` image, came from the CSV columns of the **rigid** partner. They are right for the 7 shoes whose two partners coincide, but not for NEW 92, whose drawn two-half partner is OLD 103: r 0.851, rank 5 (r 0.497, rank 226 belong to the rigid partner OLD 63). The probe was fixed and re-run; its output is in `docs/tests/T0-review2-fixes-results.md` section 2. The output above is kept as it was printed.
+
 Comparison with the statistician's list (`<scratchpad>/review_stat/overlap_sym.csv`, their rule: n >= 5, sym >= 0.3, sym > max over the next 10 image-similar OLD shoes + 0.15):
 
 ```bash
@@ -521,7 +523,7 @@ Python, unset:
 ### 6.2 Code locations, `$SCRATCH`, `.gitignore` and `reports/`
 
 ```bash
-TH=/mnt/c/Users/mehes/Documents/repo/master_thesis_forensic_shoeprint/contour_algorithm; grep -n "contour_Active_Contour.txt\|i == 126\|200 + 162\|155 + 90\|185 + 162\|128 + 95" "$TH/active_contour_snake.py" | tr -d "\r"; grep -n "max_pix == 18" "$TH/create_files_shoes.py" | tr -d "\r"; grep -n "allcont >= 8\|set.seed(313)" statistical_model/dataCC_1.Rmd; grep -n "N_CONTROLS <- 100" statistical_model/config.R; echo "--- \$SCRATCH in the plan before the fix:"; git show HEAD:docs/plans/2026-11-05-new-shoes-pipeline.md | grep -c "\$SCRATCH"; git show HEAD:docs/plans/2026-11-05-new-shoes-pipeline.md | grep -c "SCRATCH=" ; echo "--- .gitignore html rules and reports/:"; grep -n "html" .gitignore; ls -la --time-style=long-iso reports/; git ls-files reports | wc -l; git status --ignored --porcelain reports
+TH=/mnt/c/Users/mehes/Documents/repo/master_thesis_forensic_shoeprint/contour_algorithm; grep -n "contour_Active_Contour.txt\|i == 126\|200 + 162\|155 + 90\|185 + 162\|128 + 95" "$TH/active_contour_snake.py" | tr -d "\r"; grep -n "max_pix == 18" "$TH/create_files_shoes.py" | tr -d "\r"; grep -n "allcont >= 8\|set.seed(313)" statistical_model/dataCC_1.Rmd; grep -n "N_CONTROLS <- 100" statistical_model/config.R; echo "--- \$SCRATCH in the plan before the fix:"; git show 42af8dd:docs/plans/2026-11-05-new-shoes-pipeline.md | grep -c -F '$SCRATCH'; git show 42af8dd:docs/plans/2026-11-05-new-shoes-pipeline.md | grep -c -F 'SCRATCH=' ; echo "--- .gitignore html rules and reports/:"; grep -n "html" .gitignore; ls -la --time-style=long-iso reports/; git ls-files reports | wc -l; git status --ignored --porcelain reports
 ```
 
 ```text
@@ -552,6 +554,8 @@ drwxr-xr-x 11 mehes mehes  4096 2026-11-05 18:09 ..
 ```
 
 The plan used `$SCRATCH` in 3 places and never defined it (`SCRATCH=` occurs 0 times).
+
+> **Correction (2026-11-06):** the command above was changed from `git show HEAD:...` (HEAD has moved past the fix, so it no longer printed 3 / 0) to the pre-fix commit `42af8dd`, and from `grep -c "\$SCRATCH"` to `grep -c -F '$SCRATCH'` (in the agent's tool shell `grep` is a ugrep wrapper that reads a leading `$` as an anchor and prints 0; GNU grep prints 3). Re-run: 3 and 0 (`docs/tests/T0-review2-fixes-results.md` section 6).
 
 ### 6.3 OLD shoe ids behind the offset comparison, and `predict.coxph`
 
@@ -588,12 +592,12 @@ Pair images show a NEW shoe (left) and an OLD shoe cropped to the NEW frame (rig
 | `pair_204_5`, `pair_203_6` (consecutive pair onto consecutive pair) | Same sole, about 100 or more RACs each; large matched clusters on the heel pads (204) and in the forefoot (203) |
 | `pair_214_148`, `pair_238_198`, `pair_245_91`, `pair_294_24`, `pair_297_121`, `pair_556_247`, `pair_619_81`, `pair_532_335` | Same designs side by side with matched clusters (294 and 532 uncertain: one cluster only, and OLD 24 heavily inked); OLD 24 and 121 carry stickers beside the toe |
 | `pair2h_342_166`, `pair2h_358_116`, `pair2h_14_87`, `pair2h_295_189`, `pair2h_100_73`, `pair2h_15_94`, `pair2h_213_180` | Found only with one shift per half: same designs (r 0.79-0.99), matched RACs in both halves. Likely the same shoes. OLD 94 and 116 carry a sticker beside the toe |
-| `pair2h_92_103` | 2 of 5 RACs matched, different-looking print (image rank 226): unlikely, a chance match at the threshold |
-| `control_354_219`, `control_57_196` | Controls: same design (r 0.974, 0.954) and visibly unrelated RACs (sym 0.087, 0.058). This is what "same design, different shoe" looks like |
+| `pair2h_92_103` | **Wrong, corrected 2026-11-06 (A-041):** "2 of 5 RACs matched, different-looking print (image rank 226): unlikely" used the image rank of the rigid partner OLD 63. The image shows OLD 103: the same round-lug design with four heel pads (r 0.851, rank 5), 2 of 5 RACs matched at large inconsistent per-half shifts, exactly at the null maximum: uncertain |
+| `control_354_219`, `control_57_196` | Controls: same design (r 0.974, 0.954) and visibly unrelated RACs (sym 0.087, 0.058). This is what "same design, different shoe" looks like. (Caveat 2026-11-06: NEW 354 is probably a reprint of OLD 219, see `docs/qa/T0/README.md`; only 57-196 remains a valid control) |
 | `old/pair_old_236_277.png`, `old/pair_old_237_278.png` | Two OLD prints of the same chevron boot with U-shaped lugs, same outline, about 24-26 RACs matched over forefoot and heel; the consecutive pair 236/237 maps onto 277/278: very likely one pair of shoes printed twice inside OLD (K10) |
 | `new/low_contact_shoes_new.png` | NEW 112: faint forefoot, heel almost unprinted with about 30 RACs on it; 177: faint circles, RACs in the unprinted midfoot; 286: very faint; 420: partial spiral-textured print; 498: faint, a RAC cluster in the arch gap; 599: a different image type (thick rim band, dot texture), RACs a few px off the dots (0.22 on contact, 0.91 after a shift). No sticker on these six |
 
-Summary: of the 34 NEW candidates, 30 look like the same physical shoe, 3 are uncertain (452, 294, 532) and 1 is unlikely (92). No sticker was seen on the NEW prints of these pairs; many OLD prints carry one outside the sole.
+Summary: of the 34 NEW candidates, 30 look like the same physical shoe, 3 are uncertain (452, 294, 532) and 1 is unlikely (92). **Corrected 2026-11-06:** 30 likely, 4 uncertain (92 included), 0 unlikely; the second review pass judged 37 more NEW shoes the same shoe as an OLD shoe and 18 more uncertain (plan F25). No sticker was seen on the NEW prints of these pairs; many OLD prints carry one outside the sole.
 
 ## 8. Document checks, lint, CR bytes, tables
 
