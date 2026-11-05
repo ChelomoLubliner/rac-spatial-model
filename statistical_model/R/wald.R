@@ -7,15 +7,28 @@
 # referred to chi^2 with df = length(b). This is what
 # car::linearHypothesis(test = "Chisq") computes for this hypothesis matrix.
 #
-# GLMM (merMod): the intercept is dropped, so df = 24 for NEW_X_NS_XY.
-# CML (clogit/coxph): there is no intercept, all coefficients are spatial.
+# GLMM (merMod): the coefficient named "(Intercept)" is dropped (by name,
+# not by position; a merMod without an intercept is an error), so df = 24
+# for NEW_X_NS_XY. CML (clogit/coxph): there is no intercept, all
+# coefficients are spatial.
+# V (optional, e.g. a bootstrap covariance): the full covariance of all
+# coefficients, in their order. If V has row or column names they must
+# equal the coefficient names in the same order, so a permuted V is an
+# error instead of a wrong W (used by position, the committed vcov permuted
+# by set.seed(1); c(1, sample(2:25)) gives W = 1884.91 instead of 428.69,
+# tests/r/test_wald.R); a V without dimnames is used by position (decision
+# A-063).
 # If car is installed (and use_car = TRUE), its statistic is added as W_car
 # so that both can be compared.
 
 wald_all_spatial <- function(model, V = NULL, use_car = TRUE) {
   if (inherits(model, "merMod")) {
     co <- lme4::fixef(model)
-    idx <- seq_along(co)[-1]
+    if (!"(Intercept)" %in% names(co)) {
+      stop("wald_all_spatial: the merMod has no \"(Intercept)\" ",
+           "coefficient, so the spatial coefficients cannot be told apart")
+    }
+    idx <- which(names(co) != "(Intercept)")
   } else if (inherits(model, "coxph")) {
     co <- stats::coef(model)
     idx <- seq_along(co)
@@ -24,6 +37,13 @@ wald_all_spatial <- function(model, V = NULL, use_car = TRUE) {
   }
   vc <- if (is.null(V)) as.matrix(stats::vcov(model)) else as.matrix(V)
   stopifnot(nrow(vc) == length(co), ncol(vc) == length(co))
+  for (dn in list(rownames(vc), colnames(vc))) {
+    if (!is.null(dn) && !identical(dn, names(co))) {
+      stop("wald_all_spatial: the dimnames of V are not the coefficient ",
+           "names in coefficient order; reorder V, or drop its dimnames ",
+           "to use it by position")
+    }
+  }
   b <- unname(co[idx])
   vb <- unname(vc[idx, idx, drop = FALSE])
   w <- as.numeric(crossprod(b, solve(vb, b)))

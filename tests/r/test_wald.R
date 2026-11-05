@@ -33,6 +33,53 @@ w_i <- wald_all_spatial(g, V = diag(length(co)), use_car = FALSE)
 stopifnot(isTRUE(all.equal(w_i$W, sum(co[-1]^2), tolerance = 1e-12)))
 pass("explicit V = identity gives sum(b^2)")
 
+# V's dimnames must be the coefficient names in coefficient order (A-063,
+# T1 review): a permuted V with dimnames is an error, not a wrong W.
+stopifnot(identical(dimnames(vc), list(names(co), names(co))))
+w_u <- wald_all_spatial(g, V = unname(vc), use_car = FALSE)
+stopifnot(identical(w_u$W, w$W))
+pass("V without dimnames is used by position (same W as the default)")
+set.seed(1)
+perm <- c(1, sample(2:25))
+vp <- vc[perm, perm]
+msg_of <- function(expr) {
+  tryCatch({
+    expr
+    "no error"
+  }, error = function(e) conditionMessage(e))
+}
+stopifnot(grepl("not the coefficient names",
+                msg_of(wald_all_spatial(g, V = vp, use_car = FALSE))))
+w_pos <- wald_all_spatial(g, V = unname(vp), use_car = FALSE)$W
+stopifnot(abs(w_pos - w$W) > 100)
+pass(sprintf(paste("permuted V with dimnames is an error (used by position",
+                   "it would give W = %.2f)"), w_pos))
+v_rn <- vc
+rownames(v_rn) <- paste0("b", seq_along(co))
+v_cn <- vc
+colnames(v_cn) <- rev(names(co))
+stopifnot(grepl("not the coefficient names",
+                msg_of(wald_all_spatial(g, V = v_rn, use_car = FALSE))),
+          grepl("not the coefficient names",
+                msg_of(wald_all_spatial(g, V = v_cn, use_car = FALSE))))
+pass("wrong row names or reversed column names are an error")
+
+# The intercept is dropped by name: another merMod (lme4's cbpp data).
+m1 <- glmer(cbind(incidence, size - incidence) ~ period + (1 | herd),
+            data = cbpp, family = binomial)
+w1 <- wald_all_spatial(m1, use_car = FALSE)
+b1 <- fixef(m1)[names(fixef(m1)) != "(Intercept)"]
+v1 <- as.matrix(vcov(m1))[names(b1), names(b1)]
+stopifnot(w1$df == 3,
+          isTRUE(all.equal(w1$W, drop(t(b1) %*% solve(v1) %*% b1),
+                           tolerance = 1e-12)))
+pass(sprintf("cbpp merMod: intercept dropped by name, W = %.4f, df = 3",
+             w1$W))
+m0 <- glmer(cbind(incidence, size - incidence) ~ 0 + period + (1 | herd),
+            data = cbpp, family = binomial)
+stopifnot(grepl("no \"\\(Intercept\\)\"", msg_of(wald_all_spatial(m0))))
+pass("merMod without an intercept is an error")
+
 # CML: no intercept, all 24 coefficients (T0: model-based W = 420.67)
 cm <- readRDS(file.path(root, "saved_models", "CML_MODEL.rds"))
 wc <- wald_all_spatial(cm)
