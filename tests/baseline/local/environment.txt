@@ -1,0 +1,139 @@
+# Environment of the T1 Tier B reruns, recorded 2026-11-06T00:19:03+02:00
+
+## System
+Linux Taxes67-lp 6.18.54.1-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Tue Oct  6 19:13:07 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+PRETTY_NAME="Ubuntu 24.04.2 LTS"
+16
+
+## Git
+this repo: e4fedce3f5221591beb2317898a19964019f1c4c (feature/new-shoes-pipeline)
+thesis repo HEAD: 109f30a0217aab16e35a31aaed628a555f57031d
+
+## R (WSL)
+rmarkdown   2.29
+knitr       1.50
+lme4        1.1.38
+Matrix      1.6.5
+survival    3.8.3
+imager      1.0.8
+fields      17.1
+smoothie    1.0.4
+plotly      4.12.0
+rgl         1.3.24
+dplyr       1.1.4
+ggplot2     4.0.0
+data.table  1.17.8
+doParallel  1.0.17
+jsonlite    2.0.0
+digest      0.6.37
+png         0.1.8
+spam        2.11.1
+car installed: FALSE 
+R version 4.3.3 (2024-02-29)
+Platform: x86_64-pc-linux-gnu (64-bit)
+Running under: Ubuntu 24.04.2 LTS
+
+Matrix products: default
+BLAS:   /usr/lib/x86_64-linux-gnu/blas/libblas.so.3.12.0 
+LAPACK: /usr/lib/x86_64-linux-gnu/lapack/liblapack.so.3.12.0
+
+locale:
+ [1] LC_CTYPE=C.UTF-8       LC_NUMERIC=C           LC_TIME=C.UTF-8       
+ [4] LC_COLLATE=C.UTF-8     LC_MONETARY=C.UTF-8    LC_MESSAGES=C.UTF-8   
+ [7] LC_PAPER=C.UTF-8       LC_NAME=C              LC_ADDRESS=C          
+[10] LC_TELEPHONE=C         LC_MEASUREMENT=C.UTF-8 LC_IDENTIFICATION=C   
+
+time zone: Asia/Jerusalem
+tzcode source: system (glibc)
+
+attached base packages:
+[1] splines   stats     graphics  grDevices utils     datasets  methods  
+[8] base     
+
+other attached packages:
+ [1] ggplot2_4.0.0      fields_17.1        RColorBrewer_1.1-3 viridisLite_0.4.2 
+ [5] spam_2.11-1        imager_1.0.8       magrittr_2.0.4     survival_3.8-3    
+ [9] lme4_1.1-38        Matrix_1.6-5      
+
+loaded via a namespace (and not attached):
+ [1] gtable_0.3.6     dplyr_1.1.4      compiler_4.3.3   maps_3.4.3      
+ [5] tidyselect_1.2.1 Rcpp_1.1.0       stringr_1.5.2    bmp_0.3         
+ [9] scales_1.4.0     png_0.1-8        boot_1.3-30      lattice_0.22-5  
+[13] R6_2.6.1         generics_0.1.4   igraph_2.1.4     rbibutils_2.3   
+[17] MASS_7.3-60.0.1  dotCall64_1.2    tibble_3.3.0     nloptr_2.2.1    
+[21] readbitmap_0.1.5 minqa_1.2.8      pillar_1.11.1    tiff_0.1-12     
+[25] rlang_1.1.6      stringi_1.8.7    S7_0.2.0         cli_3.6.5       
+[29] withr_3.0.2      Rdpack_2.6.4     grid_4.3.3       lifecycle_1.0.4 
+[33] nlme_3.1-164     reformulas_0.4.1 vctrs_0.6.5      glue_1.8.0      
+[37] farver_2.1.2     purrr_1.1.0      jpeg_0.1-11      tools_4.3.3     
+[41] pkgconfig_2.0.3 
+pandoc: pandoc 3.1.3
+
+## Python (WSL thesis venv: /mnt/c/Users/mehes/Documents/repo/master_thesis_forensic_shoeprint/venv/bin/python)
+3.12.3 (main, Jan  8 2026, 11:30:50) [GCC 13.3.0]
+contourpy==1.3.3
+cycler==0.12.1
+fonttools==4.60.1
+ImageIO==2.37.2
+kiwisolver==1.4.9
+lazy_loader==0.4
+matplotlib==3.10.7
+narwhals==2.11.0
+networkx==3.5
+numpy==2.2.6
+opencv-python==4.12.0.88
+packaging==25.0
+pandas==2.3.3
+pillow==12.0.0
+plotly==6.4.0
+pyparsing==3.2.5
+python-dateutil==2.9.0.post0
+pytz==2025.2
+scikit-image==0.25.2
+scipy==1.16.3
+six==1.17.0
+tifffile==2025.10.16
+tqdm==4.67.1
+tzdata==2025.2
+
+## Python (Windows venv-wind, diagnostics only: /mnt/c/Users/mehes/Documents/repo/master_thesis_forensic_shoeprint/venv-wind/Scripts/python.exe)
+3.13.14 (tags/v3.13.14:fd17997, Jun 10 2026, 13:03:48) [MSC v.1944 64 bit (AMD64)]
+black==25.11.0
+click==8.3.0
+colorama==0.4.6
+contourpy==1.3.3
+cycler==0.12.1
+fonttools==4.60.1
+ImageIO==2.37.2
+kiwisolver==1.4.9
+lazy_loader==0.4
+matplotlib==3.10.7
+mypy_extensions==1.1.0
+narwhals==2.11.0
+networkx==3.5
+numpy==2.2.6
+opencv-python==4.12.0.88
+packaging==25.0
+pandas==2.3.3
+pathspec==0.12.1
+pillow==12.0.0
+platformdirs==4.5.0
+plotly==6.4.0
+pyparsing==3.2.5
+python-dateutil==2.9.0.post0
+pytokens==0.3.0
+pytz==2025.2
+ruff==0.14.4
+scikit-image==0.25.2
+scipy==1.16.3
+six==1.17.0
+tifffile==2025.10.16
+tqdm==4.67.1
+tzdata==2025.2
+
+## R (Windows, diagnostics only: /mnt/c/Users/mehes/AppData/Local/Programs/R/R-4.4.3/bin/Rscript.exe)
+lme4 1.1.37 
+Matrix 1.7.2 
+survival 3.8.3 
+car 3.1.3 
+R version 4.4.3 (2025-02-28 ucrt) 
