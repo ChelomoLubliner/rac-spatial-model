@@ -63,3 +63,44 @@ Chronological; newest entry at the bottom. Each entry: what was done, results (r
 **Reviewer scripts** (scratch, not committed): `<scratchpad>/review_eng/verify_eng.R`, `verify_eng.py`, `verify_rate.py`, `verify_step2.R`, `verify_table.py`, `verify_forms.py`.
 
 **Blockers.** None.
+
+## 2026-11-05 21:12, T0-architecture review (reviewer:statistician)
+
+**Verdict: changes required** (statistics lens). The facts are real: I re-ran `t0_probe.py`, `t0_facts.py` and `t0_probe.R`, and their outputs and the 4 PNGs are identical to the committed ones. The profile and naming architecture is sound. Part 2 as written needs the fixes below before T3/T7. None of them touches Part 1 or the OLD regression.
+
+**Verified with my own scripts.**
+- W = 428.6933, df 24, p = 9.43e-76. 1 px = 1/300 on both axes (`dataCC_1.Rmd:201-202`). The probe's dc = dr = -1 is exactly -0.5 px from the legacy floor mapping. The 2023 distances are integer pixels (0-65).
+- These plan-9 claims are correct: E[X^2] <= K'-1 under independent multinomials, df = K'-1, the Poisson GLM equals the conditional multinomial, and normalization cancels a_i, the offset and sigma^2.
+- A-007: Naomi's area of (-x_pixel, y) agrees with her area of (x, y) for 0.9974 of OLD RACs. With +x_pixel the agreement is 0.0000, so the 99% threshold of `test_validation_areas.R` is sound.
+- A RAC-based flip screen finds no left shoe in either dataset, which corroborates F17.
+
+**Findings.**
+1. **Critical: the out-of-sample premise was never verified, and some NEW shoes look like OLD shoes.** For each NEW shoe I took its most similar OLD contact image (blurred, aligned frames) and computed a symmetric RAC match (1 px tolerance, best rigid shift).
+   - For 16 NEW shoes (536 RACs) the match is >= 0.3 and more than 0.15 above the best of the next 10 similar OLD shoes.
+   - For 5 shoes it is >= 0.4: 469-212 (0.535), 453-267, 241-380, 501-12 and 548-84.
+   - Same-design NEW-NEW pairs never go above 0.20 (556 pairs).
+   - I looked at NEW 469 next to OLD 212: same tread, same outline and position, and many RACs in the same places.
+
+   Fix (T3): a pre-registered overlap screen, a visual check and a decision (Micha/Yoram). T7 then runs without the confirmed overlaps, with a with/without sensitivity.
+2. **Major: the regional comparison is not "on equal terms" (plan 9).** Theta is fitted on the same partition that the test uses. By the Poisson score equations, the OLD in-sample regional X^2 is exactly 0. On NEW, a cell-level X^2 cannot reward the continuous model's resolution inside cells, which is the claimed added value. Fix: make the pixel log score the primary model comparison. Also evaluate the real 2022 model (theta on Naomi's 14 areas) on the grid and in the log score. Never present the in-sample regional X^2 as a fit.
+3. **Major: phi is read as dependence (plan 9, D-004).** phi > 1, or disagreement between the pooled and bootstrap tests, shows extra-multinomial variation. Within-shoe dependence and between-shoe differences in the spatial pattern give the same cell counts. T7's own "clustered" simulation is a shoe-level Dirichlet, which is heterogeneity. Under independence phi <= 1, not "about 1". Fix: reword, and compare phi with its exact independent-multinomial expectation. If the editor's question needs a direct answer, add a within-shoe test, such as RAC nearest-neighbour or pair-correlation statistics against the fitted intensity.
+4. **Major: a model-structure issue is missing from the known issues.** `ns(new_x):ns(y)` has no main effects, and both bases vanish at their left boundary knot. So the log-odds equals the intercept (-2.271582) along the whole edge new_x = -0.1917 and the whole heel edge y = -0.5017 (checked at 5 points on each). Fix: add it as K8. The statistics expert checks the T5 maps and the T7 residuals near these edges. T7 adds a sensitivity refit on OLD with main effects plus interaction.
+5. **Major: variance under dependence is never scheduled (meeting item 8.5 was dropped).** The step-5 CIs and the T6 equality Wald use model-based V. I ran an indicative check: a CML refit with cluster(shoe), using Efron ties because the exact method does not support robust variance. The robust/model SE ratios have median 1.13 and max 1.37, and W drops from 394 to 234 (df 24). Fix: add cluster-robust CML variances and shoe-bootstrap GLMM variances (run in the background) to T5/T6 and the report.
+6. **Major: per-shoe data quality needs a rule before Part 2.** Per-shoe RAC on-contact rates under the legacy mapping:
+   - below 0.5: NEW 23 shoes (514 RACs), OLD 6 (77);
+   - below 0.7: NEW 135 shoes (16% of RACs), OLD 55 (9.5%);
+   - 5 NEW shoes stay below 0.6 under any flip or any shift up to 4 px: 112, 177, 286, 420 and 498.
+
+   On faint or partial prints, S is not the surface where RACs can be observed, so X^2 would reject for data reasons, not model reasons. Fix (T3): a pre-registered rule, for example dropping from the primary analysis the shoes below the OLD p5 (0.584), with a with/without sensitivity.
+7. **Minor:**
+   - (a) The T6 sigma^2 comparison is confounded by the omitted offset: var(log(100/px)) is 0.098 OLD and 0.121 NEW. The exact control offset is log(100/(px - cases)); it differs from the one used by up to 0.033 (relevant for D-008).
+   - (b) F5 is not independent evidence for the scale, and the on-contact criterion is flat in scale (296-300 differ by 0.0009). Report the bootstrap CI.
+   - (c) Report the log score weighted by shoe as well as by RAC: the top 10% of shoes hold 32% of NEW RACs.
+   - (d) 13 of the 15 NEW shoes with an image partner at r >= 0.95 have consecutive ids and unrelated RACs, so they are probably the two shoes of a pair. Add a sensitivity that resamples pairs together.
+   - (e) Name the primary test and add an effect size such as Cramer's w.
+   - (f) Validate the CML as a secondary analysis.
+   - (g) Check bootstrap calibration with binomial rejection rates, not with a KS test on discrete B = 200 p-values.
+
+**Reviewer scripts and outputs** (scratch, not committed): `<scratchpad>/review_stat/verify1.R` to `verify9.py`, `overlap_screen.csv`, `overlap_sym.csv`, `pair_469_212.png`. Total runtime about 7 min.
+
+**Blockers.** None for T1/T2. Findings 1, 2, 3 and 6 must be settled before T7, and the rules for 1 and 6 must be fixed before any NEW Part 2 number is computed.
