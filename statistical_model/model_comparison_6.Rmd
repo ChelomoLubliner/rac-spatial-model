@@ -154,3 +154,22 @@ intens_cml_scaled_sub <- exp(-sigma_sq/2)*intens.pred_cml[,cols]
 intens_cml_display <- t(intens_cml_scaled_sub[nrow(intens_cml_scaled_sub):1,])
 image.plot(intens_cml_display, axes=FALSE, main='CML_MODEL (scaled)')
 ```
+
+```{r difference_plot}
+# Difference: Random - CML (both on marginal intensity scale)
+intens_diff <- intens_random_scaled - intens_cml_scaled
+intens_diff_display <- t(intens_diff[nrow(intens_diff):1,])
+
+par(mar = c(2, 0, 1, 4))
+image.plot(intens_diff_display, axes=FALSE, main='Difference (Random - CML)')
+```
+
+```{r}
+pdf(file = paste(ROOT_PATH, "model_images/difference_random_cml.pdf", sep = ""), height=8, width=8)
+par(mar = c(2, 0, 1, 4))
+image.plot(intens_diff_display, axes=FALSE, main='Difference (Random - CML)')
+dev.off()
+
+cat("Difference range:", range(intens_diff, na.rm=TRUE), "\n")
+cat("Mean absolute difference:", mean(abs(intens_diff), na.rm=TRUE), "\n")
+```
