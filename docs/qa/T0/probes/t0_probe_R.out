@@ -1,0 +1,68 @@
+=== R environment
+R version 4.3.3 (2024-02-29) 
+BLAS: /usr/lib/x86_64-linux-gnu/blas/libblas.so.3.12.0 
+LAPACK: /usr/lib/x86_64-linux-gnu/lapack/liblapack.so.3.12.0 
+RNGkind: Mersenne-Twister Inversion Rejection 
+rmarkdown   installed=TRUE  2.29
+knitr       installed=TRUE  1.50
+lme4        installed=TRUE  1.1.38
+survival    installed=TRUE  3.8.3
+splines     installed=TRUE  4.3.3
+imager      installed=TRUE  1.0.8
+fields      installed=TRUE  17.1
+smoothie    installed=TRUE  1.0.4
+plotly      installed=TRUE  4.12.0
+rgl         installed=TRUE  1.3.24
+dplyr       installed=TRUE  1.1.4
+ggplot2     installed=TRUE  4.0.0
+data.table  installed=TRUE  1.17.8
+doParallel  installed=TRUE  1.0.17
+jsonlite    installed=TRUE  2.0.0
+digest      installed=TRUE  0.6.37
+png         installed=TRUE  0.1.8
+boot        installed=TRUE  1.3.30
+car         installed=FALSE 
+hglm        installed=FALSE 
+testthat    installed=FALSE 
+sandwich    installed=FALSE 
+pdftools    installed=FALSE 
+magick      installed=FALSE 
+
+=== committed model files (serialization info)
+saved_models/NEW_X_NS_XY.rds : writer R 4.4.3 
+saved_models/CML_MODEL.rds : writer R 4.3.3 
+
+=== committed GLMM NEW_X_NS_XY
+class: glmerMod  optimizer: nlminbwrap  conv: 0 
+nobs: 51849  groups: 386  n fixef: 25 
+sigma^2 = 0.9597791  exp(-s2/2) = 0.6189  exp(+s2/2) = 1.6159
+manual Wald (all 24 spatial coef = 0): W = 428.6933 df = 24 p = 9.43e-76
+first fixef names:
+[1] "(Intercept)"                                                   
+[2] "ns(dat$new_x, knots = knots_new_x)1:ns(dat$y, knots = knotsy)1"
+[3] "ns(dat$new_x, knots = knots_new_x)2:ns(dat$y, knots = knotsy)1"
+
+=== committed CML_MODEL
+class: clogit coxph  n coef: 24 
+
+=== committed processed data consistency
+dataCC rows: 51849  cases: 13249  shoes: 386 
+dataCC_distance rows: 51849  same (n_Acc,x,y,shoe): TRUE 
+controls per shoe (unique): 100 
+pixel counts: n=386 mean=10571.8135 MEAN_OFFSET=-4.614310784 log(100/mean)=-4.6608
+knots new_x: -0.0663992  0.0219597  0.1047822 
+knots y    : -0.325000 -0.178333  0.095000  0.208333  0.321667 
+range new_x: -0.191667  0.241667  range y: -0.501667  0.511667 
+
+=== R semantics used by the legacy stamp sweep
+logical(0) && TRUE  -> NA 
+logical(0) && FALSE -> FALSE 
+
+=== float semantics of abs(dy) < 0.01 in dataCC_distance_2.Rmd
+|drow| = 2: pairs with abs(dy) < 0.01: 393 of 393
+|drow| = 3: pairs with abs(dy) < 0.01: 160 of 392
+|drow| = 4: pairs with abs(dy) < 0.01: 0 of 391
+
+=== legacy stamp sweep (dataCC_1.Rmd lines 93-136) on NEW dims
+new t=8: >=t px=29536 | sweep with legacy bound 300: ERROR: subscript out of bounds | with bound col_shoe=255: kept px=29532 removed=4
+new t=13: >=t px=28949 | sweep with legacy bound 300: ERROR: subscript out of bounds | with bound col_shoe=255: kept px=28948 removed=1

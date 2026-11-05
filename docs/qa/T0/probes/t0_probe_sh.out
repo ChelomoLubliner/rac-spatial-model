@@ -1,0 +1,72 @@
+=== line endings of committed text outputs (CR count vs lines)
+processed_data/dataCC.csv                     lines=51850  CR=51850
+processed_data/dataCC_distance.csv            lines=51850  CR=0
+processed_data/dataCC_distance_temp.csv       lines=51850  CR=0
+processed_data/dataCC_distance_part4.csv      lines=20970  CR=20970
+processed_data/shoe_pixel_counts.csv          lines=387    CR=387
+data/all_cont.csv                             lines=396    CR=396
+data/locations_data.csv                       lines=13288  CR=13288
+data/new_shoes/locations_data_new_raw.txt     lines=20013  CR=20013
+data/new_shoes/locations_new_snake_2023.csv   lines=20014  CR=20014
+=== 2026-03-16 regeneration of dataCC.csv / all_cont.csv: EOL only?
+processed_data/dataCC.csv raw feb=d7b292f92251bb36 now=cc4a476976aea2a8 | LF-normalized feb=d7b292f92251bb36 now=d7b292f92251bb36
+data/all_cont.csv raw feb=488e728d693defbe now=d582cf502184393d | LF-normalized feb=488e728d693defbe now=488e728d693defbe
+=== PDF metadata of committed figures
+model_images/CI_cut_110.pdf              /CreationDate (D:20260316125710) /Producer (R 4.4.3) 
+model_images/CI_cut_190.pdf              /CreationDate (D:20260316125711) /Producer (R 4.4.3) 
+model_images/CI_cut_250.pdf              /CreationDate (D:20260316125711) /Producer (R 4.4.3) 
+model_images/CI_shoe_cuts.pdf            /CreationDate (D:20260316125707) /Producer (R 4.4.3) 
+model_images/CML_MODEL_SHOE.pdf          /CreationDate (D:20260316130410) /Producer (R 4.4.3) 
+model_images/NEW_X_NS_XY_SHOE.pdf        /CreationDate (D:20260316131759) /Producer (R 4.4.3) 
+model_images/difference_random_cml.pdf   /CreationDate (D:20260319105147) /Producer (R 4.4.3) 
+model_images/pixel_inten_JASAup.pdf      /CreationDate (D:20260319105145) /Producer (R 4.4.3) 
+=== thesis contour code: differs from HEAD only by CR?
+HEAD 109f30a
+files modified (raw): 11
+diff ignoring CR at EOL (lines): 0
+=== thesis venvs (package versions)
+/mnt/c/Users/mehes/Documents/repo/master_thesis_forensic_shoeprint/venv/lib/python3.12/site-packages
+  scikit_image-0.25.2.dist-info
+  numpy-2.2.6.dist-info
+  opencv_python-4.12.0.88.dist-info
+  pillow-12.0.0.dist-info
+  scipy-1.16.3.dist-info
+  matplotlib-3.10.7.dist-info
+  pandas-2.3.3.dist-info
+/mnt/c/Users/mehes/Documents/repo/master_thesis_forensic_shoeprint/venv-wind/Lib/site-packages
+  scikit_image-0.25.2.dist-info
+  numpy-2.2.6.dist-info
+  opencv_python-4.12.0.88.dist-info
+  pillow-12.0.0.dist-info
+  scipy-1.16.3.dist-info
+  matplotlib-3.10.7.dist-info
+  pandas-2.3.3.dist-info
+version = 3.12.3
+version = 3.13.9
+=== thesis 2025-11-13 run outputs (images/saved)
+total 138528
+drwxrwxrwx 1 mehes mehes     4096 2026-02-08 10:36 .
+drwxrwxrwx 1 mehes mehes     4096 2025-11-13 12:20 ..
+-rwxrwxrwx 1 mehes mehes        0 2025-11-13 11:54 .gitkeep
+-rwxrwxrwx 1 mehes mehes 46929683 2025-11-13 07:50 active-contour_all.npy
+-rwxrwxrwx 1 mehes mehes     1764 2025-11-13 07:41 all_shoes_superposed.png
+-rwxrwxrwx 1 mehes mehes   121393 2025-11-13 07:41 freq_min_18.npy
+-rwxrwxrwx 1 mehes mehes    50340 2026-02-08 13:03 freq_min_18.pdf
+-rwxrwxrwx 1 mehes mehes      767 2025-11-13 07:41 freq_min_18.png
+-rwxrwxrwx 1 mehes mehes 46929683 2025-11-13 07:42 list_contour.npy
+-rwxrwxrwx 1 mehes mehes 46929683 2025-11-13 07:41 list_matrices.npy
+-rwxrwxrwx 1 mehes mehes   741787 2025-11-13 11:54 locations_new.csv
+-rwxrwxrwx 1 mehes mehes   121393 2025-11-13 07:41 old_freq_min_18.npy
+-rwxrwxrwx 1 mehes mehes      870 2025-11-13 07:41 old_freq_min_18.png
+-rwxrwxrwx 1 mehes mehes 46809062 2025-11-13 11:54:31.716860900 +0200 /mnt/c/Users/mehes/Documents/repo/master_thesis_forensic_shoeprint/data/contour_Active_Contour.txt
+=== tools
+flake8     /home/mehes/.local/bin/flake8
+shellcheck /home/mehes/.local/bin/shellcheck
+pandoc     /usr/bin/pandoc
+pdftoppm   MISSING
+qpdf       MISSING
+gs         MISSING
+magick     MISSING
+16
+               total        used        free      shared  buff/cache   available
+Mem:              15           6           0           0           8           8

@@ -1,0 +1,32 @@
+[ WARN:0@12.945] global loadsave.cpp:1617 imencodeWithMetadata Unsupported depth image for selected encoder is fallbacked to CV_8U.
+
+=== J. provenance of the committed OLD contour
+thesis images/saved/active-contour_all.npy shape (387, 395, 307)
+committed contour records equal to that npy (skip 0-idx 126): 386 of 386
+thesis list_matrices[8] == raw shoe 9 unflipped: True | == flipped: False
+thesis freq_min_18.npy == repo data/freq_min_18.png: True | px 32975 | old_freq_min_18.npy (superposition >=18) px 27312
+
+=== K. coordinate frames, shoe 9, duplicates, 2023 mapping
+old corr(x in locations_data.csv, x of the RAC pixel in the R dataCC frame) = -0.999941
+old shoe 9: RACs 2 | on contact unflipped 0.0 | flipped 0.0
+old RACs 13287 | duplicate RAC pixels 38 | RAC pixels 13249
+new raw sorted by shoe: True | rac_num consecutive from 1 in every shoe: True
+new type values: {1: 8533, 2: 10019, 3: 455, 4: 350, 5: 135, 6: 419, 7: 102}
+new legacy-generalized pixels in bounds: 20013 of 20013 | duplicate RAC pixels 23 | RAC pixels 19990
+new legacy-generalized mapping: RACs on raw contact = 0.8078
+2023 columns: ['shoe', 'rac_num', 'x', 'y', 'type', 'COL', 'ROW', 'INSIDE_SNAKE', 'HORIZ_DIST_SNAKE', 'DIST_SNAKE', 'INSIDE_CONV', 'HORIZ_DIST_CONV', 'DIST_CONV']
+2023 COL == legacy-generalized col: True | ROW == legacy-generalized row: True
+
+=== L. prototype extents vs legacy init ellipses (0-indexed px)
+old data/freq_min_18.png (snake-filled): rows 36-353 cols 95-225 centroid (r=195.5, c=156.8) px=32975
+old superposition >=18 (no flip, as in the Python run): rows 44-347 cols 102-219 centroid (r=194.4, c=157.9) px=27312
+new superposition >=18: rows 27-335 cols 74-196 centroid (r=180.5, c=132.2) px=28559
+new superposition >=29: rows 28-334 cols 75-195 centroid (r=180.7, c=132.1) px=27881
+old init ellipse: rows 38-362 cols 65-245 (center 200,155 radii 162,90)
+new init ellipse: rows 23-347 cols 33-223 (center 185,128 radii 162,95)
+old contact px/shoe p5/p50/p95: [6245, 10266, 16146]
+new contact px/shoe p5/p50/p95: [4876, 8924, 14286]
+
+=== M. legacy get_snake_image orientation for non-square images
+W,H=307,395: shape (395, 307) | (row 50, col 20) set True | (row 300, col 200) set True | swapped (row 20, col 50) set False
+W,H=255,367: shape (367, 255) | (row 50, col 20) set True | (row 300, col 200) set True | swapped (row 20, col 50) set False

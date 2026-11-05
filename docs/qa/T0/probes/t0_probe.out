@@ -1,0 +1,51 @@
+
+=== A. raw file structure
+old contacts: bytes=46930329 expected=46930329 separators={b'\r\n'} values=[0, 1]
+old contour: bytes=46809062 expected=46809062 separators={b'\r\n'} values=[0, 1]
+new contacts: bytes=59053397 expected=59053397 separators={b'\r\n'} values=[0, 1]
+
+=== B. RAC locations
+old: RACs=13287 shoes=386 missing=[127]
+new: RACs=20013 shoes=631 missing=[]
+new RACs/shoe: min=1 median=24.0 mean=31.72 max=281
+first RAC raw x=-0.409554 2023 x=-0.204777 ratio=2.000000; max |raw/2 - 2023| x=0.00e+00 y=0.00e+00
+new coords /2: x in [-0.2390, 0.1701], y in [-0.5147, 0.4983]; old: x in [-0.2330, 0.1721], y in [-0.5025, 0.4961]
+
+=== C. contact pixels per shoe
+old: min=3729 median=10266.0 max=19672
+new: min=1343 median=8924.0 max=19145
+new smallest 8 (shoe, px): [(428, 1343), (163, 1376), (8, 2016), (375, 2963), (359, 2965), (112, 2988), (165, 3070), (286, 3154)]
+
+=== D. pixel calibration feasibility
+old legacy R aspix mapping: RACs on contact = 0.8479
+old best (rate, s, mirror_x, flip_y, dc, dr): (np.float64(0.8816), 300, True, False, -1, -1)
+new coarse best (rate, s, mirror_x, flip_y, dc, dr): (np.float64(0.7534), 300, True, False, 0, 0)
+new fine top5 (rate, sx, sy, dc, dr): [(np.float64(0.8352), 298, 300, -1, -1), (np.float64(0.8345), 296, 300, -1, -1), (np.float64(0.8343), 300, 300, -1, -1), (np.float64(0.8328), 294, 300, -1, -1), (np.float64(0.8318), 298, 302, -1, -1)]
+new 2023 COL/ROW (1-indexed) on contact = 0.8078
+
+=== E. left/right (flip) score: corr with mean shoe, flipped/orig
+old: top=[(9, 1.164), (127, 1.022), (237, 0.989), (222, 0.988)] n(ratio>1)=2
+new: top=[(618, 0.989), (498, 0.989), (27, 0.987), (274, 0.987)] n(ratio>1)=0
+
+=== F. committed OLD contour vs contact (row-span fill)
+shoe 9 coverage: unflipped=0.977 flipped=0.700
+coverage over 386: min=0.700 p5=0.947 median=1.000; worst=[(9, 0.7), (150, 0.889), (241, 0.912), (239, 0.917)]
+contour pixels/shoe: min=614 median=700.0 max=742
+
+=== G. contour_prototype.png vs freq_min_18.png
+freq_min_18 px=32975 contour_prototype px=748 xor(4-boundary)=0 xor(get_contour)=1
+
+=== H. cleaning masks
+old: all_cont px=28609 >=8 px=29719 removed by sweep=1110 all_cont outside freq_min_18=0 freq_min_18 outside all_cont=4366
+new: max overlap=466 union px=36894
+new t=8: px=29536 components=6 outside main=7
+new t=13: px=28949 components=2 outside main=1
+new t=18: px=28559 components=1 outside main=0
+new t=29: px=27881 components=1 outside main=0
+
+=== I. evidence images written
+/home/mehes/projects/rac-spatial-model/docs/qa/T0/old_prototypes.png (2492, 790)
+/home/mehes/projects/rac-spatial-model/docs/qa/T0/old_rmask_stamps.png (614, 790)
+/home/mehes/projects/rac-spatial-model/docs/qa/T0/new_superposition.png (2076, 734)
+/home/mehes/projects/rac-spatial-model/docs/qa/T0/new_sheet_16_racs.png (2040, 734)
+sheet shoes: [428, 163, 8, 375, 359, 112, 165, 286, 22, 91, 296, 320, 473, 519, 596, 599]
