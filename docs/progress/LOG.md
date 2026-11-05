@@ -28,3 +28,38 @@ Chronological; newest entry at the bottom. Each entry: what was done, results (r
 **Next.** T1: capture Tier A, run the unmodified Python and R code in scratch copies (background jobs; the legacy Python writes about 3.6 GB of plotly HTML in its scratch folder), write Tier B and the comparison table.
 
 **Blockers.** None.
+
+## 2026-11-05 20:57, T0-architecture review (reviewer:engineer)
+
+**Verdict: approve** (engineering lens). The facts are real and reproducible. The naming is collision-free and no pipeline file changed. The 9 findings below are all minor, and each lists the task that should apply its fix.
+
+**Verified by re-running, not by reading.**
+- `git diff 0979022..HEAD` outside `docs/` is empty. Both commits are `docs:` only, with no attribution lines. flake8 and shellcheck are clean, all T0 text files have 0 CR bytes, and `t0_doc_checks.py` passes.
+- The four pasted probe outputs in `docs/tests/T0-architecture-results.md` are byte-identical to the `.out` files. My re-run of all four probes (`t0_probe.py` 78 s, `t0_facts.py` 15 s) reproduced them. Only three non-deterministic lines differ: the output paths, the OpenCV timestamp and `free -g`. The PNGs came out byte-identical. The thesis `__pycache__` still holds only the 2025-12-24 files, and nothing in the thesis tree changed after 2026-11-04. Its one dirty file, `statistical_model/re_model_shoe_std_3.Rmd`, dates from 2026-02-23 (the user's own edit).
+- My own scripts confirmed these numbers:
+  - Wald W = 428.693335 with df 24; `b'V^-1 b` and the L-matrix form are `identical()`.
+  - The GLMM has 51,849 observations, 386 groups, 25 fixed effects and sigma^2 = 0.9597791; the CML has 24 coefficients.
+  - The committed contour equals the thesis npy for 386 of 386 records. Without the 126 skip only 126 records match, so the match is not trivial.
+  - NEW: 20,013 RACs, 631 shoes, 23 duplicate pixels, so 19,990 cases and 83,090 rows. The 2023 COL/ROW equal the generalized mapping. The mirror correlation is -0.999941.
+  - The actual text of `dataCC_1.Rmd:93-136` fails on NEW dimensions with "subscript out of bounds". With bound 255 it keeps 29,532 of 29,536 pixels.
+- Extra evidence for T1:
+  - The same Rmd text run on OLD reproduces `data/all_cont.csv`, and `write.csv(eol = "\r\n")` on Linux gives a byte-identical file (supports A-005).
+  - 400 random rows of the committed `dataCC_distance.csv` are reproduced exactly (`min_dist`, `horiz_dist`, `distance_shape`, `new_x`) from the committed contour, using a vectorized min (supports F8, A-016 and Tier A for step 2).
+- An exact-match check of the naming table finds every tracked artifact except `data/new_shoes/README.md`, which is excluded by design. OLD and NEW paths never overlap, and the only NEW paths that are already tracked are the 3 raw inputs. Every mermaid edge references a defined node.
+- A-007 holds. Naomi's `areas.R` applies the rules to the x of `locations_data.csv` and column-reverses the contacts (line 338) before masking.
+- I opened the 4 T0 PNGs; they match `docs/qa/T0/README.md`. The basic-memory note exists.
+
+**Findings (all minor).**
+1. F14 (plan:44) counts only one direction. With a real `write.csv`/`read.csv` round trip, 160 of 392 three-row pairs pass when the data row is above the contour row, and 161 of 392 when it is below (321 of 784 ordered pairs). Fix: correct F14 and the probe before T5.
+2. F6/A-013 (plan:36) give "OLD legacy 0.8479", but probe D uses `(x+0.25)*300`, not R's `/(0.5/150)`. The two forms differ for 2 RACs (shoe 46 at x=0.09425, y=0.2; shoe 239 at x=-0.07, y=-0.47346). The exact R-form rate is 0.847821, i.e. 0.8478. Fix: correct the number and the probe's label.
+3. T3 `test_matches_r_aspix` (plan:317) checks all NEW RACs but only 500 OLD RACs. All 20,013 NEW RACs map identically under both forms, and a 500-RAC OLD sample misses both differing RACs with probability 0.926. Fix: use all 13,287 OLD RACs and pin the 2 edge cases.
+4. Plan 4.1 says unset or empty means old, but 4.4's `rac_profile(dataset = Sys.getenv("RAC_DATASET", "old"))` returns "" for a set-but-empty variable (I checked R and Python), and `test_profile.R` has no empty case. Fix: map "" to "old" in both languages and test it (T2).
+5. `$SCRATCH` is used by T1/T2 (`run_legacy_*.sh`, `regress_old.sh`, which cleans up unless `--keep`) but is never defined. Timestamp directory names can also collide between parallel agents, who share this scratchpad. Fix: `${SCRATCH:?}` or a defined default, `set -u`, and `mktemp -d "$SCRATCH/regress_old_XXXXXX"` (T1).
+6. `test_no_hardcoding` (plan:301) greps only dimensions and paths. Dataset constants that the profile must supply are not caught: stamp threshold 8 (`dataCC_1.Rmd:98`), superposition 18 (`create_files_shoes.py:52`), snake init 200/155/162/90 (`active_contour_snake.py:55-56`), seed 313 and 100 controls. Fix: a behavioural test with sentinel NEW-profile values on a small fixture, or extend the list (T2).
+7. T4 step 6 (plan:338) allows excluding a NEW shoe, but the profile has only `shoes_without_racs`, and `RecordMap` (plan:298) asserts NEW record k is shoe k. Fix: define `excluded_shoes` and the record and factor mapping before T4.
+8. T8's `!reports/*.html` (plan:397) would un-ignore the untracked `reports/offset_changes_report.html`. Fix: un-ignore only `reports/new_shoes_report.html`.
+9. (Not a T0 defect.) The line references in meeting note 7 are off: the output path is at `active_contour_snake.py:175` and the `i == 126` skip at `:177`, not 172 and 175. T2 should use the verified lines.
+
+**Reviewer scripts** (scratch, not committed): `<scratchpad>/review_eng/verify_eng.R`, `verify_eng.py`, `verify_rate.py`, `verify_step2.R`, `verify_table.py`, `verify_forms.py`.
+
+**Blockers.** None.
