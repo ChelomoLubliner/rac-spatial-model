@@ -324,3 +324,19 @@ Chronological; newest entry at the bottom. Each entry: what was done, results (r
 **Next.** T1 (baseline). T3 must apply A-042 and review the 31 single-statistic candidates before the Part 2 shoe set is frozen.
 
 **Blockers.** None for T1-T6. Open for people: D-012 (Micha, Yoram), now with 67 likely reprints and 22 uncertain; D-013; D-008 (sign now fixed); D-009; D-010.
+
+## 2026-11-05 23:59, T1-baseline (implementer), in progress
+
+**Done and committed** (`fb9bca2`, `7a38f2e`, `fe94300`): manual Wald test `statistical_model/R/wald.R` (W = 428.693335 on the committed GLMM, three equivalent forms agree; CML W = 420.671242); Tier A baseline files in `tests/baseline/` (24 checksums from the `79247d8` blobs, the 11-file `old_baseline.sha256`, EOL table, `%.17g` model dumps); `tests/lib/` helpers (`scratch.sh` with the A-034 guards, `dump_models.R`, `compare_models.R`, `pdf_normalize.py`, `compare_legacy_python.py`, `make_tier_a.sh`); legacy runners `tests/legacy/run_legacy_python.sh` and `run_legacy_r.sh`; `tests/run_all.sh`; the verbatim thesis code in `contour_algorithm/` with `requirements-lock.txt`.
+
+**Findings so far (real output, details go to `docs/tests/T1-baseline-results.md`).**
+- The first legacy Python run (`<scratch>/t1/legacy_py_o4gTOt`) died after 139 s in the contour step with `OSError: [Errno 12] Cannot allocate memory` while plotly re-read `plotly.min.js` from the venv on `/mnt/c` (7.7 GB RAM was free: a WSL drvfs read failure). Its first step was complete: `list_matrices.npy`, `old_freq_min_18.npy`, `freq_min_18.npy` are byte-identical to the thesis 2025-11-13 run; the PNGs have identical pixels but different bytes. Root cause proven: Windows Pillow 12.0.0 (zlib-ng "1.3.1.zlib-ng") re-encodes the committed `freq_min_18.png` pixels to exactly the committed 767 bytes, Linux Pillow 12.0.0 (zlib-ng "1.3") to 807 bytes.
+- Re-run planned from a byte-identical copy of the thesis venv in scratch (`<scratch>/t1/venv_copy`, copy plus `diff -rq` in progress; drvfs copies at about 1 MB/s).
+- Snake regression on 6 OLD shoes (1, 9, 35, 153, 236, 387) with the in-repo legacy code: every record equal to the committed contour (0 differing pixels), 32 s.
+- R chain B (`<scratch>/t1/legacy_r_OB7DF8`, steps 3-6 from the committed step-2 CSV): all steps exit 0 (GLMM 281 s, CML 230 s, step 4 16 s and 14 s, step 5 30 s, step 6 21 s). **CML refit `identical()` to the committed CML in every field.** GLMM not identical: max |fixef diff| 0.000767, sigma^2 0.95979590 vs 0.95977909, logLik diff 1.2e-6.
+- **Root cause of the GLMM vcov/Wald difference (K11):** lme4 1.1-38 (installed here) skips derivatives when nobs > `check.conv.nobsmax` = 10,000 and `calc.derivs = NULL` (its NEWS); the GLMM has 51,849 rows, so the refit has `optinfo$derivs = NULL` and `vcov()` falls back to RX: W = 427.7804 with both vcov types. The committed model (lme4 1.1-37, Windows R 4.4.3) stores a 26 x 26 Hessian: W = 428.6933 (Hessian vcov), 427.7674 (RX). The RX vcovs of committed and refit differ by at most 8.5e-6.
+- Diagnostics running: local refit with `calc.derivs = TRUE`, and a refit with the Windows R 4.4.3 + lme4 1.1-37 that wrote the committed model (`<scratch>/t1/diag_glmm/`).
+
+**Running.** R chain A (`<scratch>/t1/legacy_r_oTZO3x`, all steps 1-6): step 1 done in 141.8 s (exit 0), step 2 (the slow double loop) started 23:42.
+
+**Next.** Python rerun from the venv copy; compare step-1/2 CSVs and chain-A models; Tier B files; gallery `docs/qa/sheets_old/`; `docs/qa/snake-qa.md`; results doc. `<scratch>` = `/tmp/claude-1000/-home-mehes-projects-rac-spatial-model/1d789329-e60a-4147-af28-9c8214affef3/scratchpad`.
