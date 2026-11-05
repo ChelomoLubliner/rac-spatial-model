@@ -1,0 +1,3 @@
+# Raw data files: keep byte-identical (fixed-offset readers depend on CRLF separators)
+data/new_shoes/*.txt -text
+data/new_shoes/*.csv -text
