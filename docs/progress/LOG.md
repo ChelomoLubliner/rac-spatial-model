@@ -649,3 +649,59 @@ Chronological; newest entry at the bottom. Each entry: what was done, results (r
 **Open.** A-055 (vcov method), A-060 (platform of the official NEW contour) stay proposals; freezing venv-wind's base (A-071) needs the user.
 
 **Blockers.** None.
+
+## 2026-11-06 06:55, T2-profiles review (reviewer:engineer)
+
+**Verdict: changes required** (engineering lens), for finding 1 only. The refactor itself is correct as far as I could test it: every OLD claim I re-ran reproduces, and nothing I checked in the results doc was contradicted. Findings 2-5 can go into the same fix pass or T3.
+
+**Verified by re-running, not by reading.**
+- `bash tests/run_all.sh old` at `26f323a`: ALL PASS in 2 min 46 s (91 Python tests OK, 3 skipped; 13 R scripts; flake8 46 files; shellcheck 12; work tree unchanged).
+- My own `tests/regress_old.sh --steps 1,2` (`<scratch>/rv_eng_t2/gates/regress_old_mFZv2L`): ALL PASS. The five regenerated CSVs are byte-identical to the `79247d8` blobs (`git show | cmp`), `shoe_codes.csv` equals the committed file, and step 2 ran the vectorized default (56.6 s under load).
+- My own `tests/regress_old.sh --steps 5` on the committed models: ALL PASS; `wald_test.csv` equals the committed file.
+- T2c: my own AST comparison of `9adc036` vs `6c3488f` (docstrings and placeholder-free f-strings normalized): all 8 kept modules SAME. `9adc036` touched only the 3 dropped modules, the README and `requirements.txt`.
+- The 5 colliding-profile negative controls: all caught, with the pasted failure counts.
+- The artifacts behind the pasted results exist and match:
+  - the final gate folders `regress_old_zzg9CP` and `regress_old_EXeICT` (HEAD `ed68998`, docs-only work-tree changes, 22/22 model fields identical, W 427.7804472165);
+  - the venv-wind contour (sha256 `ca8a07f2...` = committed) and the Windows R step 3 (27 of 27);
+  - the Windows step-1 CSVs (4 of 4 = committed) and the NEW smoke test (83,090 rows, 19,990 cases, 631 shoes, 100 controls each);
+  - the Linux half of the EOL probe.
+  The code of steps 0 and 3 is unchanged since `82c1661`, the commit of the Windows gates.
+- Since `79247d8` no committed OLD file changed (only `shoe_codes.csv` and `wald_test.csv` were added). No changed code file has a CR, and no commit has an attribution line. My own grep finds no dataset literal left in pipeline code, and every R and Python file write goes through a profile path.
+
+**Findings.**
+1. **Major (required): both collision tests will fail as soon as a NEW output is committed.**
+   - `tests/python/test_profiles.py:196` (`new_files & tracked_files() == set()`) and `tests/r/test_profile.R:130` (`!any(new_files %in% tracked)`) treat every tracked file as an OLD file.
+   - But plan section 5 tracks the NEW outputs: T4 commits `data/new_shoes/contour_Active_Contour_new.txt`, and T5 the NEW CSVs and models.
+   - Reproduced without touching the repo: I added that one path to a copy of the index (`GIT_INDEX_FILE`). Then `test_profiles.New.test_no_collision` FAILS (`Items in the first set but not the second: data/new_shoes/contour_Active_Contour_new.txt`), and `test_profile.R` stops with `!any(new_files %in% tracked) is not TRUE`.
+   - Risk: the T4 agent has to edit the core rule-1 guard and may weaken it.
+   - Fix: compare with the OLD tracked files only (`git ls-tree -r --name-only 79247d8` plus the OLD T2 files), or with the tracked files minus the NEW-namespaced ones. Add a test that a committed NEW output passes while a NEW path equal to an OLD tracked file still fails.
+2. **Minor: the committed OLD `processed_data/wald_test.csv` depends on whether car is installed.**
+   - With car, step 5 writes `method` = `manual+car` and fills `W_car`/`p_car` (the results doc's own Windows run, section 5).
+   - So a step-5 rerun under the Windows R does not reproduce the committed bytes, and `regress_old.sh --steps 5` fails on any machine with car. Section 10 ("not reproduced") does not list this.
+   - Fix: keep the committed file independent of optional packages (put the car comparison elsewhere, or always write the same values), or compare W/df/p numerically in the gate; and record the exception.
+3. **Minor: the sentinel fixture cannot show that five snake parameters, `rel_x_cord` and `rel_Y_cord` reach the code.**
+   - The fixture uses the real values (sigma 3, alpha 0.015, beta 10/0.10, gamma 0.001; 0.25 and 0.5), and the scanner does not forbid these literals.
+   - Mutation in a scratch copy: I hard-coded `alpha=0.015`, `beta=0.10`, `gamma=0.001` and sigma `3` in `active_contour_snake.py`. `test_sentinel_profile` and `test_snake_geometry` still pass, and the scanner finds nothing.
+   - This matters because the plan lets T4 change these values for NEW.
+   - The `make_sentinel.py` docstring claims that a leftover 0.25/0.5 "would give other outputs or an error". That is false for this fixture.
+   - Fix: give the fixture distinct values (regenerate the RAC coordinates for the new `rel_*_cord`) and assert an output that only those values produce; or correct the docstring.
+4. **Minor: no runtime namespace check.**
+   - `load_profile` and `rac_profile` validate the profile's shape, not rule 1; only the tests check rule 1, and only when they run.
+   - So a NEW path edited to an OLD one (e.g. `dataCC: processed_data/dataCC.csv`) makes the next NEW run overwrite the committed OLD CSV. `rac_write_csv` has no guard, and `rac_new_output` guards OLD runs only.
+   - Fix: both readers refuse a non-OLD profile whose output path lacks a `new` folder or the `_new` suffix.
+5. **Nits.**
+   - `re_model_shoe_std_3.Rmd:61` runs the `rac_new_output` check after the 4-minute fit; check before fitting.
+   - `test_distances_vectorized.R:76` says "1,000 OLD rows" (it is 406).
+   - Plan Revision 6 says "commits `9adc036` to `cf740fa`" and "Decisions A-073 to A-080", but `ed68998` and A-081 are part of T2 too.
+   - `print.rac_wald` prints "car not installed" also when `use_car = FALSE`.
+   - `CONTOUR_ALGORITHM` in `config.R` is now unused.
+
+**What is good.**
+- One profile file drives both languages, and both readers validate it.
+- The skip list is computed from the locations and checked in Python and R; no index is hard-coded.
+- The CLI refusal and `rac_new_output` stop in-place OLD overwrites.
+- A-081 is the honest answer to a platform fact, and the failed chained gates are shown, not hidden.
+- The vectorized step 2 keeps every float operation and both CSV round trips, and its proof is byte-level.
+- The binary CSV writer (A-080) fixes a real Windows bug that was found by testing there.
+
+**Required before the next step:** finding 1, in both languages. Findings 2-5 can go into the same fix pass or T3.
