@@ -1609,3 +1609,44 @@ The viewer drops older images. I reopened every sheet whose image had dropped, a
 **Every shoe that looks wrong, and its status:**
 - unclassed: 44, 521, 626, 458, 390;
 - classed or flagged, as documented: 8, 9, 11, 12, 14, 15, 18, 28, 35, 36, 37, 69, 104, 107, 109, 112, 113, 120, 121, 125, 140, 148, 163, 169, 173, 186, 205, 222, 263, 267, 274, 286, 294, 328, 361, 375, 376, 379, 405, 420, 422, 423, 427, 456, 486, 506, 518, 527, 557, 586, 591.
+
+## 2026-11-06 23:10, T5-newmodel (implementer), done
+
+**What.** Plan task T5, steps 1, 3, 4, 5 and 6: the R pipeline (steps 1-6) on the 631 NEW shoes with every output under the NEW names, plus the stamp-cleaning question for NEW, the PNG copies of the figures and the NEW refits on the OLD basis. Step 3b (robust variances on both datasets) is not part of this task and was not started. Started 22:10 from `f3b5d6e`. Commits:
+- `cb7340f` the NEW R stamp threshold 8 (A-110) with its evidence and the recomputed T4 QA tables;
+- `4c767bf` NEW steps 1-2 and their QA;
+- `9f279b5` NEW steps 3-6, the OLD-basis refits (A-112), the PNG twins (A-111);
+- `c3a057b` the tests;
+- then the docs commit.
+
+Decisions A-110 to A-112; plan revision 12 (F72-F77). Results with exact commands and real outputs: `docs/tests/T5-new-pipeline-results.md` (pointer `T5-results.md`); QA files described in `docs/qa/T5/README.md`.
+
+**Results.**
+- **Police stamps, A-110:** NEW has none. The step-1 sweep removes 0 px at threshold 8 (OLD: 1,110 px of stamps); every frame-artefact remnant and the margin debris lie outside the R mask at both 8 and 13. 13 would remove 5,661 more contact px on 99 more shoes, 99.4% of them inside the shoe's own contour (sole edge). So NEW keeps the OLD threshold 8 (the plan's provisional value was 13). The step-0 QA column `coverage_r` follows the profile's R mask, so two T4 tables changed in that column (10 shoes, -0.0001 to -0.0013) and the threshold study lost its `r13` columns; everything else of `tests/rebuild_new.sh --full` equals HEAD, and the fast gate passes against `cb7340f`.
+- **Step 1:** 83,090 rows = 19,990 cases + 631 x 100 controls; `MEAN_OFFSET` -4.4655 (OLD -4.6143). The contact surface S of all 631 shoes on 13 sheets, **every sheet looked at**: no sticker, label or frame artefact in any S (each is erased by the erase list or removed by the R mask: 114's and 581's handwritten marks, 580's wedge, 582's strip, 186's lines, 586's band). All controls lie on S; 7 controls (OLD 63) and 490 px of S (OLD 4,585) lie outside their contour fill: rim cuts (28, 148), faint-print specks (8) and debris specks.
+- **Step 2:** `new_x` in [-0.185, 0.2317] (OLD [-0.1917, 0.2417]) with quantiles within 0.003 of OLD's; no NA or Inf; no point outside the prototype outline; 36 rows (0.043%) beyond the OLD boundary knots; the legacy loops equal the vectorized code on 2,000 random NEW rows. NEW's cases sit lower (heel, midfoot) than OLD's: its y knots are 7 and 12 px lower at the heel.
+- **Step 3:** GLMM converged (code 0, no lme4 message), sigma^2 0.7556 (OLD 0.9598; not comparable without the offset refits of T6), RX vcov; exact CML 4 iterations. Manual Wald (all 24 spatial = 0): GLMM 585.89, df 24 (OLD 428.69 Hessian / 427.77 RX); CML 576.03 (OLD 420.67). On the OLD basis, A-112: GLMM sigma^2 0.7553, W 623.12; CML W 612.50.
+- **Steps 4-6:** 8 PDFs, all looked at with their PNG twins. NEW's intensity is highest in the centre of the midfoot, at the left heel, the right heel-midfoot and along the right forefoot edge near NEW's right boundary knot; OLD peaks at the left forefoot. GLMM and CML agree to about 1-2%. The CI cuts have OLD's shapes at higher levels.
+- **K8:** on both GLMMs the log-odds equals the intercept along the left and heel edges (max deviation 0); NEW's top-right corner extrapolates to eta 1.80, outside the prototype mask.
+
+**Tests.**
+- New: `tests/r/test_new_outputs.R` (6 checks, 13.5 s; three mutants caught: a changed contour record, a moved control, threshold 13), `tests/r/test_figures_png.R` (17.5 s), and the NEW part of `tests/r/test_distances_vectorized.R`.
+- `bash tests/run_all.sh` at `c3a057b`: ALL PASS (184 Python tests with 3 skipped live checks, 17 R scripts, flake8 85 files, shellcheck 16 files, work tree unchanged), 6 min 15 s.
+
+**OLD regression: identical.**
+- `regress_old.sh --steps 1-6 --keep` at `c3a057b`: ALL PASS (the five step-1/2 CSVs = Tier A byte for byte, `shoe_codes.csv` = `old_added_t2`, GLMM and CML `identical()` to Tier B in every dumped field, 8 normalized PDFs = Tier B, Wald W 427.7804472165 = Tier B, both live checks), 11 min 20 s.
+- `regress_old.sh --steps 0` (the profile file is shared with step 0): ALL PASS (16 threads, Haswell; contour = Tier B `e18d50df...`; 1,556 intermediates = Tier B; live check), 7 min 23 s.
+- No committed OLD file changed: the Tier A, `old_baseline` and `old_added_t2` checksums pass, and the OLD output folders hold only the OLD files (test above).
+
+**Timings** (several jobs at once): stamp probe 41 s; NEW step 1 309 s; step 2 36 s; step 3 GLMM 595 s, CML 290 s; steps 4-6 70 s; OLD-basis refits 10 min 32 s and 6 min 52 s; PNG twins 40 s (NEW), 45 s (OLD); `rebuild_new.sh --full` 438 s of steps, fast 219 s; `run_all.sh` 6 min 15 s.
+
+**Side effects outside the repo.** Only `<scratch>/t5/`: probe outputs, gate run folders (`rebuild_new_G3HyxR` and `regress_old_duW0Vz` kept with `--keep`), three mutant copies (deleted). The thesis repo was not touched.
+
+**Open for people.**
+- Shlomo: A-110 (NEW stamp threshold 8, not the provisional 13; it changed `coverage_r` in two T4 tables), A-111 (PNG copies drawn by the Rmds' code), A-112 (the OLD-basis refits recorded now for T6).
+- Statistics expert (plan T5 step 4): sigma^2 0.756 vs 0.960 needs the offset refits (T6); the right forefoot edge stripe near NEW's right boundary knot; the wider Random band at the K8 left edge on both datasets; NEW's lower case distribution in y.
+- If the NEW contour changes again (the last T4 vision review proposes fallbacks for 591, 148 and 125), rerun `RAC_DATASET=new tools/run_pipeline.sh --steps 2-6` and the two OLD-basis refits; `tests/r/test_new_outputs.R` fails until then.
+
+**Next.** T5 step 3b (shoe bootstrap and Efron-cluster variances on both datasets), then T6.
+
+**Blockers.** None.

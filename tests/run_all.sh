@@ -7,9 +7,10 @@
 # Exit 0 only if all pass.
 #
 # Usage: bash tests/run_all.sh [old]
-#   The only dataset argument is old (the default): these are the OLD
-#   regression checks and the unit tests of both profiles; a NEW argument
-#   is refused until NEW outputs exist to check (T5).
+#   The only dataset argument is old (the default): the OLD regression
+#   checks, the unit tests of both profiles and, since T5, the checks of
+#   the committed NEW outputs (tests/r/test_new_outputs.R); there is no
+#   separate NEW mode.
 # Optional: RAC_VENV_PY = the Python with numpy, scikit-image, opencv
 #           (default: the thesis venv). Slow gates (legacy reruns,
 #           tests/regress_old.sh, tests/legacy/run_windows_*.sh) are

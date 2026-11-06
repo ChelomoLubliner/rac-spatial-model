@@ -143,6 +143,23 @@ silently rewrite the committed contour; the OLD regression gate runs with the li
 threads here, as the baselines) and refuses a machine where the thread count or the kernel differs
 (`tests/baseline/local/openblas_tier_b.txt`).
 
+The NEW outputs of Steps 1-6 are committed too (T5): `processed_data/new/*_new.csv`,
+`saved_models/new/NEW_X_NS_XY_new.rds` and `CML_MODEL_new.rds`, `model_images/new/*_new.pdf`, with PNG
+copies of the figures in `docs/qa/T5/new/`. They were made from the committed NEW contour with
+
+```bash
+RAC_DATASET=new tools/run_pipeline.sh --steps 1-6     # about 22 minutes here
+```
+
+NEW prints carry no police stamp, so the stamp mask of Step 1 removes nothing there beyond the pixels in
+contact on fewer than 8 shoes (the OLD threshold; decision A-110). `tests/r/test_new_outputs.R` checks
+these outputs against the raw data and the committed contour, so a NEW contour changed later fails it until
+Steps 2-6 are rerun. Two NEW-only tools: `RAC_DATASET=new Rscript tools/fit_oldbasis_new.R NEW_X_NS_XY`
+(or `CML_MODEL`) refits the NEW data on the OLD spline knots
+(`saved_models/new/<model>_oldbasis_new.rds`, for the old-vs-new comparison; A-112), and
+`RAC_DATASET=old|new Rscript tools/figures_png.R <folder>` draws PNG copies of the Step 4-6 figures with the
+Rmds' own code (this machine has no PDF rasterizer; A-111).
+
 The plan and the decisions behind this are in `docs/plans/2026-11-05-new-shoes-pipeline.md` and
 `docs/decisions.md`; the fast tests run with `bash tests/run_all.sh`.
 
@@ -152,8 +169,9 @@ The pre-fitted OLD models ship in `saved_models/` and the OLD figures in `model_
 read those models, but for OLD they run only in a copy (they would overwrite the committed figures):
 `RAC_SCRATCH=<scratch folder> bash tests/regress_old.sh --steps 4-6 --keep` draws them from the
 committed models in a few minutes. For NEW, Steps 4--6 run in this tree once Step 3 has fitted the NEW
-models. Times on this machine (WSL): Step 1 about 2 min, Step 2 about 20 s, Step 3 about 4 min per
-model.
+models (they are committed). Times on this machine (WSL): OLD Step 1 about 2 min, Step 2 about 20 s, Step 3
+about 4 min per model; NEW Step 1 about 5 min, Step 2 about 40 s, Step 3 about 10 min (GLMM) and 5 min
+(CML), Steps 4-6 about 1.5 min.
 
 ---
 
