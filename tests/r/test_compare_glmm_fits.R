@@ -32,7 +32,12 @@ f_hess <- changed_copy(function(g) {
   g
 })
 
-stopifnot(!identical(readRDS(glmm), readRDS(glmm)))  # why field by field
+# Why field by field: two reads of one merMod file are not identical() in
+# R 4.3.3 / lme4 1.1-38 (environments in call, terms, resp and pp). That is
+# a serialization detail, not a property to test (a later R or lme4 may
+# change it; T1 review 2, nit 2), so it is only reported.
+cat("NOTE two reads of the committed GLMM identical():",
+    identical(readRDS(glmm), readRDS(glmm)), "\n")
 tab <- compare_glmm_files(glmm, glmm)
 stopifnot(nrow(tab) == 27, all(tab$same))
 pass("committed GLMM vs a second read of it: 27 of 27 fields the same")

@@ -19,9 +19,9 @@ run_variant <- function(lines_in) {
   input <- tempfile(fileext = ".Rmd")
   output <- tempfile(fileext = ".Rmd")
   writeLines(lines_in, input)
-  out <-suppressWarnings(system2(rscript, c(shQuote(script), shQuote(input),
-                                             shQuote(output)),
-                                  stdout = TRUE, stderr = TRUE))
+  out <- suppressWarnings(system2(rscript, c(shQuote(script), shQuote(input),
+                                              shQuote(output)),
+                                   stdout = TRUE, stderr = TRUE))
   status <- attr(out, "status")
   list(status = if (is.null(status)) 0L else status, log = out,
        output = output)
