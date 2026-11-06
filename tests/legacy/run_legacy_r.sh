@@ -11,14 +11,23 @@
 # switched by sed in the scratch config.R only. Step 5 runs the variant made
 # by step5_without_car.R (car is not installed here). RGL_USE_NULL=TRUE
 # keeps rgl headless. Prints the run folder on the first line.
+# The copy holds every committed output, so before the first step the
+# outputs of every step that runs are deleted from it and listed in
+# outputs_expected.txt; after the last step each must exist and be newer
+# than that list (tests/lib/run_outputs.sh, decision A-067). A missing
+# output makes the run fail (exit 1), like a failed step.
 # Outputs: repo/ (the copy, with the regenerated files), logs/<step>.log,
-# timings.tsv (step, seconds, exit), sessionInfo.txt, exit_status.
+# timings.tsv (step, seconds, exit), outputs_expected.txt,
+# outputs_regenerated.sha256, outputs_missing.txt, sessionInfo.txt,
+# exit_status.
 
 set -euo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 # shellcheck source=../lib/scratch.sh
 source "$here/../lib/scratch.sh"
+# shellcheck source=../lib/run_outputs.sh
+source "$here/../lib/run_outputs.sh"
 repo=$rac_repo_root
 commit=${RAC_LEGACY_R_COMMIT:-79247d8}
 steps=${1:-1,2,3,4,5,6}
@@ -53,6 +62,30 @@ set_feature() {
     "$sm/config.R"
   grep -q "^MODEL_FEATURE <- \"$1\"" "$sm/config.R"
 }
+
+# What each step writes (paths relative to the run folder).
+step_outputs() {
+  case $1 in
+    1) echo repo/data/all_cont.csv repo/processed_data/dataCC.csv \
+      repo/processed_data/shoe_pixel_counts.csv ;;
+    2) echo repo/processed_data/dataCC_distance_temp.csv \
+      repo/processed_data/dataCC_distance.csv ;;
+    3) echo repo/saved_models/NEW_X_NS_XY.rds repo/saved_models/CML_MODEL.rds ;;
+    4) echo repo/model_images/NEW_X_NS_XY_SHOE.pdf \
+      repo/model_images/CML_MODEL_SHOE.pdf ;;
+    5) echo repo/model_images/CI_shoe_cuts.pdf \
+      repo/model_images/CI_cut_110.pdf repo/model_images/CI_cut_190.pdf \
+      repo/model_images/CI_cut_250.pdf ;;
+    6) echo repo/model_images/pixel_inten_JASAup.pdf \
+      repo/model_images/difference_random_cml.pdf ;;
+  esac
+}
+outputs=()
+for s in ${steps//,/ }; do
+  read -r -a step_files <<< "$(step_outputs "$s")"
+  outputs+=("${step_files[@]}")
+done
+rac_outputs_begin "$run" "${outputs[@]}"
 
 printf 'step\tseconds\texit\n' > "$run/timings.tsv"
 overall=0
@@ -95,6 +128,7 @@ if has 5; then
 fi
 if has 6; then render step6 model_comparison_6.Rmd model_comparison_6.html; fi
 
+rac_outputs_end "$run" || overall=1
 Rscript -e 'suppressMessages({library(lme4); library(survival)});
   print(sessionInfo())' > "$run/sessionInfo.txt" 2>&1 || true
 echo "$overall" > "$run/exit_status"

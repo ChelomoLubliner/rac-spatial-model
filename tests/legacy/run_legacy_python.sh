@@ -17,13 +17,20 @@
 #   images/<subfolders>      every folder the code writes into
 # Outputs: data/contour_Active_Contour.txt (written with LF on Linux),
 # images/saved/*.npy|png, images/<per-shoe folders>, logs/main.log,
-# timing.txt, pip_freeze.txt, exit_status.
+# timing.txt, timings.tsv (one row, step0), outputs_expected.txt,
+# outputs_regenerated.sha256, outputs_missing.txt, pip_freeze.txt,
+# exit_status. The run folder starts without any output; the contour and
+# the eight images/saved files are listed in outputs_expected.txt before the
+# run and must exist and be newer than that list afterwards, or the run
+# fails (tests/lib/run_outputs.sh, decision A-067).
 
 set -euo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 # shellcheck source=../lib/scratch.sh
 source "$here/../lib/scratch.sh"
+# shellcheck source=../lib/run_outputs.sh
+source "$here/../lib/run_outputs.sh"
 repo=$rac_repo_root
 
 thesis=${RAC_THESIS_REPO:-/mnt/c/Users/mehes/Documents/repo/master_thesis_forensic_shoeprint}
@@ -59,6 +66,14 @@ cp -p "$repo/data/contacts_data.txt" "$repo/data/locations_data.csv" \
   "$run/data/"
 ln -s data "$run/Data"
 
+saved=()
+for f in list_matrices.npy old_freq_min_18.npy freq_min_18.npy \
+  list_contour.npy active-contour_all.npy all_shoes_superposed.png \
+  old_freq_min_18.png freq_min_18.png; do
+  saved+=("images/saved/$f")
+done
+rac_outputs_begin "$run" data/contour_Active_Contour.txt "${saved[@]}"
+
 start=$(date +%s.%N)
 echo "start $(date --iso-8601=seconds)" > "$run/timing.txt"
 status=0
@@ -73,6 +88,9 @@ end=$(date +%s.%N)
   echo "exit $status"
   echo "seconds $(echo "$end - $start" | bc)"
 } >> "$run/timing.txt"
+printf 'step\tseconds\texit\nstep0\t%s\t%s\n' "$(echo "$end - $start" | bc)" \
+  "$status" > "$run/timings.tsv"
+rac_outputs_end "$run" || { [[ $status -ne 0 ]] || status=1; }
 
 PIP_DISABLE_PIP_VERSION_CHECK=1 PIP_NO_CACHE_DIR=1 timeout 600 \
   "$venv_py" -B -m pip freeze > "$run/pip_freeze.txt" 2>&1 || true
