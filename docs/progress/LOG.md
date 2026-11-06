@@ -1368,3 +1368,41 @@ Several first reads came back blank because of the viewer limit; I reopened each
 **Not verified:** the venv-wind NEW build (A-098) and the visual judgements (vision lens). I did not run a whole OLD gate with a forced kernel; the snake reruns above show the effect.
 
 **Times** (s; load 10-40 while the other reviews ran): WSL OLD step-0 gate 1,447 (snake 1,396); the same with inherited variables 809; venv-wind OLD snake 823; the R chain as above; NEW clone step 0 (14 jobs) 409, QA 443, thresholds 53; NEW serial step 0 768; `rebuild_new.sh` step 0 182 and metrics 47; fast suite 455.
+
+## 2026-11-06 19:30, T4-snake review fixes review (reviewer:vision)
+
+**Verdict: changes required** (visual QA lens). The fixes of the first vision review hold. The contours that no band flagged before are fixed or classed, the frame artefacts are gone from the cleaned shoes, and no police-type sticker or label is on any NEW print. One problem class is still misdiagnosed: the initial ellipse. The other findings are minor.
+
+**Looked at (Read tool):**
+- all 52 NEW sheets (13 each: prototype, ellipse + first snake, final snake, cleaned; shoes 1-631);
+- `prototype_mask_new.png`, the 30 flagged figures (three per view), `overrides_before_after_new.png`, OLD `sheet_old_01.png`;
+- about 15 zoom sheets of my own (2-5x): record, saved snakes, RACs, contact outside the fill, 327/328 and 580/583/584 and 586/587 compared, 170 with another ellipse.
+
+Some first opens came back without the picture (viewer limit). I reopened those and wrote each note right after viewing. Scripts and notes: `<scratch>/rv_vis2/`.
+
+**Findings:**
+1. **Major: the ellipse fails at the heel too, and that cut is fixable.** A-105, F68 and `snake-qa.md` say the print crosses the ellipse's *top* on 43 shoes and the final contours still reach the toe tip.
+   - 15 of the 43 cross at the heel bottom: 35, 37, 46, 55, 56, 63, 142, 169, 170, 314, 401, 422, 423, 432, 586 (103 px). 29 cross at the toe (35 at both).
+   - The snakes do not recover print beyond the ellipse: 159 of its 516 px stay outside the final fill.
+     - Toe: 9 13 px, 125 14, 104 13.
+     - Heel: 170 32, 423 8, 169 6, 586 5.
+   - 170's `rim_cut` is this case. 35 px of its lower-left heel pad lie outside the ellipse, which is why no closing radius helps.
+     - My scratch probe (`ell_probe.py`) rewrites the committed record exactly with the profile ellipse (0 px gained or lost).
+     - With a per-shoe ellipse (187,127)/(167,98), or (188,128)/(165,97), 170 passes every band (coverage 0.9875 -> 1.0), with the left edge 1 px wider at the median.
+   - The same ellipse does not clearly help 169, 37, 423 or 586.
+   - Fix: correct A-105, F68 and `snake-qa.md` (heel and toe; 159 px left outside). Take a per-shoe ellipse override for 170 (plan T4 step 6 allows one, with before/after images), or record why not.
+2. **Minor: rim cuts not classed.** A-101 says every shoe with a known defect is named, but these are not:
+   - 28: the outer ring of the upper-right heel pad, 20 px, up to 6.3 px deep (deeper than any classed `rim_cut`);
+   - heel edges: 37 (23 px, 3.6 px), 148 (20 px, 2.8 px), 169 (15 px, 2.8 px), 591 (20 px, 5 px);
+   - small peaks up to a mark at the toe top: 518 and 527 (`spike`).
+   All are within the OLD tolerance (contact out < 8 px).
+3. **Minor: 186 keeps 3 px of its vertical frame line** inside the mask, at rows 250-252, col 183 (1-based). They are joined to the line's red pixels, and no rectangle covers them. They lie outside the contour, but "no artefact is left in a cleaned shoe" is not literally true. Fix: add the rectangle, or name the residual.
+4. **Minor: the 328 note.** I aligned 328 on 327 (shift 0 rows, +1 col; the forefoot, heel and whole-sole bands agree). 328's contour ends 8-10 rows above 327's heel, and one of the three specks below it lies inside 327's heel outline. `partial_print` is right, but the note should say that the contour cuts off the unprinted bottom of the U.
+
+**Checked, no finding:**
+- No sticker or label in any cleaned shoe or contour. The heel plate of 344 and 345 sits at the same place on both prints and carries RACs, so it reads as moulded sole.
+- 580 (rounded heel like 583/584), 584 (line erased), 586 (flat-topped toe whose top row matches 587's: the declared residual).
+- 354/355: the contour runs straight along the unprinted lateral waist, as an envelope.
+- The 23 overrides are better or equal; 8, 163 and 557 stay envelopes of partial prints.
+- The mask is a sole silhouette with all debris outside it.
+- Metrics cross-check: every shoe I judged wrong is flagged or classed, except those in findings 1-2. The deepest unflagged outside contact (329, 492, 433, 165, 285: 5-7 px) is isolated specks or debris.
