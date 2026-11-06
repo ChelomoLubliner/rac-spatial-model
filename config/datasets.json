@@ -94,6 +94,17 @@
           "prototype_mask": "freq_min_{t}",
           "locations_pixels": "locations_new"
         }
+      },
+      "prep": {
+        "_comment": [
+          "T3 data preparation and pixel calibration (A-087): OLD-only QA",
+          "files, no suffix; the OLD locations need no derived CSV"
+        ],
+        "locations_csv": null,
+        "pixel_calibration": "docs/qa/T3/old/pixel_calibration.csv",
+        "calibration_grid": "docs/qa/T3/old/calibration_grid.csv",
+        "shoe_contact": "docs/qa/T3/old/shoe_contact.csv",
+        "qa_dir": "docs/qa/T3/old"
       }
     },
     "new": {
@@ -105,7 +116,20 @@
       "shoes_without_racs": [],
       "excluded_shoes": [],
       "coords": {
-        "_comment": "provisional: the legacy 300 px per unit; T3 calibrates",
+        "_comment": [
+          "Calibrated in T3 (decisions A-086 pre-registered, A-087): the",
+          "generalized legacy mapping, i.e. the OLD one (300 px per unit on",
+          "both axes, x mirrored, y not flipped, the legacy centre), is kept",
+          "for NEW. Evidence (processed_data/new/pixel_calibration_new.csv,",
+          "docs/qa/T3/new/calibration_grid_new.csv, docs/tests/",
+          "T3-new-data-results.md): NEW optimum strict sx 297, sy 301,",
+          "dc -0.5, dr -0.75 px (on contact 0.838 vs legacy 0.808); OLD",
+          "optimum 300, 301, -0.5, -0.5 (0.884 vs 0.848); same orientation,",
+          "a single optimum at 300 over 100-700 px per unit on both; the",
+          "2023 COL/ROW equal this mapping for all 20,013 RACs. The strict",
+          "margin test of A-086 fails on OLD and NEW alike, the 1-pixel",
+          "dilation test passes on both (A-087 explains the choice)"
+        ],
         "divisor": 2,
         "rel_col_shoe": 150,
         "rel_row_shoe": 300,
@@ -185,6 +209,18 @@
           "prototype_mask": "freq_min_{t}",
           "locations_pixels": "locations_pixels"
         }
+      },
+      "prep": {
+        "_comment": [
+          "T3 data preparation and pixel calibration (A-087, A-088): the",
+          "derived locations CSV (coordinates already divided by 2) and the",
+          "calibration and per-shoe contact tables"
+        ],
+        "locations_csv": "data/new_shoes/locations_data_new.csv",
+        "pixel_calibration": "processed_data/new/pixel_calibration_new.csv",
+        "calibration_grid": "docs/qa/T3/new/calibration_grid_new.csv",
+        "shoe_contact": "docs/qa/T3/new/shoe_contact_new.csv",
+        "qa_dir": "docs/qa/T3/new"
       }
     }
   }

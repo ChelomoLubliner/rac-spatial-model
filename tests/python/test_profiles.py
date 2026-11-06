@@ -7,8 +7,12 @@ input, or an OLD tracked file (user rule 1). "OLD tracked file" means a
 file of the baseline commit 79247d8 or a tracked file outside the NEW
 namespace (T2 review, finding 2: the earlier rule took every tracked file
 for OLD, so it would have failed once T4 commits the NEW contour), and
-load_profile() itself refuses a profile that breaks rule 1 (A-083). Reads
-only; temporary profile files go to a tempfile folder.
+load_profile() itself refuses a profile that breaks rule 1 (A-083). Since
+T3 (T2 engineering review, finding 1; decision A-090) every tracked file
+that is not an output of the real NEW profile is protected too, so a NEW
+output aimed at committed NEW evidence (the QA images under docs/qa/T*/new)
+is caught; the T3 `prep` outputs are covered like the others. Reads only;
+temporary profile files go to a tempfile folder.
 """
 
 import dataclasses
@@ -78,12 +82,14 @@ def profile_inputs(p):
 
 def protected_files(tracked, baseline, profiles):
     """The files that no NEW output may be: every file of the baseline
-    commit, every tracked file outside the NEW namespace (the OLD files
-    committed since 79247d8, such as T2's shoe_codes.csv and wald_test.csv,
-    and any later ones) and every input of the profiles. A committed NEW
-    output is none of these, so committing NEW outputs (T4, T5) keeps the
-    rule green."""
-    out = set(baseline) | {f for f in tracked if not new_namespaced(f)}
+    commit, every tracked file that is not an output of the real NEW
+    profile (the OLD files committed since 79247d8, such as T2's
+    shoe_codes.csv and wald_test.csv, and the committed NEW evidence such
+    as docs/qa/T0/new/*_new.png; T2 engineering review, finding 1, A-090)
+    and every input of the profiles. A committed NEW output is none of
+    these, so committing NEW outputs (T3-T5) keeps the rule green."""
+    real_new = set(all_outputs(load_profile('new')).values())
+    out = set(baseline) | {f for f in tracked if f not in real_new}
     for p in profiles:
         out |= profile_inputs(p)
     return out
@@ -102,6 +108,12 @@ def with_r_path(p, key, value):
     tests catch on their own."""
     paths = MappingProxyType({**p.r['paths'], key: value})
     return dataclasses.replace(p, r=MappingProxyType({**p.r, 'paths': paths}))
+
+
+def with_prep(p, key, value):
+    """A copy of profile p with prep[key] = value (no load_profile)."""
+    return dataclasses.replace(
+        p, prep=MappingProxyType({**p.prep, key: value}))
 
 
 def all_outputs(p):
@@ -292,6 +304,15 @@ class New(unittest.TestCase):
                                     '/contacts_data_new.txt'),
             'the README of data/new_shoes (79247d8)': with_r_path(
                 new, 'all_cont', 'data/new_shoes/README.md'),
+            'committed NEW evidence (T0 QA image) that is no output':
+                with_r_path(new, 'all_cont',
+                            'docs/qa/T0/new/superposition_new.png'),
+            'a T3 prep output aimed at the raw NEW locations':
+                with_prep(new, 'shoe_contact',
+                          'data/new_shoes/locations_data_new_raw.txt'),
+            'a T3 prep output aimed at the OLD calibration grid':
+                with_prep(new, 'calibration_grid',
+                          'docs/qa/T3/old/calibration_grid.csv'),
         }
         self.assertNotIn(PurePosixPath('docs/decisions.md'), baseline)
         self.assertIn(PurePosixPath('docs/decisions.md'), tracked)
@@ -303,6 +324,34 @@ class New(unittest.TestCase):
         tracked = tracked_files()
         for path in (self.p.contacts, self.p.locations, self.p.cross_check):
             self.assertIn(rel(path), tracked)
+
+    def test_prep_outputs(self):
+        """The T3 outputs (A-087, A-088): the derived locations CSV in
+        data/new_shoes, the calibration table in processed_data/new, the
+        grid and the per-shoe table in docs/qa/T3/new; OLD has no derived
+        CSV and keeps its QA files in docs/qa/T3/old without a suffix."""
+        p, old = self.p, load_profile('old')
+        want = {'locations_csv': 'data/new_shoes/locations_data_new.csv',
+                'pixel_calibration':
+                    'processed_data/new/pixel_calibration_new.csv',
+                'calibration_grid': 'docs/qa/T3/new/calibration_grid_new.csv',
+                'shoe_contact': 'docs/qa/T3/new/shoe_contact_new.csv',
+                'qa_dir': 'docs/qa/T3/new'}
+        self.assertEqual({k: str(rel(p.prep_path(k))) for k in want}, want)
+        self.assertEqual(str(rel(p.qa_path('raw_sheet_01', 'png'))),
+                         'docs/qa/T3/new/raw_sheet_01_new.png')
+        self.assertIsNone(old.prep_path('locations_csv'))
+        self.assertEqual(str(rel(old.qa_path('calibration_curves', 'png'))),
+                         'docs/qa/T3/old/calibration_curves.png')
+        files = all_outputs(p)
+        for key in ('locations_csv', 'pixel_calibration', 'calibration_grid',
+                    'shoe_contact'):
+            self.assertEqual(files[f'prep.{key}'], rel(p.prep_path(key)))
+        self.assertIn('prep.qa_dir', p.output_dirs())
+        with self.assertRaises(ValueError):
+            p.prep_path('nothing')
+        with self.assertRaises(ValueError):
+            p.qa_path('a/b', 'png')
 
 
 class Env(unittest.TestCase):
@@ -526,6 +575,16 @@ class Validation(unittest.TestCase):
                     contour_out='data/new_shoes/c_new.txt'),
                 d['new']['python'].update(
                     contour_out='data/new_shoes/c_new.txt')),
+            'prep grid = the OLD calibration grid': lambda d: d['new'][
+                'prep'].update(
+                    calibration_grid='docs/qa/T3/old/calibration_grid.csv'),
+            'prep table without the suffix': lambda d: d['new'][
+                'prep'].update(shoe_contact='docs/qa/T3/new/shoe_contact.csv'),
+            'prep CSV = the raw NEW locations': lambda d: d['new'][
+                'prep'].update(
+                    locations_csv='data/new_shoes/locations_data_new_raw.txt'),
+            'prep QA folder inside the OLD QA folder': lambda d: d['new'][
+                'prep'].update(qa_dir='docs/qa/T3/old/new'),
         }
         for name, edit in cases.items():
             with self.subTest(case=name):

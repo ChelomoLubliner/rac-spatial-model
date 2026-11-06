@@ -19,6 +19,12 @@ folder lies in no NEW folder (:data:`NAMESPACE_FOLDERS`), an output file
 lacks the suffix, or an output file is an input of any dataset of the file
 or an output of another dataset, so an edited path can never make a NEW
 run overwrite an OLD output or a raw input.
+
+The optional ``prep`` entry names the outputs of the T3 data preparation
+(the derived NEW locations CSV, the pixel calibration and per-shoe contact
+tables, the QA folder; decisions A-087, A-088). Keys ending in ``_dir`` are
+folders, the others files (null: none for this dataset); the rule-1 check
+covers them like every other output.
 """
 
 from __future__ import annotations
@@ -156,6 +162,8 @@ class Profile:
     contour_out: Path
     stems: Mapping = field(repr=False)
     r: Mapping = field(repr=False)
+    prep: Mapping = field(repr=False,
+                          default_factory=lambda: MappingProxyType({}))
 
     # --- dimensions -----------------------------------------------------
     @property
@@ -230,17 +238,39 @@ class Profile:
         """An R output of the profile (`r.paths`), absolute."""
         return self.path(self.r['paths'][key])
 
+    def prep_path(self, key: str) -> Path | None:
+        """A T3 data-preparation output (`prep`), absolute; None when the
+        profile sets it to null (OLD has no derived locations CSV)."""
+        if key not in self.prep:
+            raise ValueError(f'the {self.dataset} profile has no prep path '
+                             f'{key!r}')
+        value = self.prep[key]
+        return None if value is None else self.path(value)
+
+    def qa_path(self, stem: str, ext: str) -> Path:
+        """A T3 QA file: <prep.qa_dir>/<stem><suffix>.<ext>."""
+        if not stem or '/' in stem or '.' in stem:
+            raise ValueError(f'bad stem {stem!r}')
+        folder = self.prep_path('qa_dir')
+        if folder is None:
+            raise ValueError(f'the {self.dataset} profile has no QA folder')
+        return folder / self._named(stem, ext)
+
     def output_dirs(self) -> dict:
         """Every output folder of this profile, by name (the folders that
         hold only this dataset's outputs; used by the namespacing and
         collision tests)."""
-        return {
+        out = {
             'python.images_dir': self.images_dir,
             'r.knit_dir': self.path(self.r['knit_dir']),
             'r.log_dir': self.path(self.r['log_dir']),
             'r.models_dir': self.r_path('models_dir'),
             'r.images_dir': self.r_path('images_dir'),
         }
+        for key, rel in self.prep.items():
+            if key.endswith('_dir') and rel is not None:
+                out[f'prep.{key}'] = self.path(rel)
+        return out
 
     def output_files(self) -> dict:
         """Every output file named by this profile, by name (per-shoe
@@ -264,6 +294,9 @@ class Profile:
         for key, rel in self.r['paths'].items():
             if not key.endswith('_dir'):
                 out[f'r.paths.{key}'] = self.path(rel)
+        for key, rel in self.prep.items():
+            if not key.endswith('_dir') and rel is not None:
+                out[f'prep.{key}'] = self.path(rel)
         return out
 
 
@@ -276,6 +309,9 @@ def _output_paths(d: Mapping) -> tuple[dict, dict]:
                'r.log_dir': d['r']['log_dir']}
     for key, value in d['r']['paths'].items():
         (folders if key.endswith('_dir') else files)[f'r.paths.{key}'] = value
+    for key, value in d.get('prep', {}).items():
+        if value is not None:
+            (folders if key.endswith('_dir') else files)[f'prep.{key}'] = value
     return ({k: PurePosixPath(v) for k, v in files.items()},
             {k: PurePosixPath(v) for k, v in folders.items()})
 
@@ -294,9 +330,9 @@ def _check_namespace(dataset: str, d: Mapping, entries: Mapping) -> None:
     folder and its stem ends with the suffix; no output file is an input of
     any entry of the file or an output file of another entry; no output
     lies in a work folder of another entry (its python.images_dir,
-    r.knit_dir, r.log_dir; the shared parents saved_models/ and
-    model_images/ are not work folders). Raises ValueError naming every
-    offending path."""
+    r.knit_dir, r.log_dir, prep.qa_dir; the shared parents saved_models/
+    and model_images/ are not work folders). Raises ValueError naming
+    every offending path."""
     suffix = d['suffix']
     files, folders = _output_paths(d)
     bad = []
@@ -319,6 +355,8 @@ def _check_namespace(dataset: str, d: Mapping, entries: Mapping) -> None:
         work = {PurePosixPath(e['python']['images_dir']),
                 PurePosixPath(e['r']['knit_dir']),
                 PurePosixPath(e['r']['log_dir'])}
+        if e.get('prep', {}).get('qa_dir') is not None:
+            work.add(PurePosixPath(e['prep']['qa_dir']))
         for what, p in {**files, **folders}.items():
             for w in sorted(work):
                 if p == w or w in p.parents:
@@ -414,6 +452,12 @@ def load_profile(dataset: str | None = None, file: Path | str | None = None,
         _rel(d['r'][key], f'r.{key}')
     _rel(py['images_dir'], 'python.images_dir')
     _rel(py['contour_out'], 'python.contour_out')
+    prep = d.get('prep', {})
+    if not isinstance(prep, dict):
+        raise ValueError(f'profile {dataset!r}: prep must be an object')
+    for key, rel in prep.items():
+        if rel is not None:
+            _rel(rel, f'prep.{key}')
     if dataset != 'old':
         _check_namespace(dataset, d, cfg['datasets'])
     return Profile(
@@ -439,4 +483,4 @@ def load_profile(dataset: str | None = None, file: Path | str | None = None,
         superpose_threshold=int(py['superpose_threshold']),
         snake=snake, write_html=bool(py['write_html']),
         contour_out=p(py['contour_out'], 'python.contour_out'),
-        stems=_freeze(py['stems']), r=_freeze(d['r']))
+        stems=_freeze(py['stems']), r=_freeze(d['r']), prep=_freeze(prep))

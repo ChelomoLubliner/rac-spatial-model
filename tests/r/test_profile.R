@@ -116,12 +116,15 @@ tracked <- git_lines("ls-files")
 baseline <- git_lines("ls-tree", "-r", "--name-only", "79247d8")
 rel <- function(p) substring(p, nchar(ROOT_PATH) + 1)
 outputs_of <- function(Q) {
+  prep <- Filter(Negate(is.null), as.list(Q$prep))
+  prep <- prep[!endsWith(names(prep), "_dir")]
   c(vapply(names(Q$r$paths)[!endsWith(names(Q$r$paths), "_dir")],
            function(k) rel(rac_path(Q, k)), ""),
     contour = rel(rac_path(Q, "contour")),
     vapply(c("NEW_X_NS_XY", "CML_MODEL"),
            function(f) rel(rac_model_path(Q, f)), ""),
-    vapply(figures, function(s) rel(rac_image_path(Q, s)), ""))
+    vapply(figures, function(s) rel(rac_image_path(Q, s)), ""),
+    setNames(unlist(prep), paste("prep", names(prep), sep = ".")))
 }
 new_files <- outputs_of(N)
 old_files <- outputs_of(P)
@@ -134,11 +137,19 @@ namespaced <- function(f) {
 for (f in new_files) {
   if (!namespaced(f)) stop("NEW output not namespaced: ", f)
 }
+stopifnot(identical(unname(new_files[c("prep.locations_csv",
+                                       "prep.pixel_calibration")]),
+                    c("data/new_shoes/locations_data_new.csv",
+                      "processed_data/new/pixel_calibration_new.csv")),
+          is.null(P$prep$locations_csv),
+          identical(P$prep$qa_dir, "docs/qa/T3/old"))
 # The files no NEW output may be (T2 review, finding 2: the earlier rule
 # took every tracked file for OLD and would fail once T4 commits the NEW
-# contour): every file of the baseline commit, every tracked file outside
-# the NEW namespace (the OLD files committed since 79247d8, such as T2's
-# shoe_codes.csv and wald_test.csv), and every input of the profiles.
+# contour): every file of the baseline commit, every tracked file that is
+# not an output of the real NEW profile (the OLD files committed since
+# 79247d8, such as T2's shoe_codes.csv and wald_test.csv, and the committed
+# NEW evidence such as docs/qa/T0/new/*_new.png; T2 engineering review,
+# finding 1, A-090), and every input of the profiles.
 inputs_of <- function(Q) {
   keys <- c("contacts", "locations", "prototype_contour", "prototype_mask",
             if (!is.null(Q$inputs$cross_check)) "cross_check",
@@ -146,7 +157,7 @@ inputs_of <- function(Q) {
   vapply(keys, function(k) rel(rac_path(Q, k)), "")
 }
 collisions <- function(Q, O, tracked, baseline) {
-  protected <- unique(c(baseline, tracked[!vapply(tracked, namespaced, TRUE)],
+  protected <- unique(c(baseline, setdiff(tracked, new_files),
                         inputs_of(O), inputs_of(Q)))
   nf <- outputs_of(Q)
   unname(nf[nf %in% c(outputs_of(O), protected)])
@@ -166,10 +177,14 @@ mutants <- list(
   list("r_path", "wald_test", "processed_data/wald_test.csv"),
   list("r_path", "dataCC", "docs/decisions.md"),
   list("python", "contour_out", "data/new_shoes/contacts_data_new.txt"),
-  list("r_path", "all_cont", "data/new_shoes/README.md"))
+  list("r_path", "all_cont", "data/new_shoes/README.md"),
+  list("r_path", "all_cont", "docs/qa/T0/new/superposition_new.png"),
+  list("prep", "shoe_contact", "data/new_shoes/locations_data_new_raw.txt"),
+  list("prep", "calibration_grid", "docs/qa/T3/old/calibration_grid.csv"))
 for (m in mutants) {
   M <- N
   if (m[[1]] == "python") M$python[[m[[2]]]] <- m[[3]]
+  else if (m[[1]] == "prep") M$prep[[m[[2]]]] <- m[[3]]
   else M$r$paths[[m[[2]]]] <- m[[3]]
   if (!identical(collisions(M, P, with_new, baseline), m[[3]])) {
     stop("collision not caught: ", m[[2]], " = ", m[[3]])
@@ -232,7 +247,17 @@ edits <- list(
   "contour = an OLD output (OLD entry edited)" = function(c) {
     c$datasets$old$python$contour_out <- "data/new_shoes/c_new.txt"
     c$datasets$new$python$contour_out <- "data/new_shoes/c_new.txt"
-    c })
+    c },
+  "prep grid = the OLD calibration grid" = function(c) {
+    c$datasets$new$prep$calibration_grid <-
+      "docs/qa/T3/old/calibration_grid.csv"; c },
+  "prep table without the suffix" = function(c) {
+    c$datasets$new$prep$shoe_contact <- "docs/qa/T3/new/shoe_contact.csv"; c },
+  "prep CSV = the raw NEW locations" = function(c) {
+    c$datasets$new$prep$locations_csv <-
+      "data/new_shoes/locations_data_new_raw.txt"; c },
+  "prep QA folder inside the OLD QA folder" = function(c) {
+    c$datasets$new$prep$qa_dir <- "docs/qa/T3/old/new"; c })
 for (nm in names(edits)) {
   msg <- load_msg(broken(edits[[nm]]))
   if (!grepl("user rule 1", msg, fixed = TRUE)) {

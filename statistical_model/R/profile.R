@@ -49,6 +49,10 @@
 # dataset; the same rule as contour_algorithm/profiles.py. So an edited
 # path can never make a NEW run overwrite an OLD output or a raw input
 # (rac_write_csv() itself does not check paths).
+# The optional prep entry names the outputs of the T3 data preparation,
+# written by the Python tools (decisions A-087, A-088): keys ending in _dir
+# are folders, the others files (null: none); the rule-1 check covers them
+# too, and an OLD prep.qa_dir is a work folder of the OLD profile.
 
 RAC_DATASETS <- c("old", "new")
 RAC_NAMESPACE_FOLDERS <- c("new", "new_shoes", "images_new")
@@ -106,11 +110,20 @@ rac_env <- function(name, default) {
   paths <- E$r$paths
   is_dir <- endsWith(names(paths), "_dir")
   key <- paste("r.paths", names(paths), sep = ".")
+  prep <- Filter(Negate(is.null), as.list(E$prep))  # no prep: list()
+  p_names <- as.character(names(prep))
+  p_dir <- endsWith(p_names, "_dir")
+  p_key <- paste("prep", p_names, sep = ".")
+  named <- function(v, k) {
+    if (length(v)) setNames(unlist(v), k) else character(0)
+  }
   list(files = c(python.contour_out = E$python$contour_out,
-                 setNames(unlist(paths[!is_dir]), key[!is_dir])),
+                 named(paths[!is_dir], key[!is_dir]),
+                 named(prep[!p_dir], p_key[!p_dir])),
        dirs = c(python.images_dir = E$python$images_dir,
                 r.knit_dir = E$r$knit_dir, r.log_dir = E$r$log_dir,
-                setNames(unlist(paths[is_dir]), key[is_dir])))
+                named(paths[is_dir], key[is_dir]),
+                named(prep[p_dir], p_key[p_dir])))
 }
 
 # The input files named by a (cleaned) profile entry E.
@@ -152,7 +165,8 @@ rac_env <- function(name, default) {
     out <- unname(.rac_output_paths(E)$files)
     protected <- c(protected, setNames(rep(paste("an output of the", nm,
                                                  "profile"), length(out)), out))
-    work <- sort(c(E$python$images_dir, E$r$knit_dir, E$r$log_dir))
+    work <- sort(c(E$python$images_dir, E$r$knit_dir, E$r$log_dir,
+                   E$prep$qa_dir))
     all_out <- c(o$files, o$dirs)
     for (k in names(all_out)) {
       for (w in work) {
@@ -227,6 +241,19 @@ rac_profile <- function(dataset = rac_env("RAC_DATASET", "old"),
   }
   for (key in c("contacts", "locations")) {
     .rac_check_rel(P$inputs[[key]], paste("inputs", key, sep = "."))
+  }
+  for (key in c("cross_check", "sticker_masks")) {
+    if (!is.null(P$inputs[[key]])) {
+      .rac_check_rel(P$inputs[[key]], paste("inputs", key, sep = "."))
+    }
+  }
+  if (!is.null(P$prep) && !is.list(P$prep)) {
+    stop("profile '", dataset, "': prep must be an object", call. = FALSE)
+  }
+  for (key in names(P$prep)) {
+    if (!is.null(P$prep[[key]])) {
+      .rac_check_rel(P$prep[[key]], paste("prep", key, sep = "."))
+    }
   }
   .rac_check_rel(P$python$contour_out, "python.contour_out")
   .rac_check_rel(P$prototype$contour, "prototype.contour")
