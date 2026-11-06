@@ -28,3 +28,5 @@ Thumbs.db
 # Work folders of the contour code (Python step 0) and run logs; never tracked
 /images*/
 /logs/
+# Full pixel tables of Part 2 (large, reproducible; plan section 5)
+processed_data/**/pixels_full*.rds

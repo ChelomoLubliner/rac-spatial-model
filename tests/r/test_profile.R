@@ -3,7 +3,11 @@
 # legacy path strings; NEW must be namespaced and must keep the OLD
 # prototype frame; the selection rules for RAC_DATASET and every RAC_*
 # variable; reading a profile must not touch the RNG; rac_write_csv() writes
-# the profile's line endings. Writes only to tempdir().
+# the profile's line endings; rac_new_output() refuses to overwrite an OLD
+# model or figure (A-075); config.R gives the legacy MEAN_OFFSET for OLD,
+# the OLD fallback without the pixel-count file, and NA with a warning for
+# NEW without it (A-021), and MODEL_FEATURE from RAC_MODEL_FEATURE. Writes
+# only to tempdir().
 #
 # Run from anywhere:  Rscript tests/r/test_profile.R
 root <- local({
@@ -206,6 +210,62 @@ stopifnot(sum(raw == as.raw(13)) == 0, sum(raw == as.raw(10)) == 3,
                             sep = "")))
 stopifnot(inherits(try(rac_write_csv(df, Q, "no_such_key"), silent = TRUE),
                    "try-error"))
-unlink(sub("/$", "", tmp_root), recursive = TRUE)
 pass("rac_write_csv: CRLF for OLD dataCC, LF for NEW, folders created")
+
+# 7. rac_new_output: an existing OLD model or figure is never overwritten
+f_old <- rac_model_path(Q, "NEW_X_NS_XY")
+stopifnot(identical(rac_new_output(Q, f_old), f_old), dir.exists(dirname(f_old)))
+writeLines("x", f_old)
+stopifnot(inherits(try(rac_new_output(Q, f_old), silent = TRUE), "try-error"))
+f_new <- rac_image_path(QN, "CI_cut_110")
+stopifnot(identical(rac_new_output(QN, f_new), f_new))
+writeLines("x", f_new)
+stopifnot(identical(rac_new_output(QN, f_new), f_new))
+unlink(sub("/$", "", tmp_root), recursive = TRUE)
+pass("rac_new_output: refuses an existing OLD output, NEW may be rewritten")
+
+# 8. config.R: MEAN_OFFSET and MODEL_FEATURE.
+run_config <- function(dir, dataset, feature = "") {
+  e <- new.env()
+  warn <- character(0)
+  old_wd <- setwd(file.path(dir, "statistical_model"))
+  on.exit(setwd(old_wd))
+  Sys.setenv(RAC_DATASET = dataset, RAC_MODEL_FEATURE = feature)
+  withCallingHandlers(sys.source("config.R", envir = e),
+                      warning = function(w) {
+                        warn <<- c(warn, conditionMessage(w))
+                        invokeRestart("muffleWarning")
+                      })
+  list(env = e, warn = warn)
+}
+r_old <- run_config(root, "old")
+stopifnot(round(r_old$env$MEAN_OFFSET, 9) == -4.614310784,
+          !length(r_old$warn), identical(r_old$env$N_CONTROLS, 100),
+          identical(r_old$env$MODEL_FEATURE, "NEW_X_NS_XY"),
+          identical(r_old$env$P$dataset, "old"))
+stopifnot(identical(run_config(root, "old", "CML_MODEL")$env$MODEL_FEATURE,
+                    "CML_MODEL"))
+# a root without any pixel-count file
+bare <- tempfile("rac_bare_")
+dir.create(file.path(bare, "statistical_model", "R"), recursive = TRUE)
+dir.create(file.path(bare, "config"))
+invisible(file.copy(file.path(root, "statistical_model", "config.R"),
+                    file.path(bare, "statistical_model")))
+invisible(file.copy(list.files(file.path(root, "statistical_model", "R"),
+                               full.names = TRUE),
+                    file.path(bare, "statistical_model", "R")))
+invisible(file.copy(file.path(root, "config", "datasets.json"),
+                    file.path(bare, "config")))
+r_fb <- run_config(bare, "old")
+stopifnot(identical(r_fb$env$MEAN_OFFSET, log(100 / 10615)),
+          length(r_fb$warn) == 1)
+r_new <- run_config(bare, "new")
+stopifnot(identical(r_new$env$MEAN_OFFSET, NA_real_),
+          length(r_new$warn) == 1, grepl("NA", r_new$warn),
+          identical(r_new$env$P$dataset, "new"))
+unlink(bare, recursive = TRUE)
+Sys.unsetenv(rac_vars)
+pass(paste("config.R: OLD MEAN_OFFSET -4.614310784; without the pixel-count",
+           "file OLD falls back to log(100/10615), NEW is NA with a warning;",
+           "MODEL_FEATURE from RAC_MODEL_FEATURE"))
 cat("ALL PASS test_profile\n")

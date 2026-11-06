@@ -10,7 +10,8 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
-set.seed(313)
+source("config.R") # the profile P (plan section 4); it does not use the RNG
+set.seed(P$r$seed)
 library(fields)
 library(imager)
 library(splines)
@@ -19,27 +20,24 @@ library(survival)
 library(ggplot2)
 library(car)
 
-source("config.R")
-
-col_shoe <- 307
-row_shoe <- 395
-num_shoe <- 387
-rel_col_shoe <- 150
-rel_row_shoe <- 300
-rel_x_cord <- 0.25
-rel_Y_cord <- 0.5
+# The prototype (map) frame of the CI maps and cuts, the same for both
+# datasets (P$prototype, A-006)
+col_proto <- P$prototype$col_shoe
+row_proto <- P$prototype$row_shoe
+proto_rel_col_shoe <- P$prototype$coords$rel_col_shoe
+proto_rel_Y_cord <- P$prototype$coords$rel_Y_cord
 ```
 
 ```{r}
 # Load data
-file_name <- paste(ROOT_PATH, "processed_data/dataCC_distance.csv", sep = "")
+file_name <- rac_path(P, "dataCC_distance")
 dataCC <- read.csv(file_name, header = TRUE)
 
 # Load saved models
-file_name <- paste(ROOT_PATH, "saved_models/NEW_X_NS_XY.rds", sep = "")
+file_name <- rac_model_path(P, "NEW_X_NS_XY")
 random_model <- readRDS(file = file_name)
 
-file_name <- paste(ROOT_PATH, "saved_models/CML_MODEL.rds", sep = "")
+file_name <- rac_model_path(P, "CML_MODEL")
 cml_model <- readRDS(file = file_name)
 
 # Compute sigma^2 from random model
@@ -50,13 +48,13 @@ cat("Scaling factor exp(-sigma^2/2):", exp(-sigma_sq/2), "\n")
 
 ```{r}
 # Build coordinate grids
-xcoor <- t(matrix(rep((-col_shoe/2 + 1:col_shoe) * rel_Y_cord / rel_col_shoe, row_shoe), col_shoe, row_shoe))
-ycoor <- -matrix(rep((-row_shoe/2 + 1:row_shoe) * rel_Y_cord / rel_col_shoe, col_shoe), row_shoe, col_shoe)
+xcoor <- t(matrix(rep((-col_proto/2 + 1:col_proto) * proto_rel_Y_cord / proto_rel_col_shoe, row_proto), col_proto, row_proto))
+ycoor <- -matrix(rep((-row_proto/2 + 1:row_proto) * proto_rel_Y_cord / proto_rel_col_shoe, col_proto), row_proto, col_proto)
 xy <- expand.grid(xcoor[1,], ycoor[,1])
 colnames(xy) <- c("x", "y")
 
 # Load mask
-img_filled <- t(as.matrix(load.image(paste(ROOT_PATH, "data/freq_min_18.png", sep = ""))))
+img_filled <- t(as.matrix(load.image(rac_path(P, "prototype_mask"))))
 ```
 
 ```{r}
@@ -97,9 +95,9 @@ inte <- -log(1 - pr)
 for(i in 1:3) inte[as.vector(t(img_filled)==0), i] <- NA
 
 CI_r <- list(
-  matrix(inte[,1], row_shoe, col_shoe, byrow=TRUE),
-  matrix(inte[,2], row_shoe, col_shoe, byrow=TRUE),
-  matrix(inte[,3], row_shoe, col_shoe, byrow=TRUE)
+  matrix(inte[,1], row_proto, col_proto, byrow=TRUE),
+  matrix(inte[,2], row_proto, col_proto, byrow=TRUE),
+  matrix(inte[,3], row_proto, col_proto, byrow=TRUE)
 )
 names(CI_r) <- c("Low", "Mid", "High")
 
@@ -170,9 +168,9 @@ inte_cml <- -log(1 - pr_cml)
 for(i in 1:3) inte_cml[as.vector(t(img_filled)==0), i] <- NA
 
 CI_cml <- list(
-  matrix(inte_cml[,1], row_shoe, col_shoe, byrow=TRUE),
-  matrix(inte_cml[,2], row_shoe, col_shoe, byrow=TRUE),
-  matrix(inte_cml[,3], row_shoe, col_shoe, byrow=TRUE)
+  matrix(inte_cml[,1], row_proto, col_proto, byrow=TRUE),
+  matrix(inte_cml[,2], row_proto, col_proto, byrow=TRUE),
+  matrix(inte_cml[,3], row_proto, col_proto, byrow=TRUE)
 )
 names(CI_cml) <- c("Low", "Mid", "High")
 ```
@@ -184,7 +182,7 @@ names(CI_cml) <- c("Low", "Mid", "High")
 
 # Crop columns to match File 6 (3-model comparison)
 sub <- 40
-cols <- sub:(col_shoe - sub)
+cols <- sub:(col_proto - sub)
 
 sho <- CI_cml$Mid * exp(-sigma_sq/2)
 sho <- sho[, cols]
@@ -195,7 +193,7 @@ sho[250,] <- 0
 # Display: same orientation as file 4/6
 image.plot(t(sho)[, nrow(sho):1], axes=FALSE, xlab="CML probability with cut lines at rows 110, 190, 250")
 
-pdf(file = paste(ROOT_PATH, "model_images/CI_shoe_cuts.pdf", sep = ""), height=8, width=5)
+pdf(file = rac_new_output(P, rac_image_path(P, "CI_shoe_cuts")), height=8, width=5)
 image.plot(t(sho)[, nrow(sho):1], axes=FALSE, xlab="CML probability with cut lines at rows 110, 190, 250")
 dev.off()
 ```
@@ -205,7 +203,7 @@ dev.off()
 # CI ribbon plots (Figure 3, right panels)
 # ============================================================
 
-CI_cut <- function(cut, CI_cml, CI_r, sigma_sq, col_shoe=307) {
+CI_cut <- function(cut, CI_cml, CI_r, sigma_sq, col_shoe=col_proto) {
   ran <- 1:col_shoe
   scale <- exp(-sigma_sq/2)
 
@@ -253,17 +251,17 @@ print(CI_cut_250)
 ```
 
 ```{r}
-pdf(file = paste(ROOT_PATH, "model_images/CI_cut_110.pdf", sep = ""), height=4, width=8)
+pdf(file = rac_new_output(P, rac_image_path(P, "CI_cut_110")), height=4, width=8)
 print(CI_cut_110)
 dev.off()
 
-pdf(file = paste(ROOT_PATH, "model_images/CI_cut_190.pdf", sep = ""), height=4, width=8)
+pdf(file = rac_new_output(P, rac_image_path(P, "CI_cut_190")), height=4, width=8)
 print(CI_cut_190)
 dev.off()
 
-pdf(file = paste(ROOT_PATH, "model_images/CI_cut_250.pdf", sep = ""), height=4, width=8)
+pdf(file = rac_new_output(P, rac_image_path(P, "CI_cut_250")), height=4, width=8)
 print(CI_cut_250)
 dev.off()
 
-cat("All CI PDFs saved to model_images/\n")
+cat("All CI PDFs saved to", dirname(rac_image_path(P, "CI_cut_250")), "\n")
 ```

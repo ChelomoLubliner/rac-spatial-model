@@ -67,11 +67,43 @@ Open each `.Rmd` in RStudio (working directory: `statistical_model/`) and knit i
 | 5 | `statistical_tests_5.Rmd` | Confidence intervals (Random vs CML) |
 | 6 | `model_comparison_6.Rmd` | Side-by-side comparison figure |
 
-To fit **both** models, run Step 3 twice -- once with each setting in `statistical_model/config.R`:
+To fit **both** models, run Step 3 twice -- once with each value of the environment variable
+`RAC_MODEL_FEATURE` (read by `statistical_model/config.R`; `NEW_X_NS_XY` when unset):
 
-```r
-MODEL_FEATURE <- "NEW_X_NS_XY"   # or "CML_MODEL"
+```bash
+RAC_MODEL_FEATURE=CML_MODEL Rscript -e 'rmarkdown::render("re_model_shoe_std_3.Rmd")'
 ```
+
+### Datasets: OLD (387 shoes) and NEW (631 shoes)
+
+Every dimension, count, skip list, threshold and path comes from a **dataset profile** in
+`config/datasets.json`, read by both the Python contour code (`contour_algorithm/profiles.py`)
+and the R steps (`statistical_model/R/profile.R`). Select it with `RAC_DATASET`:
+
+| `RAC_DATASET` | Dataset | Frame | Outputs |
+|---|---|---|---|
+| `old` (default; unset or empty) | the 387 original shoes | 307 x 395 | the committed paths, unchanged |
+| `new` | the 631 shoes of `data/new_shoes/` | 255 x 367 | a `new` folder and the suffix `_new`, e.g. `processed_data/new/dataCC_new.csv`, `saved_models/new/NEW_X_NS_XY_new.rds`, `images_new/` |
+
+Both datasets use the OLD prototype (`data/contour_prototype.png`, `data/freq_min_18.png`) for
+`new_x` and the maps, so the standardized coordinate means the same for both. Run steps with
+
+```bash
+RAC_DATASET=new tools/run_pipeline.sh --steps 0-6      # 0 = the snake contour (Python)
+```
+
+which renders each Rmd (steps 3 and 4 once per model) and logs to `logs/<dataset>/`. The committed
+OLD outputs are never overwritten in place: the OLD contour, models and figures come from Windows
+builds that a rerun on another platform does not reproduce bit for bit, so the code refuses to
+overwrite them; OLD runs belong in `tests/regress_old.sh` (a scratch copy, compared with the
+baselines; `RAC_SCRATCH` must name a scratch folder):
+
+```bash
+RAC_SCRATCH=<scratch folder> bash tests/regress_old.sh --steps 0-6 --keep
+```
+
+The plan and the decisions behind this are in `docs/plans/2026-11-05-new-shoes-pipeline.md` and
+`docs/decisions.md`; the fast tests run with `bash tests/run_all.sh`.
 
 ### Skip the fitting
 
@@ -88,7 +120,7 @@ rac-spatial-model/
 │   ├── locations_data.csv         #   RAC locations (x, y, shoe)
 │   ├── contour_Active_Contour.txt #   shoe boundary contours
 │   ├── all_cont.csv               #   cumulative contact surface (Step 1)
-│   ├── freq_min_18.png            #   contact-surface mask (>= 8 shoes)
+│   ├── freq_min_18.png            #   prototype mask: snake-filled superposition (>= 18 shoes)
 │   └── contour_prototype.png      #   prototype contour for new_x
 │
 ├── processed_data/                # pipeline-generated datasets

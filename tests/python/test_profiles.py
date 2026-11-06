@@ -59,6 +59,13 @@ def all_outputs(p):
     return out
 
 
+def repo_files():
+    """Every file of the work tree (.git and .claude, which the Claude
+    Code harness may write during a run, left out)."""
+    return sorted(p.relative_to(REPO) for p in REPO.rglob('*')
+                  if p.is_file() and not {'.git', '.claude'} & set(p.parts))
+
+
 def clean_env():
     """Patch os.environ without any RAC_* variable."""
     keep = {k: v for k, v in os.environ.items() if not k.startswith('RAC_')}
@@ -304,6 +311,39 @@ class Cli(unittest.TestCase):
                             'RAC_DATASET')
         self.assert_refused(self.run_cli({'RAC_DATASET': 'new'}, '--steps',
                                          'create,html'), before, '--steps')
+
+    def run_script(self, script, extra_env, *args):
+        env = {k: v for k, v in os.environ.items()
+               if not k.startswith('RAC_')}
+        env.update(extra_env)
+        return subprocess.run(['bash', str(REPO / script), *args],
+                              cwd=self.root, env=env, capture_output=True,
+                              text=True, timeout=300)
+
+    def test_runners_refuse_profile_file(self):
+        """tools/run_pipeline.sh and tests/regress_old.sh refuse a set
+        RAC_PROFILE_FILE before writing anything (A-049)."""
+        repo_before = repo_files()
+        r = self.run_script('tools/run_pipeline.sh',
+                            {'RAC_PROFILE_FILE': str(FIXTURE_PROFILE)},
+                            '--steps', '1')
+        self.assertEqual(r.returncode, 2, r.stderr)
+        self.assertIn('A-049', r.stderr)
+        scratch = self.root / 'scratch'
+        scratch.mkdir()
+        r = self.run_script('tests/regress_old.sh',
+                            {'RAC_PROFILE_FILE': str(FIXTURE_PROFILE),
+                             'RAC_SCRATCH': str(scratch)}, '--steps', '1')
+        self.assertEqual(r.returncode, 2, r.stderr)
+        self.assertIn('A-049', r.stderr)
+        self.assertEqual(list(scratch.iterdir()), [])
+        r = self.run_script('tools/run_pipeline.sh', {'RAC_DATASET': 'foo'},
+                            '--steps', '1')
+        self.assertEqual(r.returncode, 2, r.stderr)
+        self.assertIn('RAC_DATASET', r.stderr)
+        r = self.run_script('tools/run_pipeline.sh', {}, '--steps', '9')
+        self.assertEqual(r.returncode, 2, r.stderr)
+        self.assertEqual(repo_files(), repo_before)
 
 
 class Validation(unittest.TestCase):

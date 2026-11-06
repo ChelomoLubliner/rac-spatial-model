@@ -13,6 +13,11 @@
 #           own commit to gate the refactored Rmd and adds the paths the
 #           profile needs to the archive list below);
 #           RAC_WIN_RSCRIPT (default: the Windows R 4.4.3 Rscript.exe).
+# Since T2 the step reads the dataset profile: config/datasets.json is
+# archived too (when the commit has it), and a config.R that takes the
+# model from RAC_MODEL_FEATURE (rac_model_feature()) is accepted in place
+# of the legacy literal MODEL_FEATURE <- "NEW_X_NS_XY"; the driver sets
+# RAC_MODEL_FEATURE=NEW_X_NS_XY.
 # The Windows R has no pandoc, so the Rmd runs through knitr::knit (code
 # and output, no HTML). The copy is on the Linux file system; Windows R
 # reaches it through \\wsl.localhost (wslpath -w). The copy has no model
@@ -66,13 +71,18 @@ if [[ -z "$ref_want" || "$ref_sha" != "$ref_want" ]]; then
   exit 2
 fi
 
-git -C "$repo" archive --format=tar "$commit" statistical_model \
-  processed_data/dataCC_distance.csv processed_data/shoe_pixel_counts.csv \
-  data/all_cont.csv | tar -x -C "$run/repo"
+paths=(statistical_model processed_data/dataCC_distance.csv
+  processed_data/shoe_pixel_counts.csv data/all_cont.csv)
+if git -C "$repo" cat-file -e "$commit:config/datasets.json" 2> /dev/null; then
+  paths+=(config/datasets.json)
+fi
+git -C "$repo" archive --format=tar "$commit" "${paths[@]}" |
+  tar -x -C "$run/repo"
 echo "commit=$(git -C "$repo" rev-parse "$commit")" > "$run/legacy_source.txt"
-if ! grep -q '^MODEL_FEATURE <- "NEW_X_NS_XY"' \
+if ! grep -qE '^MODEL_FEATURE <- ("NEW_X_NS_XY"|rac_model_feature\(\))' \
   "$run/repo/statistical_model/config.R"; then
-  echo "run_windows_r_step3.sh: config.R does not select NEW_X_NS_XY" >&2
+  echo "run_windows_r_step3.sh: config.R selects neither NEW_X_NS_XY nor" \
+    "the RAC_MODEL_FEATURE model" >&2
   exit 2
 fi
 

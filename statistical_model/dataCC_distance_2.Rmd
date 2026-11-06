@@ -19,17 +19,23 @@ source("config.R")
 
 
 ```{r}
+# Every dataset value comes from the profile P (config.R; plan section 4).
+col_shoe <- P$col_shoe # the number of columns in each shoe
+row_shoe <- P$row_shoe # the number of rows in each shoe
+num_shoe <- P$num_shoe  # the number of shoes (OLD: 386 of them have RACs - shoe 127 has no RACS)
 
-col_shoe <- 307 # 307 is the number of columns in each shoe
-row_shoe <- 395 # 395 is the number of rows in each shoe
-num_shoe <- 387  # 387 is the number of shoes but 386 is the number of shoes with RACs - shoe 127 has no RACS
+rel_col_shoe <- P$coords$rel_col_shoe  # the relevant columns (contain non zero pixels in some shoes)
+rel_row_shoe <- P$coords$rel_row_shoe  # the relevant rows (contain non zero pixels in some shoes)
+rel_x_cord <- P$coords$rel_x_cord # using coordinates as in the locations file the relevant x coordinates are between -rel_x_cord and rel_x_cord
+rel_Y_cord <- P$coords$rel_Y_cord # the relevant Y coordinates are between -rel_Y_cord and rel_Y_cord
 
-rel_col_shoe <- 150  # out of the 307 columns only 150 are relevant (contain non zero pixels in some shoes)
-rel_row_shoe <- 300  # out of the 395 rows only 300 are relevant (contain non zero pixels in some shoes)
-rel_x_cord <- 0.25 # using coordinates as in the locations_data.CSV file the relevant x coordinates are between -.25 and 0.25
-rel_Y_cord <- 0.5 # the relevant Y coordinates are between -0.5 and 0.5
+# The prototype (map) frame: the OLD prototype grid for both datasets (A-001, A-006)
+col_proto <- P$prototype$col_shoe
+row_proto <- P$prototype$row_shoe
+proto_rel_col_shoe <- P$prototype$coords$rel_col_shoe
+proto_rel_Y_cord <- P$prototype$coords$rel_Y_cord
 
-file_name <- paste(ROOT_PATH, "processed_data/dataCC.csv", sep = "")
+file_name <- rac_path(P, "dataCC")
 dataCC <- read.csv(file_name, header = TRUE)
 
 ```
@@ -37,11 +43,16 @@ dataCC <- read.csv(file_name, header = TRUE)
 
 ```{r contour_distance_}
 
-#get convex hull contours as a list of doubles(395*307) of pixel and convert them to x-y  coordinates
-file_name <- paste(ROOT_PATH, "data/contour_", CONTOUR_ALGORITHM, ".txt", sep = "")
-d <- readChar(file_name, nchars = (col_shoe * row_shoe + 2) * num_shoe) 
+#get convex hull contours as a list of doubles(row_shoe*col_shoe) of pixel and convert them to x-y  coordinates
+#record i is the i-th analysis shoe = shoe code i of dataCC (A-031, A-053); the file must hold exactly these records
+file_name <- rac_path(P, "contour")
+n_records <- length(rac_analysis_shoes(P))
+if (file.size(file_name) != (col_shoe * row_shoe + 2) * n_records) {
+  stop(file_name, " is not ", n_records, " records of ", col_shoe, " x ", row_shoe, " + 2 bytes")
+}
+d <- readChar(file_name, nchars = (col_shoe * row_shoe + 2) * n_records) 
 contour_txt <- list() 
-for (i in 1:386) {
+for (i in seq_len(n_records)) {
   contour_txt[[i]] <- matrix(
     as.numeric(unlist(strsplit(substr(d, 1 + (col_shoe * row_shoe + 2) * (i - 1), (col_shoe * row_shoe + 2) * i - 2), split = ""))),
     row_shoe, col_shoe, byrow = 1
@@ -51,14 +62,14 @@ for (i in 1:386) {
 contour_pix <- list() 
 # each data_pix[[i]] is a matrix with column 1 indicating the shoe, 2 the x, 3 the y, 4 the amount of RACs in that pixel
 # we include only data where there is contact surface (after adjusting for the case that if there is a RAC there will be contact surface)
-for (i in 1:386) {
+for (i in seq_len(n_records)) {
   xcoor <- t(matrix(rep((-col_shoe / 2 + 1:col_shoe) * rel_Y_cord / rel_col_shoe, row_shoe), col_shoe, row_shoe))
   ycoor <- -matrix(rep((-row_shoe / 2 + 1:row_shoe) * rel_Y_cord / rel_col_shoe, col_shoe), row_shoe, col_shoe)
   shoe <- rep(i, length(contour_txt[[i]][contour_txt[[i]] == 1]))
   contour_pix[[i]] <- cbind(shoe, xcoor[contour_txt[[i]] == 1], ycoor[contour_txt[[i]] == 1]) # the data is only where there is contact surface
 }
 contour_pix_use <- numeric()
-for (i in 1:386) {
+for (i in seq_len(n_records)) {
   contour_pix_use <- rbind(contour_pix_use, contour_pix[[i]]) 
 }
 
@@ -111,8 +122,7 @@ calculate_min_distance <- function(new_data, contour_alg_df) {
     }
     new_data$min_dist[i] <- min_distance
   }
-file_name <- paste(ROOT_PATH, "processed_data/dataCC_distance_temp.csv", sep = "")
-write.csv(new_data, file_name, row.names = FALSE)
+rac_write_csv(new_data, P, "dataCC_distance_temp")
   return(new_data)
 }
 
@@ -139,8 +149,7 @@ calculate_min_horiz_distance <- function(new_data, contour_alg_df){
     new_data$horiz_dist[i] <- min_horiz_dist
   }
   new_data$horiz_dist[is.infinite(new_data$horiz_dist)] <- new_data$min_dist[is.infinite(new_data$horiz_dist)]
-  file_name <- paste(ROOT_PATH, "processed_data/dataCC_distance_temp.csv", sep = "")
-  write.csv(new_data, file_name, row.names = FALSE)
+  rac_write_csv(new_data, P, "dataCC_distance_temp")
   return(new_data)
 }
 
@@ -149,7 +158,7 @@ calculate_min_horiz_distance <- function(new_data, contour_alg_df){
 
 ```{r contour_distance_8    BIG ITERATION HORIZ DIST}
 new_data <- calculate_min_distance(dataCC, contour_df)
-file_name <- paste(ROOT_PATH, "processed_data/dataCC_distance_temp.csv", sep = "")
+file_name <- rac_path(P, "dataCC_distance_temp")
 new_data <-read.csv(file_name,header=TRUE)
 new_data <- calculate_min_horiz_distance(new_data, contour_df)
 
@@ -160,7 +169,7 @@ new_data <- calculate_min_horiz_distance(new_data, contour_df)
 
 # HORIZ DISTANCE
 #horiz_dist_mean <- mean(new_data$horiz_dist)
-file_name <- paste(ROOT_PATH, "processed_data/dataCC_distance_temp.csv", sep = "")
+file_name <- rac_path(P, "dataCC_distance_temp")
 new_data <- read.csv(file_name,header=TRUE)
 
 #new_data <- new_data %>% mutate(horiz_dist_cat = ifelse(horiz_dist > 0.1, 1, 0))
@@ -173,9 +182,11 @@ new_data <- read.csv(file_name,header=TRUE)
 
 ```{r }
 
-image <- t(as.matrix(load.image(paste(ROOT_PATH, "data/contour_prototype.png", sep = ""))))
-xcoor <- t(matrix(rep((-col_shoe / 2 + 1:col_shoe) * rel_Y_cord / rel_col_shoe, row_shoe), col_shoe, row_shoe))
-ycoor <- -matrix(rep((-row_shoe / 2 + 1:row_shoe) * rel_Y_cord / rel_col_shoe, col_shoe), row_shoe, col_shoe)
+# The prototype contour in its own frame (P$prototype), never in the data frame of the dataset
+image <- t(as.matrix(load.image(rac_path(P, "prototype_contour"))))
+stopifnot(all(dim(image) == c(row_proto, col_proto)))
+xcoor <- t(matrix(rep((-col_proto / 2 + 1:col_proto) * proto_rel_Y_cord / proto_rel_col_shoe, row_proto), col_proto, row_proto))
+ycoor <- -matrix(rep((-row_proto / 2 + 1:row_proto) * proto_rel_Y_cord / proto_rel_col_shoe, col_proto), row_proto, col_proto)
 entire_contour <- data.frame(x = xcoor[image == 1], y = ycoor[image == 1]) # the data 
 distance_per_y <- entire_contour %>% group_by(y) %>% summarise(min_x = abs(min(x)), max_x = max(x))
 
@@ -209,15 +220,12 @@ for (i in 1:nrow(new_data)) {
 new_data$distance_shape <- dist_shape
 
 new_data$new_x <- (new_data$x * new_data$distance_shape) / (abs(new_data$x) + new_data$horiz_dist)
-file_name <- paste(ROOT_PATH, "processed_data/dataCC_distance.csv", sep = "")
-write.csv(new_data, file_name, row.names = FALSE)
+rac_write_csv(new_data, P, "dataCC_distance")
 ```
 
 
 
 ```{r }
-#file_name <- paste(ROOT_PATH, "processed_data/contour_algorithm.csv", sep = "")
-#write.csv(contour_df, file_name, row.names = FALSE)
 
 rm(contour_pix)
 rm(xcoor)
@@ -236,7 +244,7 @@ gc()
 
 ```{r contour_distance_4}
 library(plotly)
-shoes_to_check <- 200
+shoes_to_check <- min(200, n_records) # a shoe code to look at (200 in the legacy code)
 
 filtered_df1 <- new_data[new_data$shoe == shoes_to_check, ][,c('shoe','x','y')]
 filtered_df2 <- contour_df[contour_df$shoe == shoes_to_check, ][,c('shoe','x','y')]

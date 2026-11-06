@@ -26,6 +26,12 @@
 #                              row.names = FALSE, eol = P$r$eol[[key]]),
 #                              creating the folder if needed
 # rac_ensure_dir(path)         create the parent folder of a file to write
+# rac_new_output(P, path)      a model or figure about to be written: for
+#                              OLD it must not exist (the committed files
+#                              come from Windows R and never get a WSL
+#                              rerun in place; OLD runs belong in a scratch
+#                              copy that deletes them first, decision
+#                              A-075); creates the folder; returns path
 # rac_model_feature()          RAC_MODEL_FEATURE: NEW_X_NS_XY (default) or
 #                              CML_MODEL
 # rac_distance_impl()          RAC_DISTANCE_IMPL: legacy (default) or
@@ -172,6 +178,16 @@ rac_ensure_dir <- function(path) {
   d <- dirname(path)
   if (!dir.exists(d)) dir.create(d, recursive = TRUE)
   invisible(path)
+}
+
+rac_new_output <- function(P, path) {
+  if (identical(P$dataset, "old") && file.exists(path)) {
+    stop("refusing to overwrite the committed OLD output ", path, ": OLD ",
+         "runs belong in a scratch copy (tests/regress_old.sh deletes the ",
+         "outputs first), or delete the file first (decision A-075)",
+         call. = FALSE)
+  }
+  rac_ensure_dir(path)
 }
 
 rac_write_csv <- function(x, P, key) {

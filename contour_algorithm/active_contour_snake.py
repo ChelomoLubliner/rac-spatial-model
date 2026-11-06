@@ -23,6 +23,8 @@ from .extreme_values_x_y import dict_points, get_contour
 from .io_shoes import write_shoes
 from .locations import record_skip_idx0
 
+WHITE = 255  # rac: literal-ok (an 8-bit grey level, not the NEW width)
+
 
 def get_image(profile, entire_shoe, im_num, list_contour):
     img = np.nan
@@ -90,7 +92,7 @@ def extreme_values(profile, im_arr):
     new_arr[tuple(zip(*new_points_x))] = True
     new_image = Image.fromarray(new_arr)
 
-    return new_image.point(lambda x: 255 if x == 0 else 0)
+    return new_image.point(lambda x: WHITE if x == 0 else 0)
 
 
 def get_snake_image(profile, snake):
@@ -104,7 +106,8 @@ def get_snake_image(profile, snake):
     # create a blank image of the same size as the input image
     output = np.zeros((profile.W, profile.H))
     # draw the snake on the output image
-    cv2.polylines(output, [np.int32(snake)], False, (255, 0, 0), thickness=3)
+    cv2.polylines(output, [np.int32(snake)], False, (WHITE, 0, 0),
+                  thickness=3)
 
     # convert the output image to PNG format
     png_bytes = cv2.imencode('.png', output)[1].tobytes()
