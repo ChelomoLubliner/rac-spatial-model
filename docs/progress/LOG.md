@@ -1561,3 +1561,51 @@ The descriptions are in the results doc, section 8, and in `snake-qa.md`.
 **Not verified:** visual judgements beyond the images above (vision lens).
 
 **Times** (s; load 15-34): WSL OLD step-0 gate 1,876 (snake 1,727); steps 1-6 1,611 (step 1 157, step 2 56, GLMM 720, CML 408, step 4 27 and 30, step 5 132, step 6 47); steps 4-6 on the committed models 23, 21, 42, 26; venv-wind OLD step 0 1,055; Windows R GLMM 593; `rebuild_new.sh --full` 468; serial NEW step 0 1,119; venv-wind NEW step 0 919; override writer 43; fast suite 289.
+
+## 2026-11-06 22:10, T4-snake second review fixes review (reviewer:vision)
+
+**Verdict: changes required, all findings minor.** No contour or cleaning defect beyond the OLD bar is left, no sticker, label or stamp survives in a cleaned shoe or a contour, and 170's own ellipse encloses its heel pad. What is still open: the review classes, which A-101 says name every known defect and which feed the Part 2 sensitivity list, miss five shoes; two fixes that cost nothing were not applied; one statement about labels in the docs is wrong.
+
+**Looked at (Read tool):**
+- all 52 NEW sheets, 13 per kind (prototype, ellipse + first snake, final snake, cleaned; shoes 1-631);
+- `prototype_mask_new.png`;
+- both halves of `overrides_before_after_new.png` (24 pairs);
+- all 29 flagged figures, three per view;
+- OLD `sheet_old_01.png` and `prototype_old.png`;
+- about 15 zoom panels of my own (3-6x): record, ellipse, mask boundary, removed and erased pixels, RACs.
+
+The viewer drops older images. I reopened every sheet whose image had dropped, and every label value I had copied from sheets 01-07 matches the metrics CSV (21 of 21). Scripts and notes: `<scratch>/rv_vis3/` (`notes.md`, `indep.py`, `ends.py`, `balloon.py`, `rimcut.py`, `tips.py`, `zoom.py`, `cmp170.py`).
+
+**Checks that passed:**
+- **Independent numbers.** My own reader, eraser and RAC mapping give the same cleaned counts as the CSV. `contact_out_max_px`, `rac_out_max_px` and `coverage_fill` agree to 5e-4 or better, and every record lies within 3.64 px of its saved second snake. The print beyond the initial ellipse is 42 shoes and 481 px, of which 27 shoes and 127 px lie outside the fill: the docs' numbers.
+- **170.** Against the `015551b` contour only records 170 (864 px) and 186 (85 px) changed. The lower-left heel pad, which the old contour cut through its rim, is now enclosed; the rest of the outline is within about 1 px.
+- **Stickers, labels, frame artefacts.** None in any cleaned shoe or contour.
+  - The 344/345 heel bar is moulded sole: 5-6 RACs lie on it on each print.
+  - 186: the frame-line pieces are erased; the 13-px cluster lies outside the contour.
+  - 55: the arch marks are debris (at most 2 of 631 prints touch those pixels), and its arch contour runs at cols 82-85, inside the 82-93 range of same-design shoes.
+- **Screens, NEW against OLD on the same measures.**
+  - Rim cuts are shallower on NEW: deepest 6.0 px against OLD 12.5.
+  - Toe and heel tip widths are within the OLD minima.
+  - Toe and heel ballooning outliers are envelopes of separate pads or partial toes, all looked at.
+
+**Findings (all minor):**
+1. **Five visible defects have no review class.** A-101 says every known defect is named, and Part 2 uses the list.
+   - 44 `rim_cut`: the tip of the lower-right heel crescent, 10 px, up to 5.0 px deep (deeper than the classed 37, 148, 169).
+   - 521 `partial_print`: the heel bottom-right did not print; the contour cuts diagonally, as on 112.
+   - 626 `partial_print`: the heel ends in a V point at a heel streak with the bottom-left unprinted, as 267 did before its override.
+   - 458 `partial_print`: the toe top-left did not print; the toe is lopsided with a notch, as on 69, 173, 456, 361.
+   - 390 `spike`: the toe rises to a narrow dome over two isolated top marks, as on 9.
+
+   Fix: add these rows and close the class with a systematic screen, not by eye.
+2. **Fixes that cost nothing are not applied, while 376 got a visual override with no band broken.**
+   - 591: radius 24 encloses the cut strokes (its own note: coverage 1.0, median row width unchanged).
+   - 148: radius 16 encloses the pad edge.
+   - 125: the ellipse (187, 127) / (167, 98) encloses the toe-tip sliver.
+
+   Fix: apply them, or record with Shlomo why the band rule of A-102 outranks the visual rule here.
+3. **Docs: handwritten marks.** 114 (top left, about 144 px) and 581 (top right) carry handwritten characters like 14's, and 231 has an ambiguous mark. All lie outside the mask and are removed. `snake-qa.md` calls 114's mark "a fragment" and 581's "debris", and says that no label is on any NEW print. The text should name these marks.
+4. **Note, not a defect.** The mask's toe top (row 19) lies above the ellipse's top (row 23). That is the structural cause of the toe crossings (A-105).
+
+**Every shoe that looks wrong, and its status:**
+- unclassed: 44, 521, 626, 458, 390;
+- classed or flagged, as documented: 8, 9, 11, 12, 14, 15, 18, 28, 35, 36, 37, 69, 104, 107, 109, 112, 113, 120, 121, 125, 140, 148, 163, 169, 173, 186, 205, 222, 263, 267, 274, 286, 294, 328, 361, 375, 376, 379, 405, 420, 422, 423, 427, 456, 486, 506, 518, 527, 557, 586, 591.
