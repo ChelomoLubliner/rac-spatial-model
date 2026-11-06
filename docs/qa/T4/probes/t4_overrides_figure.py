@@ -6,8 +6,9 @@ profile's parameters alone (before; recomputed here) and with the override
 (after; the official step-0 run), each drawn on the raw shoe with the RAC
 pixels (green inside the contour's row-span fill, magenta outside); the
 labels name the closing radius of each (the profile's 10; the override's
-24, or 16 where 24 breaks another band, A-102). Needs the NEW step-0
-outputs with --qa and one OpenBLAS thread (checked).
+24, or 16 where 24 breaks another band, A-102) and 'ell' where the
+override gives the shoe its own initial ellipse (170, A-107). Needs the
+NEW step-0 outputs with --qa and one OpenBLAS thread (checked).
 
 usage (repo root):
   OPENBLAS_NUM_THREADS=1 RAC_DATASET=new python -B \\
@@ -41,9 +42,13 @@ for shoe in sorted(acs.snake_overrides(p)):
     cleaned = run['matrices'][shoe - 1] & run['mask']
     racs = run['racs'].get(shoe, np.zeros((0, 2), int))
     r_before = before.snake.first_closing_radius
-    r_after = acs.snake_params(p, shoe).first_closing_radius
+    sp_after = acs.snake_params(p, shoe)
+    r_after = sp_after.first_closing_radius
+    own_ellipse = ((sp_after.center_rc, sp_after.radii_rc)
+                   != (p.snake.center_rc, p.snake.radii_rc))
+    after_tag = f'after r{r_after}' + (' ell' if own_ellipse else '')
     for tag, record, second in ((f'before r{r_before}', arr, rec['second']),
-                                (f'after r{r_after}', run['records'][k],
+                                (after_tag, run['records'][k],
                                  run['second'][shoe - 1])):
         r = dict(run)
         r['records'] = run['records'].copy()

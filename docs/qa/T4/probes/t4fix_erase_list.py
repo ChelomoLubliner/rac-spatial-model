@@ -1,15 +1,18 @@
 """The additions of the T4 review fixes to the NEW erase list (probe;
-decision A-100).
+decisions A-100, A-107).
 
 Starts from the T4 list (the first 25 rows of
 data/new_shoes/sticker_masks_new.csv, as committed at 1a69e26), adds the
-23 rectangles of the review fixes, prints each added row with the contact
-pixels it erases (all, inside the mask) and whether a RAC pixel lies in it,
-checks that the 580 rectangles erase exactly the contact outside the
-same-design heel envelope and that the 105 rectangles hold exactly its
-debris blob, writes OUT.csv and says whether it equals the committed list.
-The mask is the one of the work tree's step-0 run (images_new); the
-proposal was made on the T4 run (mask 35,156 px).
+23 rectangles of the review fixes and the 1 of the second review fixes
+(186: 3 px of its vertical frame line kept inside the mask), prints each
+added row with the contact pixels it erases (all, inside the mask) and
+whether a RAC pixel lies in it, checks that the 580 rectangles erase
+exactly the contact outside the same-design heel envelope, that the 105
+rectangles hold exactly its debris blob and that the 186 rectangle erases
+exactly the 3 kept pixels of the line's component (the rest of it lies
+outside the mask), writes OUT.csv and says whether it equals the
+committed list. The mask is the one of the work tree's step-0 run
+(images_new); the proposal was made on the T4 run (mask 35,156 px).
 
 usage (repo root):
   python -B docs/qa/T4/probes/t4fix_erase_list.py OUT.csv
@@ -154,6 +157,22 @@ print('105 rectangles hold exactly the blob:', inbox == blob, len(blob))
 rows.append((481, 335, 335, 80, 92,
              'isolated 6-px straight dash 2 rows below the heel, far left of '
              'it (frame-line fragment; T4 review)'))
+
+# 186 (second T4 review fixes, A-107): the vertical frame line right of
+# the print keeps 3 px inside the mask at rows 250-252, col 183 (1-based),
+# 8-connected to its mask-removed pixels at cols 184-186; on the course of
+# the line's other pieces (rows 202-204, 212-216, 260-263)
+rows.append((186, 250, 252, 183, 186,
+             'piece of the vertical frame line right of the print (3 px kept '
+             'inside the mask at col 183, joined to the line\'s pixels '
+             'outside it; second T4 review)'))
+lab, _ = ndi.label(mats[185], structure=np.ones((3, 3)))
+line = set(map(tuple, np.argwhere(lab == lab[249, 182]) + 1))
+kept = {(int(r), int(c)) for r, c in line if mask[r - 1, c - 1]}
+inbox = {(r, c) for r in range(250, 253) for c in range(183, 187)
+         if mats[185, r - 1, c - 1]}
+print('186 rectangle erases exactly the line piece:', inbox == line,
+      len(line), 'px, of them inside the mask:', sorted(kept))
 
 new = pd.DataFrame(rows, columns=list(committed.columns))
 table = pd.concat([committed, new], ignore_index=True)

@@ -47,3 +47,4 @@ shoe,row0,row1,col0,col1,reason
 105,28,37,156,169,"debris blob right of the toe tip, separate from the sole (96 px, 11 of them inside the mask; T4 review)"
 105,38,41,159,169,"debris blob right of the toe tip, separate from the sole (96 px, 11 of them inside the mask; T4 review)"
 481,335,335,80,92,"isolated 6-px straight dash 2 rows below the heel, far left of it (frame-line fragment; T4 review)"
+186,250,252,183,186,"piece of the vertical frame line right of the print (3 px kept inside the mask at col 183, joined to the line's pixels outside it; second T4 review)"
