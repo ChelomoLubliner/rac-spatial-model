@@ -1167,3 +1167,50 @@ Several first reads came back blank because of the viewer limit; I reopened each
 6. **Checked, not a finding:**
    - The heel plate of 344 and 345 is sole: it is at the same place on both prints and carries RACs.
    - No other frame line found by a thin-line screen over all 631 shoes. I looked at the 11 hits and the first-row and last-row straight-edge candidates.
+
+## 2026-11-06 16:05, T4-snake review (reviewer:reproducibility)
+
+**Verdict: approve** (reproducibility lens). I re-ran every OLD step at `1a69e26` myself, with my own drivers and comparisons, on both platforms. Every OLD output came back exactly: Tier A where the platform allows it, Tier B on WSL. The RNG sequence is unchanged, no NEW file can overwrite an OLD one (static check and a full NEW rebuild in a clone), and the committed NEW contour and QA files rebuild byte for byte. The findings below are minor; none needs a rebuild.
+
+**How I ran it** (`<scratch>/rv_repro_t4/`, scripts in `bin/`). Each run used `git archive 1a69e26` (a `git clone` at `1a69e26` for the NEW rebuild and the suite), deleted the outputs of its steps first, and compared only files newer than a start marker. Step 0: `python -m contour_algorithm.main` (thesis venv on `/mnt/c`; venv-wind on Windows) with the BLAS variables removed from the environment. R steps the README way (`cd statistical_model && Rscript -e 'rmarkdown::render(...)'`). Comparisons: `cmp` against `git show 79247d8:<path>`, my own R field extraction and b'V^-1 b, my own PDF date stripper against the T1 chain-A PDFs. I did not use `regress_old.sh`, `dump_models.R`, `compare_models.R` or `pdf_normalize.py`.
+
+**Results.**
+- **Tier A list.** My sha256 of the 24 `79247d8` blobs = `committed_79247d8.sha256` = the work tree; `old_baseline` and `old_added_t2` pass. Since `79247d8` the four output folders changed only by additions and `data/new_shoes/README.md`. T4 touched no harness file (`tests/regress_old.sh`, `tests/lib/`, `tests/baseline/`, `tools/`).
+- **OLD step 0 under venv-wind** (Python 3.13.14, Store 3.13.3824.0) at HEAD: the contour is byte-identical to the `79247d8` blob (0 of 386 records differ, CRLF at every stride); the four npy = Tier B; `active-contour_all.npy` = the thesis run of 2025-11-13 (`cmp`). This is the Windows gate that the implementer did not rerun.
+- **OLD step 0 on WSL** (legacy flags) at HEAD: contour = Tier B (`e18d50df...`). The 30 records that differ from the committed contour are exactly those of `contour_linux_diff.csv` (19,027 px). All 1,556 npy/png files were regenerated and equal Tier B, with none extra. With `--qa` (serial): the same contour and 1,556 files, and `snake_points.npz` = the implementer's.
+- **OLD R chain on WSL** at HEAD (steps 1, 2, 3 for both models, 4 for both, 5, 6; every render exit 0, no `## Error` line):
+  - The five step-1/2 CSVs equal the `79247d8` bytes; `shoe_codes.csv` equals its first commit and `old_added_t2`.
+  - GLMM `identical()` to Tier B (the T1 chain-A refit) in 18 of 18 fields (fixef, both vcovs, theta, VarCorr, logLik, deviance, beta, u, X, y and the rest). CML `identical()` to Tier B and to the `79247d8` blob in 9 of 9.
+  - My W: GLMM 427.7804472165131 (= Tier B; the Tier A GLMM gives 428.6933350011, df 24), CML 420.6712420035153. `wald_test.csv`: W 427.780447216513, df 24.
+  - All 8 PDFs equal the Tier B PDFs once the dates are stripped.
+  - Steps 2-6 matter because every step sources the T4-changed `R/profile.R` and `R/io.R` through `config.R`; the implementer gated steps 0 and 1 only.
+- **RNG.** `set.seed(P$r$seed)` (313, a double) is still the only seeding of step 1, and `sample()` at `dataCC_1.Rmd:260` the only draw. The erase-list block (`:89-94`) draws nothing: `.Random.seed` is unchanged after `rac_profile` plus `rac_read_sticker_masks` for OLD (NULL) and NEW (25 rows). `dataCC.csv` is byte-identical, so the 38,600 controls are the same. The step-0 code has no RNG.
+- **Collisions.**
+  - Static: the profile's 31 NEW output files and 4,417 per-shoe image paths are all namespaced; none is an OLD output or a tracked non-NEW file. No literal output path in pipeline code.
+  - Experiment: a NEW rebuild in a clean clone (the README commands plus `--thresholds`, with `OPENBLAS_NUM_THREADS=8 OMP_NUM_THREADS=3` in the caller's environment). The log shows `numpy OpenBLAS threads: 1`. All 450 tracked files keep their bytes (`git status` clean). 70 committed NEW outputs were rewritten, all 70 byte-identical: the contour (`88d55933...`), 4 QA tables, 52 sheets plus `prototype_mask_new.png`, 12 flagged figures. The 3,166 new files all lie in `images_new/` with `_new` stems. The threshold study gives the same bytes with 1 and with 16 threads.
+- **NEW step 0 the pipeline runner's way** (no `--qa`, no `--jobs`: one process, as `tools/run_pipeline.sh` runs it): contour = the committed `88d55933...` for all 631 shoes (the unit test covers 8).
+- **OLD QA reference.** `docs/qa/T4/old/snake_metrics.csv` rebuilds byte for byte: WSL `--qa` step 0, then the committed contour put back, then `qa_snake --metrics`.
+- **Fast suite** in a fresh clone at `1a69e26`: ALL PASS (172 Python tests with 4 skipped, 14 R scripts, flake8, shellcheck, work tree unchanged).
+- **Images I opened.**
+  - `overrides_before_after_new.png`: radius 24 encloses the heel pads of 63 and 109, the toe tip of 557 and the faint fragments of 8 and 163 that radius 10 cut.
+  - `final_snake_sheet_01_new.png` (shoes 1-49): the outlines enclose the heel pads; red margin debris lies outside on 13, 15, 22, 35 and 36; the flagged 8 and 11 are labelled in yellow; no sticker inside an outline.
+  - My regenerated `images_new/qa_snake/im_162_new.png` (shoe 163): the red dashed ellipse; the first snake notched at the right forefoot; the second snake smooth around the faint print.
+
+**Findings** (all minor; none needs a rebuild).
+1. **The OLD gate depends on the OpenBLAS thread count, and nothing states or checks it.**
+   - Both baselines are 16-thread builds (`numpy OpenBLAS threads: 16` in my venv-wind and WSL logs).
+   - With an inherited `OPENBLAS_NUM_THREADS=1`, OLD step 0 at HEAD writes a contour that is neither Tier A nor Tier B: 32 of 386 records differ from Tier B (F56 reproduced). OpenBLAS also reads `OMP_NUM_THREADS`, which many setups export.
+   - `regress_old.sh` passes the environment through, and neither `tests/baseline/README.md` nor the README states the precondition.
+   - Fix: state it in `tests/baseline/README.md`, and make `regress_old.sh` stop with a clear message when the step-0 log's thread count is not 16 (or unset the three variables for OLD). This is the engineer's finding 6 too.
+2. **A-092 overclaims portability.** numpy's OpenBLAS 0.3.29 is a DYNAMIC_ARCH build; it picks the Haswell kernel on this AMD Ryzen 7 5800U. Another CPU may pick another kernel, so "reproducible anywhere on this numpy build" holds only for CPUs that pick the same one. `tests/baseline/local/environment.txt` records neither the kernel nor the thread count. Fix: record both (`scipy_openblas_get_corename64_` and the thread count) there and in the step-0 logs; pin `OPENBLAS_CORETYPE` if portability is wanted.
+3. **In a fresh checkout the fast suite does not test forked = serial.** `Blas.test_jobs_identical` skips without the untracked `images_new/` (4 skips in my clone, 3 in the work tree). My full serial run settles it for this commit; a self-contained test would keep it settled. This shares a root cause with the engineer's finding 1. A NEW step-0 rebuild gate (step 0 in scratch vs the committed sha256, 3-4 min here) would cover both.
+4. **`docs/qa/snake_qa_new.csv` lies outside a NEW folder** (rule 1 asks for the folder and the suffix). It cannot collide with anything: the `_new` name is unique, and it is a hand copy equal to the regenerated table. But rule 1 is non-negotiable: move it under a NEW folder or drop it. This is the engineer's finding 3 too.
+5. **Doc nits.**
+   - The results doc does not write out the restore step of the OLD QA reference (the committed contour copied back after the WSL `--qa` run), and the file rebuilds byte for byte only with it.
+   - "16 R scripts" should be 14.
+   - A-094 and A-098 cite results sections 5 and 9 instead of 6 and 8.
+   - The report says the suite ran at `1a69e26`, the results doc says `8c5f6b9`. My run at `1a69e26` passes, so nothing is lost.
+
+**Not verified:** the venv-wind NEW build (13 of 631 records differ, A-098); the statistician's and the visual reviewer's lenses.
+
+**Times** (s; load 20-40 with the other reviews running): venv-wind OLD step 0 989; WSL OLD step 0 2,004 (snake 1,920); OLD `--qa` step 0 1,417; OLD step 0 with one thread and 14 jobs 112; R chain: step 1 281, step 2 87, GLMM 821, CML 436, step 4 26 and 25, step 5 37, step 6 30; NEW serial step 0 1,016; clone rebuild: step 0 204 (14 jobs), QA 448, thresholds 238 and 263; fast suite 982.
