@@ -1,0 +1,99 @@
+shoe,flag,note
+8,partial_or_faint,"very faint, heel almost unprinted (2,016 px)"
+11,partial_or_faint,heel partly printed; RACs (red) on the unprinted part for some
+12,partial_or_faint,faint print
+13,partial_or_faint,faint print
+22,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+31,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+33,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+35,margin_debris,specks or a small fragment in the margin outside the sole
+35,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+36,margin_debris,specks or a small fragment in the margin outside the sole
+36,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+37,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+55,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+56,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+60,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+61,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+66,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+67,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+69,rac_off_print,every RAC 1-2 px beside a lug or block (strict 0)
+72,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+73,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+84,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+86,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+87,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+93,frame_artefact,thin vertical line in the right margin beside the heel
+96,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+97,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+101,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+103,partial_or_faint,faint print
+104,margin_debris,specks or a small fragment in the margin outside the sole
+106,partial_or_faint,faint print
+107,partial_or_faint,faint print
+109,partial_or_faint,faint print
+112,partial_or_faint,heel almost unprinted with a dense cluster of RACs on it (as T0)
+113,partial_or_faint,heel partly printed; RACs (red) on the unprinted part for some
+114,margin_debris,specks or a small fragment in the margin outside the sole
+120,partial_or_faint,heel partly printed; RACs (red) on the unprinted part for some
+121,partial_or_faint,heel partly printed; RACs (red) on the unprinted part for some
+122,partial_or_faint,heel partly printed; RACs (red) on the unprinted part for some
+123,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+124,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+132,partial_or_faint,faint print
+140,partial_or_faint,heel partly printed; RACs (red) on the unprinted part for some
+142,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+147,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+148,frame_artefact,thin horizontal line across the top margin above the toe
+149,frame_artefact,thin horizontal line across the top margin above the toe
+150,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+151,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+161,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+162,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+163,partial_or_faint,faint print
+165,partial_or_faint,faint print
+166,partial_or_faint,faint print
+177,partial_or_faint,faint; RACs in the unprinted arch or midfoot (as T0)
+186,frame_artefact,"straight lines framing the print: a double line across the top, a line down the right side, a line at the bottom left"
+207,partial_or_faint,faint print
+217,partial_or_faint,faint print
+219,partial_or_faint,heel partly printed; RACs (red) on the unprinted part for some
+223,frame_artefact,short thin diagonal stroke between the heel pads
+264,partial_or_faint,faint print
+266,partial_or_faint,heel partly printed; RACs (red) on the unprinted part for some
+267,partial_or_faint,heel partly printed; RACs (red) on the unprinted part for some
+268,partial_or_faint,heel partly printed; RACs (red) on the unprinted part for some
+271,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+274,partial_or_faint,partial or very faint print (286 and 420 as T0)
+275,partial_or_faint,faint print
+278,partial_or_faint,heel partly printed; RACs (red) on the unprinted part for some
+286,partial_or_faint,partial or very faint print (286 and 420 as T0)
+302,partial_or_faint,heel partly printed; RACs (red) on the unprinted part for some
+309,partial_or_faint,faint print
+329,margin_debris,specks or a small fragment in the margin outside the sole
+354,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+355,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+391,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+392,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+420,partial_or_faint,partial or very faint print (286 and 420 as T0)
+428,partial_or_faint,faint print
+432,margin_debris,specks or a small fragment in the margin outside the sole
+462,margin_debris,specks or a small fragment in the margin outside the sole
+465,margin_debris,specks or a small fragment in the margin outside the sole
+471,partial_or_faint,heel partly printed; RACs (red) on the unprinted part for some
+498,partial_or_faint,faint; RACs in the unprinted arch or midfoot (as T0)
+499,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+506,rac_off_print,"one RAC just above the toe, off the print"
+515,rac_off_print,every RAC 1-2 px beside a lug or block (strict 0)
+524,margin_debris,specks or a small fragment in the margin outside the sole
+569,partial_or_faint,heel partly printed; RACs (red) on the unprinted part for some
+580,frame_artefact,"solid band with a straight edge across the top above the toe; solid white wedge with straight edges below and right of the heel, touching the heel"
+582,frame_artefact,thin tilted line with a small solid wedge above the toe; short vertical strip left of the heel
+585,frame_artefact,thin horizontal line under the heel
+586,frame_artefact,thick textured band across the top above the toe
+589,frame_artefact,short line and a small wedge at the top right
+598,image_type,different image type: thick rim band and dot texture
+599,image_type,"different image type (as 598); RACs 1-2 px off the dots (strict 0.22, best shift 0.91; as T0)"
+617,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+618,over_inked,"forefoot printed as a solid white area (examples noted, not exhaustive)"
+629,rac_off_print,its 1 RAC about 4 px from the nearest contact pixel inside the toe outline

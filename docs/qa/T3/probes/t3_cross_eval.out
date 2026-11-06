@@ -1,0 +1,8 @@
+old strict: own optimum Setting(sx=300.0, sy=301.0, dc=-0.5, dr=-0.5, mirror_x=True, flip_y=False) rate 0.883947; at the new optimum Setting(sx=297.0, sy=301.0, dc=-0.5, dr=-0.75, mirror_x=True, flip_y=False) rate 0.874313; legacy 0.847821
+   own - other optimum 0.009633 95% [0.004951, 0.014950]; other optimum - legacy 0.026492 95% [0.017385, 0.035424]
+old dilated: own optimum Setting(sx=297.0, sy=299.0, dc=-0.5, dr=-0.75, mirror_x=True, flip_y=False) rate 0.991796; at the new optimum Setting(sx=296.0, sy=299.0, dc=-0.5, dr=-0.75, mirror_x=True, flip_y=False) rate 0.991495; legacy 0.990291
+   own - other optimum 0.000301 95% [0.000000, 0.000590]; other optimum - legacy 0.001204 95% [-0.000077, 0.002630]
+new strict: own optimum Setting(sx=297.0, sy=301.0, dc=-0.5, dr=-0.75, mirror_x=True, flip_y=False) rate 0.838005; at the old optimum Setting(sx=300.0, sy=301.0, dc=-0.5, dr=-0.5, mirror_x=True, flip_y=False) rate 0.834907; legacy 0.807775
+   own - other optimum 0.003098 95% [-0.000747, 0.007534]; other optimum - legacy 0.027132 95% [0.021669, 0.033196]
+new dilated: own optimum Setting(sx=296.0, sy=299.0, dc=-0.5, dr=-0.75, mirror_x=True, flip_y=False) rate 0.980812; at the old optimum Setting(sx=297.0, sy=299.0, dc=-0.5, dr=-0.75, mirror_x=True, flip_y=False) rate 0.980563; legacy 0.974666
+   own - other optimum 0.000250 95% [-0.000051, 0.000617]; other optimum - legacy 0.005896 95% [0.004040, 0.007561]

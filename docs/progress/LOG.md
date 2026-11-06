@@ -939,3 +939,29 @@ Chronological; newest entry at the bottom. Each entry: what was done, results (r
 **What.** Started T3-newdata (plan T3, first part: the NEW locations CSV, the pixel calibration, the shoes without RACs and with RACs off the contact surface). Baseline at `48f6f89`: `bash tests/run_all.sh old` ALL PASS (3 min 36 s). Pre-registered the calibration grids, criteria and the reading of rule (i) in A-086 before any grid ran on the real data (exploration so far: file formats, parsing and the 2023 `COL/ROW`, no calibration grid).
 
 **Found while exploring (real output in the results doc):** R's `read.csv` / `read.table` parse 11 OLD x values and 4 OLD y values 1 ulp away from the correctly rounded double (Python's `float()` and pandas agree with each other); the R `aspix` pixels nevertheless equal the Python division form for all 13,287 OLD and 20,013 NEW RACs. The 2023 `COL/ROW` equal R `aspix` for all 20,013 NEW RACs.
+
+## 2026-11-06 11:40, T3-newdata (implementer), done
+
+**What.** The first part of plan T3 (task "T3-newdata"): the NEW locations in the OLD column format, the pixel calibration of the NEW images validated on OLD first, the shoes without RACs and with RACs off contact, the skip list. Commits `a9981e8` (pre-registration A-086, before any grid ran on the real data), `b5d3c4c` (code, tests, outputs), then the docs commit. Decisions A-086 to A-090 and D-014 (for Shlomo and Micha); plan Revision 8 with facts F51-F55. Exact commands and real outputs: `docs/tests/T3-new-data-results.md` (`docs/tests/T3-results.md` points to it).
+
+**Results.**
+- **Locations:** `data/new_shoes/locations_data_new.csv` (`shoe,x,y,type,rac_num`, raw / 2 in exact decimals, 7 places, LF). Its x and y equal the 2023 file exactly for all 20,013 RACs (max abs diff 0), bit for bit equal to `read_locations` (raw / 2) in Python and `identical()` in R; shoe ids and RAC counts per shoe equal. The pipeline still reads the raw file (A-088).
+- **Mapping R vs Python vs 2023:** R `aspix` evaluated from `dataCC_1.Rmd` = Python `legacy_pixel` for every OLD and NEW RAC = the 2023 `COL/ROW`. R's parser puts 11 OLD x, 4 OLD y, 4 NEW x and 2 NEW y values 1 ulp off the correctly rounded double; no pixel changes (F51).
+- **Calibration (A-086 grids; F52):** OLD (validation): x mirrored, y not flipped (0.848 vs 0.44-0.55 for the other orientations), one optimum at 300 over 100-700 px per unit, stage F strict optimum (300, 301, -0.5, -0.5) 0.8839; legacy hit rate 0.8478, 0.9903 with 1-pixel dilation. NEW: the same orientation, one optimum at 300, stage F strict (297, 301, -0.5, -0.75) 0.8380; legacy 0.8078, dilated 0.9747; the 2023 `COL/ROW` = legacy (0 RACs differ); the 2023 R script values give 0.18-0.22. **Rule:** strict (i) False and (ii) False (the 0.005 margin is not met on either dataset: upper bounds 0.0061 and 0.0056), (iii) True; dilated: all True. **Decision A-087: keep the legacy mapping for NEW**, a departure from the primary criterion, flagged for Shlomo: the strict test fails on OLD too, where the mapping is known; the validated (dilated) test passes on both; NEW and OLD agree; a NEW-only correction would treat the datasets differently. Post hoc: NEW at the OLD optimum loses 0.0031 [-0.0007, 0.0075].
+- **Skip list (A-089; F53):** every NEW shoe has RACs (19,990 case pixels); every RAC off contact on NEW 69, 515, 629 (629 also with dilation); RACs off contact 19.2% strict, 2.5% dilated (OLD 15.2%, 1.0%). `shoes_without_racs` and `excluded_shoes` stay [] for NEW. A-029 preview q = 0.8217: 75 NEW and 16 OLD shoes below (F55).
+- **Looked at:** both calibration figures, both off-contact sheets, all 20 raw NEW sheets (631 tiles), and the artefact shoes twice enlarged. No police-type sticker on any NEW record at sheet resolution (OLD 59, 66, 142, 150, 374 show what they look like); straight-edged frame artefacts on NEW 93, 148, 149, 186, 580, 582, 585, 586, 589 (580's wedge touches the heel: T4 must check the cleaning); faint and partial prints; 598-599 a different image type (F54). Notes per sheet in `docs/qa/T3/README.md`, flags in `docs/qa/T3/new/visual_flags_new.csv`.
+- **Profile:** a `prep` entry names the T3 outputs; both readers check them with rule 1; the collision tests now protect every tracked file that is not a real NEW output (T2 engineering review, finding 1; A-090).
+
+**Tests.** 43 new Python tests (143 in all, 3 skipped live checks) and 1 new R script (15 in all). Fast suite on a scratch clone of `b5d3c4c`: ALL PASS in 4 min 9 s (Tier A 24/24, old_baseline 11/11, old_added_t2 2/2, flake8 54 files, shellcheck 14, work tree unchanged).
+
+**OLD regression.** `regress_old.sh --steps 1`: ALL PASS (the three Tier A CSVs and `shoe_codes.csv` byte-identical), 122 s. No committed OLD file changed.
+
+**Timings (s).** OLD calibration 83, NEW 123; shoe tables 13 and 15 (0.8 s of computing each after vectorizing); QA images 22 and 43; fast suite 249; step-1 gate 122.
+
+**Side effects outside the repo.** Only `<scratch>/t3/` (probes, logs, the scratch clone, the regress run folder kept with `--keep`). The thesis repo was not touched.
+
+**Next.** The rest of T3: `stickers.py` and the full-size census (step 3; start from `visual_flags_new.csv`), the overlap screen (3b), the quality rule with the census's partial-print part and the Part 2 shoe set frozen (3c, 3d), the R stamp threshold (step 4). Then T4 (snake), which must check the frame artefacts of F54.
+
+**Open.** A-087 (keep the legacy mapping against the strict criterion) and D-014 (correct the half-pixel offset in both datasets?) need Shlomo and Micha. A-075 still needs Shlomo's confirmation.
+
+**Blockers.** None.
