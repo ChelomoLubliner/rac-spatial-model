@@ -5,12 +5,21 @@
 # user rule 5). Old-regression mode: nothing is written to the repository.
 # Exit 0 only if all pass.
 #
-# Usage: bash tests/run_all.sh
+# Usage: bash tests/run_all.sh [old]
+#   The only dataset argument is old (the default): these are the OLD
+#   regression checks and the unit tests of both profiles; a NEW argument
+#   is refused until NEW outputs exist to check (T5).
 # Optional: RAC_VENV_PY = the Python with numpy, scikit-image, opencv
 #           (default: the thesis venv). Slow gates (legacy reruns,
-#           tests/regress_old.sh) are separate and run in the background.
+#           tests/regress_old.sh, tests/legacy/run_windows_*.sh) are
+#           separate and run in the background.
 
 set -euo pipefail
+
+if [[ $# -gt 1 || "${1:-old}" != old ]]; then
+  echo "run_all.sh: usage: bash tests/run_all.sh [old]" >&2
+  exit 2
+fi
 
 repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 cd "$repo"
