@@ -36,14 +36,17 @@
 # and runs the live checks that the steps cover (test_snake_old_regression
 # for step 0, test_old_regression.R for steps 1-3, test_live_r_pdfs for steps
 # 3-6).
-# OpenBLAS precondition of step 0 (T4 review; decisions A-092, A-103): the
-# snake depends on numpy's OpenBLAS thread count, and both OLD baselines
-# were written with 16 threads, the library default on this 16-CPU machine
+# OpenBLAS precondition of step 0 (T4 review; decisions A-092, A-103,
+# A-108): the snake depends on numpy's OpenBLAS thread count and kernel,
+# and both OLD baselines were written with 16 threads, the library default
+# on this 16-CPU machine, and the Haswell kernel
 # (tests/baseline/local/openblas_tier_b.txt). The pipeline runs without
-# OPENBLAS_NUM_THREADS, GOTO_NUM_THREADS and OMP_NUM_THREADS (an inherited
-# value would change 32 records); before step 0 the script reads the count
-# that numpy's OpenBLAS will run and stops (exit 2) when it is not the
-# recorded one, and the step-0 log's count is checked again afterwards.
+# OPENBLAS_NUM_THREADS, GOTO_NUM_THREADS, OMP_NUM_THREADS and
+# OPENBLAS_CORETYPE (an inherited thread count would change 32 records, a
+# forced kernel others); before step 0 the script reads the count and the
+# kernel that numpy's OpenBLAS will run and stops (exit 2) when either is
+# not the recorded one, and the step-0 log's values are checked again
+# afterwards.
 # Step 0 and steps 2-6 are never compared in one run: step 2 reads the
 # contour, which step 0 rewrites on WSL as Tier B (30 records differ from
 # the committed Windows contour, A-060), while the step-2 to step-6
@@ -124,23 +127,37 @@ if has 0 && { has 2 || has 3 || has 4 || has 5 || has 6; }; then
 fi
 
 # The OpenBLAS precondition of step 0 (see the header), checked before the
-# run folder is made: a wrong thread count cannot reproduce Tier B.
-blas_env=(env -u OPENBLAS_NUM_THREADS -u GOTO_NUM_THREADS -u OMP_NUM_THREADS)
+# run folder is made: a wrong thread count or kernel cannot reproduce Tier
+# B. OPENBLAS_CORETYPE (a forced kernel) is removed like the thread
+# variables (second T4 review, A-108).
+blas_env=(env -u OPENBLAS_NUM_THREADS -u GOTO_NUM_THREADS -u OMP_NUM_THREADS
+  -u OPENBLAS_CORETYPE)
 blas_record=$repo/tests/baseline/local/openblas_tier_b.txt
 want_threads=$(awk '$1 == "threads" {print $2}' "$blas_record")
 want_kernel=$(awk '$1 == "kernel" {print $2}' "$blas_record")
 if has 0; then
-  got_threads=$(
+  got_blas=$(
     cd "$repo" || exit 1
     "${blas_env[@]}" PYTHONDONTWRITEBYTECODE=1 "$py" -B -c \
-      'from contour_algorithm.active_contour_snake import numpy_blas_threads
-print(numpy_blas_threads())' 2> /dev/null
-  ) || got_threads=""
+      'from contour_algorithm.active_contour_snake import (
+    numpy_blas_corename, numpy_blas_threads)
+print(numpy_blas_threads(), numpy_blas_corename())' 2> /dev/null
+  ) || got_blas=""
+  got_threads=${got_blas%% *}
+  got_kernel=${got_blas#* }
   if [[ "$got_threads" != "$want_threads" ]]; then
     echo "regress_old.sh: numpy's OpenBLAS would run ${got_threads:-?}" \
       "threads; both OLD step-0 baselines were written with" \
       "$want_threads ($blas_record), and the snake depends on the count" \
       "(A-092): the OLD contour cannot be compared on this machine" >&2
+    exit 2
+  fi
+  if [[ "$got_kernel" != "$want_kernel" ]]; then
+    echo "regress_old.sh: numpy's OpenBLAS would run the" \
+      "${got_kernel:-?} kernel; both OLD step-0 baselines were written" \
+      "with $want_kernel ($blas_record), and the snake depends on the" \
+      "kernel (A-103, A-108): the OLD contour cannot be compared on this" \
+      "machine" >&2
     exit 2
   fi
 fi
@@ -248,12 +265,14 @@ if has 0; then
     2> /dev/null | head -n 1 | awk '{print $NF}' || true)
   logged_kernel=$(grep -o 'numpy OpenBLAS kernel: .*' "$run/logs/step0.log" \
     2> /dev/null | head -n 1 | awk '{print $NF}' || true)
-  if [[ "$logged" == "$want_threads" ]]; then
-    record PASS "step 0 OpenBLAS threads = baseline" \
-      "$logged threads (kernel ${logged_kernel:-?}, baseline $want_kernel)"
+  if [[ "$logged" == "$want_threads" && "$logged_kernel" == "$want_kernel" ]]
+  then
+    record PASS "step 0 OpenBLAS threads and kernel = baseline" \
+      "$logged threads, kernel $logged_kernel"
   else
-    record FAIL "step 0 OpenBLAS threads = baseline" \
-      "logged ${logged:-nothing}, baseline $want_threads (logs/step0.log)"
+    record FAIL "step 0 OpenBLAS threads and kernel = baseline" \
+      "logged ${logged:-nothing} threads, kernel ${logged_kernel:-nothing};" \
+      "baseline $want_threads, $want_kernel (logs/step0.log)"
   fi
   check_sha "step 0 contour = Tier B (CRLF)" data/contour_Active_Contour.txt \
     "$(awk '/\[LF->CRLF\]/ {print $1}' \

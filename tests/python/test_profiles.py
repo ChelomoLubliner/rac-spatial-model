@@ -519,6 +519,10 @@ class Validation(unittest.TestCase):
                 locations_format='tsv'),
             'snake center': lambda d: d['new']['python']['snake'].update(
                 center_rc=[185]),
+            'empty blas kernel': lambda d: d['new']['python'].update(
+                blas_kernel=' '),
+            'blas kernel not a name': lambda d: d['new']['python'].update(
+                blas_kernel=5),
         }
         for name, edit in cases.items():
             path = self.broken(edit)

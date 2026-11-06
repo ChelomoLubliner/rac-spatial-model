@@ -6,12 +6,16 @@ speck far outside: the absolute triggers of A-099), the flag bands, the
 Python port of the R stamp mask against the committed OLD
 data/all_cont.csv, the erase list (format, application, the committed NEW
 list), the review file (format, classes, A-101), the command-line refusals
-(OLD has no sheets folder; --jobs needs fork), the BLAS-thread guard and
-the kernel getter, forked snakes equal to serial ones (on the sentinel
-fixture, in a subprocess with one BLAS thread, as the NEW profile runs:
-self-contained, T4 review), and the committed NEW QA outputs (metrics
-table, its task copy, the contact sheets, every flagged shoe resolved).
-Reads only; temporary files go to a tempfile folder.
+(OLD has no sheets folder and no 2023 file; --jobs needs fork, refused
+before step 0 reads its profile), the pruning of stale flagged figures,
+the BLAS guard (thread count and kernel, A-108) on every code path that
+runs a snake and the kernel getter, forked snakes equal to serial ones
+(on the sentinel fixture, in a subprocess with one BLAS thread, as the
+NEW profile runs: self-contained, T4 review), and the committed NEW QA
+outputs (metrics table, its task copy, the contact sheets, one flagged
+figure per flagged shoe, every flagged shoe resolved, 'override' exactly
+for the shoes with an override row). Reads only; temporary files go to a
+tempfile folder.
 """
 
 import dataclasses
@@ -325,6 +329,7 @@ class Profiles(unittest.TestCase):
                          (0, None))
         p = load_profile('old')
         self.assertIsNone(p.blas_threads)
+        self.assertIsNone(p.blas_kernel)
         self.assertIsNone(p.snake_overrides)
         self.assertEqual(acs.snake_overrides(p), {})
         self.assertIs(acs.snake_params(p, 9), p.snake)
@@ -336,9 +341,11 @@ class Profiles(unittest.TestCase):
         """The T4 decisions reach the NEW profile: one BLAS thread (A-092),
         closing radius 10 for the first snake (A-094), the erase list
         (A-095), the mask from >= 18 shoes (A-096), the per-shoe
-        overrides (A-097); the init ellipse stays the 2023 one (A-019)."""
+        overrides (A-097, A-102, A-107), the kernel of the committed
+        contour (A-108); the init ellipse stays the 2023 one (A-019)."""
         p = load_profile('new')
         self.assertEqual(p.blas_threads, 1)
+        self.assertEqual(p.blas_kernel, 'Haswell')
         self.assertEqual(p.superpose_threshold, 18)
         self.assertEqual(p.snake.first_closing_radius, 10)
         self.assertIsNone(p.snake.first_gaussian_sigma)
@@ -350,11 +357,19 @@ class Profiles(unittest.TestCase):
                          REPO / 'data/new_shoes/snake_overrides_new.csv')
         over = acs.snake_overrides(p)
         # closing radius 24, or 16 where 24 breaks another band (A-097,
-        # A-102); no override changes the ellipse
-        self.assertTrue(over and all(
+        # A-102); one shoe starts from its own ellipse, 170, whose heel-pad
+        # rim lies beyond the profile ellipse (A-107)
+        radius_only = {s: v for s, v in over.items() if s != 170}
+        self.assertTrue(radius_only and all(
             set(v) == {'first_closing_radius'}
-            and v['first_closing_radius'] in (16, 24) for v in over.values()))
+            and v['first_closing_radius'] in (16, 24)
+            for v in radius_only.values()))
         self.assertEqual(over[165], {'first_closing_radius': 16})
+        self.assertEqual(over[170], {'center_rc': (187.0, 127.0),
+                                     'radii_rc': (167.0, 98.0)})
+        sp170 = acs.snake_params(p, 170)
+        self.assertEqual((sp170.first_closing_radius, sp170.center_rc,
+                          sp170.radii_rc), (10, (187.0, 127.0), (167.0, 98.0)))
         self.assertEqual(acs.snake_params(p, min(over)).first_closing_radius,
                          24)
         self.assertEqual(acs.snake_params(p, None), p.snake)
@@ -425,6 +440,68 @@ class Blas(unittest.TestCase):
         non-empty name, or None where the getter is missing."""
         name = acs.numpy_blas_corename()
         self.assertTrue(name is None or (isinstance(name, str) and name))
+
+    def test_kernel_guard(self):
+        """A profile that fixes a kernel (python.blas_kernel, A-108) is
+        refused under another one, with the reason; NEW fixes the kernel
+        of its committed contour, OLD none (its gate checks the
+        baselines' kernel)."""
+        new, old = load_profile('new'), load_profile('old')
+        self.assertIsNone(old.blas_kernel)
+        self.assertEqual(new.blas_kernel, 'Haswell')
+        threads = acs.numpy_blas_threads()
+        loose = dataclasses.replace(new, blas_threads=None)
+        name = acs.numpy_blas_corename()
+        if name is not None:
+            self.assertEqual(acs.check_blas_threads(
+                dataclasses.replace(loose, blas_kernel=name)), threads)
+        with self.assertRaisesRegex(RuntimeError, 'kernel'):
+            acs.check_blas_threads(dataclasses.replace(
+                loose, blas_kernel='NoSuchKernel'))
+
+    def test_every_snake_path_is_checked(self):
+        """The prototype snake (step 0a, the threshold study), the shoe
+        snake and step 0's run() check the profile's thread count before
+        a snake runs or anything is written (second T4 review: the
+        prototype snake of step 0a ran unchecked)."""
+        from unittest import mock
+        from contour_algorithm import main as step0
+        wrong = dataclasses.replace(load_profile('new'), blas_threads=999)
+        with mock.patch.object(acs, 'active_contour',
+                               side_effect=AssertionError('a snake ran')):
+            with self.assertRaisesRegex(RuntimeError, '999'):
+                acs.prototype_mask_from(
+                    wrong, np.zeros((wrong.H, wrong.W), np.uint8))
+            with self.assertRaisesRegex(RuntimeError, '999'):
+                acs.active_contour_shoe(wrong, None, False, False, 0)
+            with tempfile.TemporaryDirectory(prefix='blas_') as tmp:
+                p = dataclasses.replace(
+                    wrong, root=Path(tmp), images_dir=Path(tmp) / 'img_new',
+                    contour_out=Path(tmp) / 'out_new' / 'c_new.txt')
+                with self.assertRaisesRegex(RuntimeError, '999'):
+                    step0.run(p, log=lambda *a: None)
+                self.assertEqual(list(Path(tmp).iterdir()), [])
+
+    def test_cli_refuses_another_kernel(self):
+        """python -m contour_algorithm.main refuses (exit 2, the reason on
+        stderr) to run snake steps under a kernel that the profile does
+        not fix, before step 0 starts (A-108)."""
+        import contextlib
+        import io
+        from unittest import mock
+        from contour_algorithm import main as step0
+        other = dataclasses.replace(load_profile('new'), blas_threads=None,
+                                    blas_kernel='NoSuchKernel')
+        err = io.StringIO()
+        with mock.patch.dict(os.environ, {'RAC_DATASET': 'new'}), \
+                mock.patch.object(step0, 'load_profile',
+                                  return_value=other), \
+                mock.patch.object(step0, 'run', side_effect=AssertionError(
+                    'step 0 must not start')), \
+                contextlib.redirect_stderr(err):
+            os.environ.pop('RAC_PROFILE_FILE', None)
+            self.assertEqual(step0.main(['--steps', 'snake']), 2)
+        self.assertIn('NoSuchKernel', err.getvalue())
 
     def test_jobs_identical(self):
         """Forked snakes equal serial ones bit for bit, on the sentinel
@@ -509,7 +586,7 @@ class CommandLine(unittest.TestCase):
 
     def args(self, **kw):
         import argparse
-        base = dict(sheets=False, thresholds=None, jobs=1)
+        base = dict(sheets=False, thresholds=None, crosscheck=False, jobs=1)
         base.update(kw)
         return argparse.Namespace(**base)
 
@@ -517,9 +594,12 @@ class CommandLine(unittest.TestCase):
         old = load_profile('old')
         self.assertIsNone(old.prep_path('sheets_dir'))
         self.assertIsNone(q.task_copy_path(old))
-        self.assertIn('--sheets', q.refusal(old, self.args(sheets=True)))
-        self.assertIn('--thresholds',
+        self.assertIn('--sheets needs',
+                      q.refusal(old, self.args(sheets=True)))
+        self.assertIn('--thresholds needs',
                       q.refusal(old, self.args(thresholds='18,29')))
+        self.assertIn('--sheets and --thresholds need ', q.refusal(
+            old, self.args(sheets=True, thresholds='18')))
         self.assertEqual(q.refusal(old, self.args()), '')
         new = load_profile('new')
         self.assertEqual(q.refusal(new, self.args(sheets=True,
@@ -527,7 +607,24 @@ class CommandLine(unittest.TestCase):
         self.assertEqual(q.task_copy_path(new),
                          REPO / 'docs/qa/sheets_new/snake_qa_new.csv')
 
+    def test_crosscheck_needs_the_2023_file(self):
+        """--crosscheck is refused before anything is written when the
+        profile has no 2023 file (OLD), not after --metrics wrote (second
+        T4 review)."""
+        old, new = load_profile('old'), load_profile('new')
+        self.assertIsNone(old.cross_check)
+        self.assertIn('--crosscheck needs',
+                      q.refusal(old, self.args(crosscheck=True)))
+        self.assertEqual(q.refusal(new, self.args(crosscheck=True)), '')
+
     def test_jobs_need_fork(self):
+        """--jobs > 1 is refused where fork is missing. step 0's main must
+        refuse before it reads the profile or runs anything: both are
+        mocked to fail, so a missing guard fails here and writes nothing
+        (second T4 review: it used to run NEW step 0a-0b in the work
+        tree)."""
+        import contextlib
+        import io
         import multiprocessing
         from unittest import mock
         new = load_profile('new')
@@ -538,9 +635,34 @@ class CommandLine(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 acs.run_snakes(new, [None, None], jobs=2)
             from contour_algorithm import main as step0
-            with mock.patch.dict(os.environ, {'RAC_DATASET': 'new'}):
+            err = io.StringIO()
+            with mock.patch.dict(os.environ, {'RAC_DATASET': 'new'}), \
+                    mock.patch.object(step0, 'load_profile',
+                                      side_effect=AssertionError(
+                                          'the profile must not be read')), \
+                    mock.patch.object(step0, 'run', side_effect=AssertionError(
+                        'step 0 must not run')), \
+                    contextlib.redirect_stderr(err):
                 os.environ.pop('RAC_PROFILE_FILE', None)
                 self.assertEqual(step0.main(['--jobs', '2']), 2)
+            self.assertIn('fork', err.getvalue())
+
+    def test_prune_flagged(self):
+        """--flagged removes the figures of shoes that are no longer
+        flagged, and only files named like a per-shoe image of the
+        dataset."""
+        with tempfile.TemporaryDirectory(prefix='flagged_') as tmp:
+            folder = Path(tmp)
+            for name in ('im_7_new.png', 'im_163_new.png', 'im_9.png',
+                         'notes.txt', 'im_x_new.png'):
+                (folder / name).write_bytes(b'x')
+            self.assertEqual(q.prune_flagged(folder, ['im_7_new.png'],
+                                             '_new'), ['im_163_new.png'])
+            self.assertEqual(sorted(f.name for f in folder.iterdir()),
+                             ['im_7_new.png', 'im_9.png', 'im_x_new.png',
+                              'notes.txt'])
+            self.assertEqual(q.prune_flagged(folder / 'none', [], '_new'),
+                             [])
 
 
 class Files(unittest.TestCase):
@@ -557,7 +679,7 @@ class Files(unittest.TestCase):
         self.assertEqual(t['record'].tolist(),
                          list(range(1, len(t) + 1)))
         # the task's name, in the NEW sheets folder (user rule 1), written
-        # by qa_snake --metrics (A-100)
+        # by qa_snake --metrics (A-104)
         task_copy = q.task_copy_path(self.p)
         self.assertEqual(task_copy.parent, self.p.prep_path('sheets_dir'))
         self.assertEqual(task_copy.read_bytes(),
@@ -573,6 +695,17 @@ class Files(unittest.TestCase):
                 self.assertEqual(names, [
                     f'{kind}_sheet_{k:02d}_new.png'
                     for k in range(1, n_sheets + 1)])
+
+    def test_flagged_figures(self):
+        """The flagged folder holds exactly one figure per flagged shoe,
+        im_<shoe - 1>_new.png (--flagged prunes the figures of shoes that
+        are no longer flagged; second T4 review)."""
+        folder = self.p.prep_path('snake_qa_dir') / 'flagged'
+        flagged = self.table.loc[self.table['qa_flags'] != '', 'shoe']
+        want = sorted(self.p.image_path('qa_snake', int(s) - 1).name
+                      for s in flagged)
+        self.assertTrue(want)
+        self.assertEqual(sorted(f.name for f in folder.iterdir()), want)
 
     def test_flags_match_the_bands(self):
         """qa_flags is what flag_shoe gives on the stored (rounded)
@@ -605,6 +738,13 @@ class Files(unittest.TestCase):
                 self.assertGreater(len(str(row['note']).strip()), 10)
         passed = t[t['qa_flags'] == '']
         self.assertTrue((passed['resolution'] == '').all())
+        # a flagged shoe is resolved as 'override' exactly when it has a
+        # row in the override file (second T4 review)
+        over = set(acs.snake_overrides(self.p))
+        for row in flagged.to_dict('records'):
+            with self.subTest(shoe=row['shoe'], check='override row'):
+                self.assertEqual(row['resolution'] == 'override',
+                                 row['shoe'] in over)
         # every listed shoe is a NEW shoe; the classes are known (A-101)
         review = q.read_review(self.p)
         self.assertTrue(set(review.index) <= set(self.p.analysis_shoes()))

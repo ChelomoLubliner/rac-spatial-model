@@ -30,13 +30,15 @@ was not written from is evidence: Tier B came from
 <scratch>/t1/legacy_py_MXmkvc, so that folder can only pass (A-066); the
 T1 run folders predate the manifest and are refused.
 
-OpenBLAS precondition (T4 review fixes, A-103): the snake depends on numpy's
-OpenBLAS thread count, and both OLD baselines were written with the count
+OpenBLAS precondition (T4 review fixes, A-103; the kernel since the second
+T4 review fixes, A-108): the snake depends on numpy's OpenBLAS thread count
+and kernel, and both OLD baselines were written with the count and kernel
 recorded in tests/baseline/local/openblas_tier_b.txt (16, the library
-default on this machine). The reruns fail with that explanation when the
-process runs another count (an inherited OPENBLAS_NUM_THREADS,
-OMP_NUM_THREADS or GOTO_NUM_THREADS, or another CPU count), instead of
-with a pixel difference.
+default on this machine; Haswell). The reruns fail with that explanation
+when the process runs another count (an inherited OPENBLAS_NUM_THREADS,
+OMP_NUM_THREADS or GOTO_NUM_THREADS, or another CPU count) or another
+kernel (an inherited OPENBLAS_CORETYPE, or another CPU), instead of with
+a pixel difference.
 
 Run from the repo root with the thesis venv python:
   MPLBACKEND=Agg python -B -m unittest tests.python.test_snake_old_regression
@@ -83,21 +85,32 @@ def run_folder_base(run):
 
 
 def blas_precondition():
-    """'' when numpy's OpenBLAS runs the thread count of the OLD baselines
-    (tests/baseline/local/openblas_tier_b.txt), else the reason why a
-    snake rerun cannot reproduce them."""
-    want = None
+    """'' when numpy's OpenBLAS runs the thread count and the kernel of the
+    OLD baselines (tests/baseline/local/openblas_tier_b.txt), else the
+    reason why a snake rerun cannot reproduce them (the kernel: second T4
+    review, A-108)."""
+    want, want_kernel = None, None
     for line in (LOCAL / 'openblas_tier_b.txt').read_text().splitlines():
         if line.startswith('threads '):
             want = int(line.split()[1])
+        if line.startswith('kernel '):
+            want_kernel = line.split()[1]
     got = active_contour_snake.numpy_blas_threads()
-    if got == want:
-        return ''
-    return (f'numpy OpenBLAS runs {got} threads; the OLD baselines were '
-            f'written with {want} (tests/baseline/local/openblas_tier_b.txt)'
-            ' and the snake depends on the count (A-092): run without '
-            'OPENBLAS_NUM_THREADS, OMP_NUM_THREADS and GOTO_NUM_THREADS on a '
-            f'machine where the library default is {want}')
+    if got != want:
+        return (f'numpy OpenBLAS runs {got} threads; the OLD baselines were '
+                f'written with {want} (tests/baseline/local/'
+                'openblas_tier_b.txt) and the snake depends on the count '
+                '(A-092): run without OPENBLAS_NUM_THREADS, OMP_NUM_THREADS '
+                'and GOTO_NUM_THREADS on a machine where the library '
+                f'default is {want}')
+    got_kernel = active_contour_snake.numpy_blas_corename()
+    if got_kernel != want_kernel:
+        return (f'numpy OpenBLAS runs the {got_kernel} kernel; the OLD '
+                f'baselines were written with {want_kernel} (tests/baseline/'
+                'local/openblas_tier_b.txt) and the snake depends on it '
+                '(A-103, A-108): run without OPENBLAS_CORETYPE on a machine '
+                f'whose OpenBLAS picks {want_kernel}')
+    return ''
 
 
 def linux_records():
