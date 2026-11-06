@@ -8,8 +8,13 @@ They were copied in T1 (2026-11-05) so that the plan's T2 port (style fixes, dat
 is a reviewable diff against the code that produced the committed old contour.
 
 `requirements-lock.txt` is the `pip freeze` of the thesis venv (Python 3.12.3) that runs this code.
-`requirements.txt` lists `alphashape`, which is not installed and is only used by
-`alphas_shape.py` (not imported by `main.py`).
+`requirements.txt` pins the direct dependencies to those versions (T2).
+
+Three thesis modules that `main.py` never imports were dropped in T2 (decision A-073):
+`alphas_shape.py` (needs `alphashape` and `shapely`, which are not installed),
+`contact_with_locations.py` (a QA drawing with a hard-coded Windows path) and `convex_hull.py`
+(the convex-hull contour of the 2023 processing). Their verbatim text stays in this repo's history
+(commit `fe94300`) and in the thesis repo at `109f30a`.
 
 ## Do not run it in place
 The legacy code uses paths relative to its working directory: it reads `../data/contacts_data.txt`
