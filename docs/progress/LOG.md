@@ -1406,3 +1406,82 @@ Some first opens came back without the picture (viewer limit). I reopened those 
 - The 23 overrides are better or equal; 8, 163 and 557 stay envelopes of partial prints.
 - The mask is a sole silhouette with all debris outside it.
 - Metrics cross-check: every shoe I judged wrong is flagged or classed, except those in findings 1-2. The deepest unflagged outside contact (329, 492, 433, 165, 285: 5-7 px) is isolated specks or debris.
+
+## 2026-11-06 21:00, T4-snake second review fixes (implementer), done
+
+**What.** Fixes for the second round of T4-snake reviews: the engineer and the reproducibility reviewer approved with minor findings; the vision reviewer required changes, with one major finding. Started 19:34 from `015551b`. Commits:
+- `437ed27` code;
+- `dd26bb8` NEW data, QA outputs, probes;
+- `586c18a` tests and gates;
+- `873b49e` two note corrections and the checks probe;
+- then the docs commit.
+
+Decisions A-107 to A-109; plan revision 11 (F68 corrected, F69-F71). Results with exact commands and real outputs: `docs/tests/T4-review2-fixes-results.md`. The NEW section of `docs/qa/snake-qa.md` is corrected from what I saw.
+
+**Results.**
+- **The ellipse (major), A-107.** I reproduced the reviewer's numbers exactly. The print crosses the initial ellipse on 43 shoes: at the toe on 29, at the heel bottom on 15, both on 35. 159 of the 516 px beyond it stay outside the contours.
+  - I tried three ellipses on the 28 shoes with lost print. The profile ellipse rewrites all 28 records, a check of the probe. The snake answers the ellipse globally: the fill changes by about 100-1,400 px.
+  - 170 starts from its own ellipse, (187, 127) / (167, 98). Coverage goes from 0.9875 to 1.0 and no band is broken. Elsewhere every part moves by at most 1 px at the median and at most 3 px.
+  - No other ellipse override: 169, 37 and 125 break no band, and for 104 and 9 no ellipse gives the better outline.
+  - Afterwards 42 shoes keep print beyond their ellipse, 127 px of it outside the contours: 90 px are slivers of printed parts the contour otherwise encloses, 37 px are specks.
+- **Review classes:**
+  - 28, 37, 148, 169, 591 are `rim_cut`; 518 and 527 are `spike`. I looked at each at 6x, and ran radius 16 and 24 and two ellipses on each; the notes say which would help.
+  - 328's note is reworded (the reviewer is right: one speck lies inside 327's heel).
+  - 170 leaves the review file.
+- **186:** a 49th rectangle erases exactly its 6-px line piece (3 px inside the mask). The superposition and the mask do not change. 186's contour moves by at most 2 px. A 13-px cluster of unclear origin stays outside the contour and is named as a residual.
+- **OpenBLAS, A-108:**
+  - The NEW profile pins the kernel (`python.blas_kernel` "Haswell"), and every code path that runs a snake checks threads and kernel.
+  - NEW step 0 refuses another kernel. Shown with `OPENBLAS_CORETYPE=Sandybridge`: exit 2, nothing written.
+  - `regress_old.sh` removes `OPENBLAS_CORETYPE` and refuses another kernel before step 0 (exit 2 in 6 s with a `Zen` record); the OLD snake test names the kernel instead of pixel counts.
+  - `rebuild_new.sh` compares with the HEAD blobs, fails on a work-tree copy that differs from HEAD, checks threads and kernel, and has `--full`.
+- **Override writer, A-109:** self-contained; 13 tags corrected (A-097 -> A-102); a rerun writes the same bytes.
+- **Engineer's nits:** A-104 cited; "needs"; the `--crosscheck` refusal moved into `refusal()`; the 'override'-iff-row check; the fork test without side effects; `--flagged` prunes stale figures; the flagged folder is tested.
+- **Final NEW contour `f7703bcd...`** (records 170 and 186 changed): 602 of 631 pass every band (95.40%), and the 29 flagged shoes are reviewed, none excluded. The T4 bands alone pass 619 (98.10%); the literal tightness 0.95 passes 589 (93.34%). The 2023 cross-check is unchanged: 19,998 of 20,013 RACs inside.
+- **Slips of my own, corrected before the docs commit:**
+  - 170's override reason said "the forefoot does not move" (its right edge moves 1 px out at the median);
+  - 37's note said "radius 16 and 24 keep the cut" (they leave 8-10 px of it);
+  - the edge check's sign was reversed in its first version.
+- **Correction of the 18:35 entry above:** "every T4 column identical" for the rebuilt OLD QA reference should read: every T4 column except `qa_flags`, which gains the A-099 trigger names on 24 rows.
+
+**Tests.** `test_qa_snake` goes from 31 to 37 tests, with new checks in `test_profiles` and `test_snake_old_regression`. The 5 changed modules pass 76 tests (2 skipped). I ran 8 mutants, each removing one new guard, and all 8 are caught; the fork mutant now fails without writing. `bash tests/run_all.sh` on the final tree: ALL PASS (184 Python tests with 3 skipped live checks, 14 R scripts, flake8, shellcheck, work tree unchanged), 3 min 57 s. The first suite run failed only its work-tree check, because I edited two documents while it ran. `tests/rebuild_new.sh --full` at `586c18a`: ALL PASS (the contour, 4 tables, cross-check, threshold table, 2 figures, 52 sheets, 29 flagged figures = HEAD), 7 min. The fast mode at `873b49e`: ALL PASS, 2 min 13 s.
+
+**OLD regression.**
+- `regress_old.sh --steps 0`: ALL PASS (16 threads, kernel Haswell, contour = Tier B `e18d50df...`, 1,556 intermediates, live check), 858 s beside other jobs.
+- `--steps 1-6`: ALL PASS (CSVs = Tier A, models `identical()` to Tier B, 8 PDFs, W 427.7804472165, live checks), 17 min 20 s.
+- With `OPENBLAS_CORETYPE=Sandybridge OPENBLAS_NUM_THREADS=1` inherited: ALL PASS, 11 min.
+- venv-wind (Python 3.13.14) at `873b49e`: contour = Tier A `ca8a07f2...`, four npy = Tier B, `active-contour_all.npy` = the thesis run of 2025-11-13; it logs kernel Haswell, 16 threads.
+- No committed OLD file, R file, `tools/` file, baseline or raw input changed; the Tier A, `old_baseline` and `old_added_t2` checksums pass.
+
+**Visual review.** Looked at with the Read tool:
+- the reviewer's `cmp170.png`;
+- candidate-ellipse figures and 4x heel zooms of 170, 169 and 37, and 3x toes of 125, 104 and 9;
+- 8x zooms of 186's frame line, with 187 for comparison, and 186's new outline over the old;
+- 6x zooms of 28, 37, 148, 169, 591, 518 and 527, and the whole shoes at 2x;
+- the four rebuilt sheets 04 (the final-snake sheet whole, rows 4 and 6 of the ellipse sheet, 186's cleaned and prototype tiles);
+- rows of the before/after figure with 170's pair.
+
+The descriptions are in the results doc, section 8, and in `snake-qa.md`.
+
+**Timings.**
+| What | Time |
+|---|---|
+| ellipse crossing probe | 1 min 13 s |
+| ellipse trial (28 shoes x 4) | 2 min 16 s |
+| NEW step 0 | 1 min 48 s |
+| NEW QA with sheets | 3 min 25 s |
+| threshold study | 18 s |
+| before/after figure | 28 s |
+| override writer | 18 s |
+| OLD gates | 858 s (step 0), 17 min 20 s (steps 1-6), 11 min (inherited variables) |
+| venv-wind step 0 | 11 min 6 s |
+
+**Side effects outside the repo.** Only `<scratch>/t4fix2/`: analysis, mutants, gate run folders kept with `--keep`, and a scratch copy for the refusal demonstrations. The thesis repo was only read: venv-wind ran from it, on a `git archive` copy of this repo.
+
+**Open for people.**
+- Shlomo:
+  - A-107: the first per-shoe ellipse override, 170.
+  - A-108: the kernel pin. On a machine whose OpenBLAS picks another kernel, NEW step 0 refuses; rebuilding there means changing `python.blas_kernel`.
+  - Still open from before: A-100 (580's and 586's erase judgements), A-102 (376's visual override), A-096 (mask threshold 18 against the plan's 29), A-094 (closing radius 10).
+- The task's 97% is reached only under the T4 bands (98.10%); under the A-099 triggers it is 95.40%, with every flagged shoe reviewed.
+
+**Blockers.** None.

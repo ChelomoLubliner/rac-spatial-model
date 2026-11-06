@@ -65,14 +65,17 @@ The ported step 0 with the OLD profile reproduces, on WSL, the T1 rerun of the v
 `test_snake_geometry.py`, `test_locations.py`, `test_sentinel_profile.py` (the profile values reach
 the outputs on a tiny fixture, A-035).
 
-## NEW profile (T4, decisions A-092 to A-097; T4 review fixes, A-099 to A-106)
-The NEW snake differs from the legacy one in four profile values, all inactive for OLD: one OpenBLAS thread;
-`snake.first_closing_radius` 10 (the first snake runs on the cleaned shoe closed with a disk of radius 10, so separate
-heel pads and lugs form one silhouette; the image of the second snake is unchanged); the cleaning mask from the shoes in
-contact on >= 18 of 631; per-shoe overrides (`inputs.snake_overrides`: closing radius 24 for 22 shoes, 16 for one).
-The erase list (`inputs.sticker_masks`, 48 rectangles on 11 shoes) removes frame artefacts and debris before anything
-else. Every NEW contour is the snake of the cleaned shoe as for OLD; 601 of 631 pass every QA band and the other 30 are
-reviewed (`docs/qa/snake-qa.md`). `tests/rebuild_new.sh` rebuilds the committed contour and QA tables in a scratch copy.
+## NEW profile (T4, decisions A-092 to A-097; T4 review fixes, A-099 to A-106; second review fixes, A-107 to A-109)
+The NEW snake differs from the legacy one in four profile values, all inactive for OLD: one OpenBLAS thread (and the
+kernel of the committed contour, `python.blas_kernel`; every code path that runs a snake checks both, and step 0
+refuses another, A-108); `snake.first_closing_radius` 10 (the first snake runs on the cleaned shoe closed with a disk
+of radius 10, so separate heel pads and lugs form one silhouette; the image of the second snake is unchanged); the
+cleaning mask from the shoes in contact on >= 18 of 631; per-shoe overrides (`inputs.snake_overrides`: closing radius 24
+for 22 shoes, 16 for one, and its own initial ellipse for 170, A-107). The erase list (`inputs.sticker_masks`, 49
+rectangles on 11 shoes) removes frame artefacts and debris before anything else. Every NEW contour is the snake of the
+cleaned shoe as for OLD; 602 of 631 pass every QA band and the other 29 are reviewed (`docs/qa/snake-qa.md`).
+`tests/rebuild_new.sh [--full]` rebuilds the committed contour and QA files in a scratch copy and compares them with
+HEAD.
 
 ## Known issues kept as they are (plan, known issues)
 - K1: the thesis flip of image 8 was dead code (`FOLDER` never equalled `'Images/Old_Shoes/'`), so
