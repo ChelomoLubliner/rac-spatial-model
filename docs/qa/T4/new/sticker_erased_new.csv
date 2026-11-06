@@ -1,26 +1,49 @@
 shoe,row0,row1,col0,col1,erased_px,erased_in_mask_px,reason
-148,1,29,1,255,128,72,thin frame line (plate or paper edge) across the top above the toe; it touches the toe's top row
+148,1,29,1,255,128,66,thin frame line (plate or paper edge) across the top above the toe; it touches the toe's top row
 148,30,30,101,106,4,4,left end of the same frame line inside the mask
-149,1,31,1,255,83,42,thin tilted frame line across the top above the toe
-186,1,30,1,255,309,185,double frame line across the top above the toe
-186,31,31,96,108,8,8,left end of the frame lines inside the mask
-186,31,31,140,156,17,16,right end of the frame lines inside the mask
-186,32,32,96,102,3,3,left end of the frame lines inside the mask
-186,32,32,146,156,7,7,right end of the frame lines inside the mask
-186,332,367,1,255,134,81,frame line along the bottom below the heel
-580,1,36,1,255,534,106,solid band with a straight edge across the top above the toe (the toe starts at row 41)
-580,317,326,168,255,334,20,tip of the solid wedge right of the heel inside the mask
-580,327,334,159,255,265,91,solid wedge and straight bar at the heel's lower right
+149,1,31,1,255,83,40,thin tilted frame line across the top above the toe
+186,1,30,1,255,309,173,double frame line across the top above the toe
+186,31,31,96,108,8,7,left end of the frame lines inside the mask
+186,31,31,140,156,17,13,right end of the frame lines inside the mask
+186,32,32,96,102,3,2,left end of the frame lines inside the mask
+186,32,32,146,156,7,5,right end of the frame lines inside the mask
+186,332,367,1,255,134,75,frame line along the bottom below the heel
+580,1,36,1,255,534,89,solid band with a straight edge across the top above the toe (the toe starts at row 41)
+580,317,326,168,255,334,26,tip of the solid wedge right of the heel inside the mask
+580,327,334,159,255,265,101,solid wedge and straight bar at the heel's lower right
 580,328,334,86,108,100,100,straight bar at the heel's lower left (same design 581 and 583: heel bottom near row 333)
-580,335,367,1,255,203,203,straight bar below the heel
-582,1,36,1,255,284,84,thin tilted frame line with a small wedge across the top above the toe
-585,335,335,76,96,15,9,thin tilted frame line under the heel
+580,335,367,1,255,203,200,straight bar below the heel
+582,1,36,1,255,284,79,thin tilted frame line with a small wedge across the top above the toe
+585,335,335,76,96,15,7,thin tilted frame line under the heel
 585,336,336,86,126,26,26,thin tilted frame line under the heel
 585,337,337,119,161,14,14,thin tilted frame line under the heel
-585,338,338,151,167,11,7,thin tilted frame line under the heel
-586,1,36,1,255,749,433,thick textured band across the top above the toe (same design 587: toe from row 37)
-586,37,42,86,104,77,52,band left of the toe where it merges with the toe tip
-586,37,42,142,171,86,70,band right of the toe where it merges with the toe tip
+585,338,338,151,167,11,8,thin tilted frame line under the heel
+586,1,36,1,255,749,409,thick textured band across the top above the toe (same design 587: toe from row 37)
+586,37,42,86,104,77,48,band left of the toe where it merges with the toe tip
+586,37,42,142,171,86,64,band right of the toe where it merges with the toe tip
 586,43,46,86,98,8,7,band remnants left of the toe
 586,43,46,157,171,3,3,band remnants right of the toe
 589,1,26,126,151,4,4,tip of the wedge at the top right inside the mask
+584,334,334,85,185,32,28,"straight 1-px frame line under the heel (row 334, cols 89-180; the heel ends on row 333 at cols 120-138; same batch as the erased lines of 580 and 585; T4 review)"
+586,37,42,105,141,204,204,"solid band remnant over the toe tip (rows 37-42 hold 31-37 contact px per row in cols 105-141 against 0-5 on the same-design 587 aligned on the forefoot, shift +4 rows -1 col; the real toe starts near row 41, so about 9 px of real toe tip go with it; T4 review)"
+580,325,325,154,167,1,1,"bar below the heel merged with the heel bottom: erased outside the heel envelope of the same-design 583 and 584 (aligned on the heel, shift -1 row +1 col, 1 px margin), so the heel keeps a rounded bottom ending on row 332; T4 review"
+580,326,326,153,167,8,8,"bar below the heel merged with the heel bottom: erased outside the heel envelope of the same-design 583 and 584 (aligned on the heel, shift -1 row +1 col, 1 px margin), so the heel keeps a rounded bottom ending on row 332; T4 review"
+580,327,327,151,158,8,8,"bar below the heel merged with the heel bottom: erased outside the heel envelope of the same-design 583 and 584 (aligned on the heel, shift -1 row +1 col, 1 px margin), so the heel keeps a rounded bottom ending on row 332; T4 review"
+580,328,328,150,157,8,8,"bar below the heel merged with the heel bottom: erased outside the heel envelope of the same-design 583 and 584 (aligned on the heel, shift -1 row +1 col, 1 px margin), so the heel keeps a rounded bottom ending on row 332; T4 review"
+580,329,329,110,112,3,3,"bar below the heel merged with the heel bottom: erased outside the heel envelope of the same-design 583 and 584 (aligned on the heel, shift -1 row +1 col, 1 px margin), so the heel keeps a rounded bottom ending on row 332; T4 review"
+580,329,329,148,158,11,11,"bar below the heel merged with the heel bottom: erased outside the heel envelope of the same-design 583 and 584 (aligned on the heel, shift -1 row +1 col, 1 px margin), so the heel keeps a rounded bottom ending on row 332; T4 review"
+580,330,330,109,115,7,7,"bar below the heel merged with the heel bottom: erased outside the heel envelope of the same-design 583 and 584 (aligned on the heel, shift -1 row +1 col, 1 px margin), so the heel keeps a rounded bottom ending on row 332; T4 review"
+580,330,330,147,158,12,12,"bar below the heel merged with the heel bottom: erased outside the heel envelope of the same-design 583 and 584 (aligned on the heel, shift -1 row +1 col, 1 px margin), so the heel keeps a rounded bottom ending on row 332; T4 review"
+580,331,331,110,116,7,7,"bar below the heel merged with the heel bottom: erased outside the heel envelope of the same-design 583 and 584 (aligned on the heel, shift -1 row +1 col, 1 px margin), so the heel keeps a rounded bottom ending on row 332; T4 review"
+580,331,331,144,158,15,15,"bar below the heel merged with the heel bottom: erased outside the heel envelope of the same-design 583 and 584 (aligned on the heel, shift -1 row +1 col, 1 px margin), so the heel keeps a rounded bottom ending on row 332; T4 review"
+580,332,332,110,117,8,8,"bar below the heel merged with the heel bottom: erased outside the heel envelope of the same-design 583 and 584 (aligned on the heel, shift -1 row +1 col, 1 px margin), so the heel keeps a rounded bottom ending on row 332; T4 review"
+580,332,332,141,158,18,18,"bar below the heel merged with the heel bottom: erased outside the heel envelope of the same-design 583 and 584 (aligned on the heel, shift -1 row +1 col, 1 px margin), so the heel keeps a rounded bottom ending on row 332; T4 review"
+580,333,334,109,158,93,93,"bar below the heel merged with the heel bottom: erased outside the heel envelope of the same-design 583 and 584 (aligned on the heel, shift -1 row +1 col, 1 px margin), so the heel keeps a rounded bottom ending on row 332; T4 review"
+148,30,30,87,100,14,1,left end of the top frame line on row 30 (3 px were kept inside the mask; T4 review)
+186,31,37,157,210,172,0,right ends of the top double frame line beyond the toe (one pixel was kept inside the mask; T4 review)
+186,33,33,95,105,1,1,left end of the top frame lines on row 33 (1 px inside the mask; T4 review)
+186,212,216,187,190,7,0,piece of the vertical frame line right of the print (one pixel inside the mask; T4 review)
+186,260,263,182,184,6,3,piece of the vertical frame line right of the print (one pixel inside the mask; T4 review)
+105,28,37,156,169,81,0,"debris blob right of the toe tip, separate from the sole (96 px, 11 of them inside the mask; T4 review)"
+105,38,41,159,169,15,0,"debris blob right of the toe tip, separate from the sole (96 px, 11 of them inside the mask; T4 review)"
+481,335,335,80,92,6,4,"isolated 6-px straight dash 2 rows below the heel, far left of it (frame-line fragment; T4 review)"
