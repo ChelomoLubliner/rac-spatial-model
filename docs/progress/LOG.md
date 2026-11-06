@@ -473,3 +473,51 @@ Chronological; newest entry at the bottom. Each entry: what was done, results (r
 **Open.** A-055 (vcov method for T5/T6, statistics expert) and A-060 (platform of the official NEW contour, T4) are unchanged proposals. The A-062 residual risk is stated: a hand-made folder named like `x_abcdef` directly under the scratch root would be accepted.
 
 **Blockers.** None.
+
+## 2026-11-06 02:35, T1-baseline review of the fix pass 823a80c..2d39846 (reviewer:engineer)
+
+**Verdict: changes required** (engineering lens), for one item only: finding 1 below. The blocking scratch-guard bug is fixed correctly, and every claim of the fix pass that I tested reproduces. Findings 2-4 can go into T2.
+
+**Verified by re-running, not by reading.**
+- `bash tests/run_all.sh`: ALL PASS, 12 checks in 66 s (25 Python tests, 1 skipped by design; 6 R scripts; flake8 20 files, shellcheck 8; work tree unchanged). `contour_algorithm/` still has 106 flake8 findings, as stated. The changed text files have 0 CR bytes, and none of the 6 commits has an attribution line. Since `79247d8`, no file changed under `data/`, `processed_data/`, `saved_models/` or `model_images/`, and no Rmd and no `config.R` changed.
+- **Scratch guard, red and green.** I ran the HEAD test file against the pre-fix `scratch.sh` in my own mirror, with `TMPDIR` confined: `FAILED (failures=20)`. Against the fixed library: `OK`, 11 tests.
+  - My extra probes are all refused (rc 2): `./x_abcdef`, `x_abcdef/.`, `x_abcdef/..`, the run folder reached through a symlinked alias of the root, a trailing newline, and a tab.
+  - A run folder holding symlinks to an outside folder is removed, and the outside file survives.
+  - On the real scratchpad, the shape rule accepts exactly the claimed entries: 4 of 20 in `t1/`, none at the root, and 4 of 25 in `review_t1_repro/`.
+- **Wald.** `test_wald.R` passes on WSL and under the Windows R 4.4.3 with car, where W_car = 428.693335 equals the manual W.
+- **Windows R step 3.** `compare_glmm_fits.R` on the saved fit of `winr_step3_dDeVqT` prints `RESULT 27 of 27 fields the same` (exit 0). The stored Hessian is identical, and W = 428.6933.
+- **Determinism.**
+  - Python: `legacy_py_doxevy` and the reviewer's `pychain_ZlQAFJ` both pass `test_full_run_folder`, their 1,556 intermediates pass `sha256sum -c`, and both contours have sha256 `d43fda7e...`.
+  - R: `RAC_REGRESS_R_RUN` set to `legacy_r_FTg4vJ` and to `liveR_95moUH` gives ALL PASS both times. The 8 normalized PDFs of `legacy_r_FTg4vJ` equal Tier B, and its step 5 prints W = 427.7804.
+- **Docs.**
+  - The Tier A vs Tier B table (fix results 6.3) and the Diagnostic 1 table (T1 results 5.3) regenerate byte for byte. The index lists and per-shoe numbers (855 / 824 / 1,402 / 18 px; max 8.944 px) match `contour_linux_diff.csv`.
+  - I opened `docs/qa/T1/old/contour_platform_diff_old.png`. The descriptions of shoes 21, 176, 11 and 354 match: green bows into the left arch of 21 and 11; 176 is a parallel offset with a magenta bump at the top-right toe; 354 has a few magenta pixels at the right waist and the heel. One exception: shoe 11's heel is not "shared", it shows alternating one-pixel offsets.
+
+**Findings.**
+1. **Major (required): the CLI exit status of `tests/lib/compare_models.R` passes dumps that are not identical.**
+   - Cause: lines 54-55 count only rows whose `max_abs_diff` is not NA. So a numeric field holding NaN, a numeric field of a different length, and every character field are left out of the exit status.
+   - Reproduced against `models_committed.rds`. Each of these exits 0, although its row shows `identical=FALSE`: `fixef[1] = NaN`, a 24-element `fixef`, `optimizer = "bobyqa"`, `cml_method = "breslow"`. A dump with all 10 GLMM estimate fields set to NaN also exits 0 (10 of 22 rows FALSE). This breaks even the header's promise (line 9: "exit 0 if every numeric field is identical()").
+   - Why it matters: it is the same failure class as T1 finding 6 (a field that is not really compared). The plan has T2's `regress_old.sh` reuse this tool, and A-065 cites its "exit 0" as evidence.
+   - Today nothing is wrong yet: no automated gate relies on the CLI (`test_old_regression.R` uses `all(cmp$identical)`), and the A-065 claim holds, because the pasted table shows 22 of 22 rows identical.
+   - Fix: `quit(status = if (all(tab$identical)) 0 else 1)`, a matching header, and CLI cases (NaN, length, character) in `tests/r/test_compare_models.R`.
+2. **Minor: `run_windows_r_step3.sh` reads its reference GLMM from the work tree** (`$repo/saved_models/NEW_X_NS_XY.rds`, line 87) and never checks that it is Tier A. An in-place OLD run would silently change the reference, because rule 1 keeps that path.
+   - Fix: compare with `git show 79247d8:saved_models/NEW_X_NS_XY.rds` extracted into the run folder (I checked: sha256 `ae670fd3...`), or `sha256sum -c` that line first.
+   - For T2 runs with `RAC_WINR_COMMIT`: WSL variables such as `RAC_DATASET` reach a Windows process only through `WSLENV`, so set them in the generated driver.
+3. **Minor: A-062.** The residual risk is real.
+   - In a throwaway root, the hand-made folders `legacy_python` and `results_backup` were accepted and deleted (rc 0). Names like `*_python`, `*_images`, `*_backup` and `*_output` are plausible.
+   - The argument against a marker file does not hold: if `rsync --delete` drops the marker, cleanup is refused, which is the safe direction. Consider the marker (written by `rac_scratch_new`, required by `rac_scratch_remove`).
+   - `rac_scratch_root` (line 49) is a plain global: overriding it moved the deletion scope in my probe. Make it readonly, with a guard for a second `source`.
+4. **Nits.**
+   - `tests/legacy/plot_contour_platform_diff.py` is the sixth copy of `W, H = 307, 395` and `read_records`, and the third copy of the shoe-record mapping. Since `test_no_hardcoding` skips all of `tests/`, NEW tooling added there later is not scanned; an allowlist of the OLD-only files would be tighter.
+   - `test_compare_glmm_fits.R:35` asserts `!identical(readRDS(g), readRDS(g))`. It will fail for no real reason if a later R or lme4 serializes these environments identically.
+   - `test_step5_variant.R:22` has `out <-suppressWarnings(`.
+
+**What is good.**
+- The guard fix is minimal, and its red/green evidence reproduces.
+- The Wald dimnames and intercept checks are right, and they are tested against the old code.
+- `compare_glmm_fits.R` compares field by field with care, and the `resp$mu` trap is documented.
+- The Windows-R gate makes Tier A of step 3 reproducible with in-repo tools.
+- The determinism claims now rest on independent runs.
+- Every pasted output I re-ran is real.
+
+**Required before the next step:** finding 1 (code and test). Findings 2-4 can go into the first T2 commits.
