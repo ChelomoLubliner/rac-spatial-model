@@ -1,0 +1,296 @@
+# The committed NEW outputs of steps 1-6 (plan T5 step 1, review focus 3
+# and 4; decisions A-110, A-111, A-112).
+#
+# 1. Step 1 (processed_data/new/): dataCC_new.csv has one code per analysis
+#    shoe, n_controls controls per shoe and one case per distinct RAC pixel
+#    (19,990 with the legacy mapping kept by T3, A-087); shoe_codes_new.csv
+#    maps code k to the k-th analysis shoe; the contact surface S
+#    recomputed here (raw records, erase list, all_cont_new.csv, RAC pixels
+#    by step 1's own aspix) gives exactly shoe_pixel_counts_new.csv; every
+#    control lies on S and on no RAC pixel, every case on a RAC pixel;
+#    all_cont_new.csv is the set of pixels in contact on >= r.stamp_threshold
+#    shoes (A-110: the sweep removes nothing on NEW); the NEW CSVs have LF
+#    line endings only.
+# 2. Step 2: dataCC_distance_new.csv keeps (n_Acc, x, y, shoe) of
+#    dataCC_new.csv; min_dist, horiz_dist, distance_shape, new_x are finite;
+#    horiz_dist >= min_dist; every distance_shape value is a per-row half
+#    width of the OLD prototype contour in its own 307 x 395 frame after the
+#    CSV round trip (the prototype frame was used, A-006); the contour file
+#    holds length(rac_analysis_shoes(P)) records (A-053); the distances of
+#    25 random shoes recomputed from the committed contour with
+#    compute_distances() and step 2's shape chunk are identical() to the
+#    CSV, so a step 2 left stale by a contour change fails here.
+# 3. Step 3 (saved_models/new/): the GLMM converged (code 0, no lme4
+#    message), 25 fixed effects, 631 groups, as many rows as dataCC, and its
+#    design matrix rebuilt from dataCC_distance_new.csv with the step-3
+#    basis equals getME(X) (it was fitted on the committed CSV); the CML has
+#    24 coefficients, one event per case, and the step-3 basis of the NEW
+#    data; the OLD-basis refits (A-112) carry the OLD basis.
+# 4. Step 5: wald_test_new.csv has df 24 and the W of wald_all_spatial() on
+#    the NEW GLMM; its vcov label says which vcov lme4 used.
+# 5. Steps 4-6: the 8 NEW PDFs exist and are PDFs; their PNG twins
+#    (tools/figures_png.R, A-111) exist in docs/qa/T5/new/.
+# 6. No collision: every tracked or new file in the NEW output folders of
+#    T5 has a stem ending in the NEW suffix, and the OLD output folders hold
+#    only the OLD files (Tier A, the write-once lists
+#    tests/baseline/old_added_*.sha256 of the tasks that add OLD files,
+#    README files).
+# Writes only below tempdir().
+#
+# Run from anywhere:  Rscript tests/r/test_new_outputs.R
+suppressMessages({
+  library(dplyr)
+  library(splines)
+  library(lme4)
+  library(survival)
+})
+root <- local({
+  f <- sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE))
+  normalizePath(file.path(dirname(f), "..", ".."))
+})
+ROOT_PATH <- paste(root, "/", sep = "")
+for (f in c("profile.R", "io.R", "distances.R", "wald.R", "compare.R")) {
+  source(file.path(root, "statistical_model", "R", f))
+}
+source(file.path(root, "tests", "lib", "rmd_chunk.R"))
+pass <- function(name) cat("PASS", name, "\n")
+P <- rac_profile("new", root = ROOT_PATH)
+P_old <- rac_profile("old", root = ROOT_PATH)
+W <- P$col_shoe
+H <- P$row_shoe
+shoes <- rac_analysis_shoes(P)
+n_shoes <- length(shoes)
+csv_round_trip <- function(df) {
+  f <- tempfile(fileext = ".csv")
+  write.csv(df, f, row.names = FALSE)
+  read.csv(f, header = TRUE)
+}
+
+# --- 1. step 1 ---------------------------------------------------------------
+dataCC <- read.csv(rac_path(P, "dataCC"), header = TRUE)
+codes <- read.csv(rac_path(P, "shoe_codes"), header = TRUE)
+counts <- read.csv(rac_path(P, "pixel_counts"), header = TRUE)
+mask <- as.matrix(read.csv(rac_path(P, "all_cont"), header = TRUE))
+stopifnot(identical(names(dataCC), c("n_Acc", "x", "y", "shoe")),
+          identical(codes$code, seq_len(n_shoes)),
+          identical(codes$shoe, shoes),
+          identical(sort(unique(dataCC$shoe)), seq_len(n_shoes)),
+          all(dataCC$n_Acc %in% c(0, 1)),
+          all(table(dataCC$shoe[dataCC$n_Acc == 0]) == P$r$n_controls),
+          identical(counts$shoe, shoes), all(counts$pixel_count > 0),
+          all(dim(mask) == c(H, W)), all(mask %in% c(0, 1)))
+# the raw records, the erase list, the stamp mask and the RAC pixels
+con <- file(rac_path(P, "contacts"), "rb")
+bytes <- readBin(con, "raw", P$num_shoe * (W * H + 2))
+close(con)
+stopifnot(length(bytes) == P$num_shoe * (W * H + 2))
+raw <- lapply(seq_len(P$num_shoe), function(i) {
+  matrix(as.numeric(bytes[(i - 1) * (W * H + 2) + seq_len(W * H)] ==
+                      as.raw(49)), H, W, byrow = TRUE)
+})
+sticker <- rac_read_sticker_masks(P)
+if (!is.null(sticker)) raw <- rac_apply_sticker_masks(raw, sticker)
+for (i in P$r$contact_flip_shoes) raw[[i]] <- raw[[i]][, W:1]
+sum_raw <- Reduce(`+`, raw)
+stopifnot(identical(unname(mask == 1),
+                    unname(sum_raw >= P$r$stamp_threshold)))
+eval(parse(text = rmd_chunk(file.path(root, "statistical_model",
+                                      "dataCC_1.Rmd"), "2.init_functions")))
+loc <- read_locations(P)
+rac_col <- aspix_x(loc$x)
+rac_row <- aspix_y(loc$y)
+scale <- P$coords$rel_col_shoe / P$coords$rel_Y_cord
+cc_col <- round(dataCC$x * scale + W / 2)
+cc_row <- round(H / 2 - dataCC$y * scale)
+stopifnot(all(abs(dataCC$x * scale + W / 2 - cc_col) < 1e-6),
+          all(abs(H / 2 - dataCC$y * scale - cc_row) < 1e-6))
+n_px <- integer(n_shoes)
+on_s <- logical(nrow(dataCC))
+on_rac <- logical(nrow(dataCC))
+for (k in seq_len(n_shoes)) {
+  s <- shoes[k]
+  rac <- matrix(FALSE, H, W)
+  sel <- loc$shoe == s
+  rac[cbind(rac_row[sel], rac_col[sel])] <- TRUE
+  S <- (raw[[s]] * mask == 1) | rac
+  n_px[k] <- sum(S)
+  rows <- which(dataCC$shoe == k)
+  idx <- cbind(cc_row[rows], cc_col[rows])
+  on_s[rows] <- S[idx]
+  on_rac[rows] <- rac[idx]
+}
+n_cases <- sum(!duplicated(data.frame(loc$shoe, rac_row, rac_col)))
+stopifnot(identical(as.numeric(n_px), as.numeric(counts$pixel_count)),
+          all(on_s), identical(on_rac, dataCC$n_Acc == 1),
+          sum(dataCC$n_Acc) == n_cases,
+          nrow(dataCC) == n_cases + n_shoes * P$r$n_controls)
+for (key in c("dataCC", "pixel_counts", "all_cont", "shoe_codes",
+              "dataCC_distance_temp", "dataCC_distance", "wald_test")) {
+  b <- readBin(rac_path(P, key), "raw", file.size(rac_path(P, key)))
+  stopifnot(identical(P$r$eol[[key]], "\n"), !any(b == as.raw(13)))
+}
+pass(sprintf(paste("step 1: %d shoes, %d controls each, %d cases (the",
+                   "distinct RAC pixels), %d rows; S recomputed from the raw",
+                   "records, the erase list, the stamp mask (>= %d shoes,",
+                   "no pixel swept) and the RAC pixels = the pixel counts;",
+                   "every control on S and on no RAC pixel; LF only"),
+             n_shoes, P$r$n_controls, n_cases, nrow(dataCC),
+             P$r$stamp_threshold))
+rm(raw, bytes)
+invisible(gc())
+
+# --- 2. step 2 ---------------------------------------------------------------
+dist <- read.csv(rac_path(P, "dataCC_distance"), header = TRUE)
+stopifnot(identical(names(dist), c("n_Acc", "x", "y", "shoe", "row_number",
+                                   "min_dist", "horiz_dist", "distance_shape",
+                                   "new_x")),
+          identical(dist[c("n_Acc", "x", "y", "shoe")], dataCC),
+          identical(dist$row_number, seq_len(nrow(dataCC))))
+for (v in c("min_dist", "horiz_dist", "distance_shape", "new_x")) {
+  stopifnot(all(is.finite(dist[[v]])))
+}
+stopifnot(all(dist$horiz_dist >= dist$min_dist),
+          all(dist$distance_shape > 0),
+          all(abs(dist$new_x) <= dist$distance_shape))
+# the prototype's per-row half-widths in its own frame, round-tripped
+proto <- t(as.matrix(imager::load.image(rac_path(P, "prototype_contour"))))
+Wp <- P$prototype$col_shoe
+Hp <- P$prototype$row_shoe
+stopifnot(all(dim(proto) == c(Hp, Wp)), Wp != W, Hp != H)
+pc <- P$prototype$coords
+xp <- t(matrix(rep((-Wp / 2 + 1:Wp) * pc$rel_Y_cord / pc$rel_col_shoe, Hp),
+               Wp, Hp))
+yp <- -matrix(rep((-Hp / 2 + 1:Hp) * pc$rel_Y_cord / pc$rel_col_shoe, Wp),
+              Hp, Wp)
+widths <- data.frame(x = xp[proto == 1], y = yp[proto == 1]) %>%
+  group_by(y) %>% summarise(min_x = abs(min(x)), max_x = max(x))
+half <- csv_round_trip(data.frame(v = c(widths$min_x, widths$max_x)))$v
+stopifnot(all(dist$distance_shape %in% half))
+n_rec <- file.size(rac_path(P, "contour")) / (W * H + 2)
+stopifnot(n_rec == n_shoes)
+# 25 random shoes recomputed from the committed contour
+cbytes <- readBin(rac_path(P, "contour"), "raw", n_rec * (W * H + 2))
+xc <- t(matrix(rep((-W / 2 + 1:W) * P$coords$rel_Y_cord /
+                     P$coords$rel_col_shoe, H), W, H))
+yc <- -matrix(rep((-H / 2 + 1:H) * P$coords$rel_Y_cord /
+                    P$coords$rel_col_shoe, W), H, W)
+contour_of <- function(i) {
+  m <- matrix(cbytes[(i - 1) * (W * H + 2) + seq_len(W * H)] == as.raw(49),
+              H, W, byrow = TRUE)
+  data.frame(shoe = i, x = xc[m], y = yc[m])
+}
+set.seed(25)
+pick <- sort(sample(seq_len(n_shoes), 25))
+contour_df <- do.call(rbind, lapply(pick, contour_of))
+sub <- dataCC[dataCC$shoe %in% pick, ]
+tmp <- tempfile("t5_new_outputs_")
+P_tmp <- P
+P_tmp$root <- paste(tmp, "/", sep = "")
+nd <- compute_distances(sub, contour_df, P_tmp)
+nd$distance_shape <- distance_shape_vec(nd$x, nd$y, widths)
+nd$new_x <- (nd$x * nd$distance_shape) / (abs(nd$x) + nd$horiz_dist)
+nd <- csv_round_trip(nd)
+ref <- dist[dist$shoe %in% pick, ]
+for (v in c("min_dist", "horiz_dist", "distance_shape", "new_x")) {
+  stopifnot(identical(nd[[v]], ref[[v]]))
+}
+unlink(tmp, recursive = TRUE)
+pass(sprintf(paste("step 2: (n_Acc, x, y, shoe) = dataCC; finite distances,",
+                   "horiz_dist >= min_dist, |new_x| <= distance_shape; every",
+                   "distance_shape a half-width of the prototype in its",
+                   "own frame; %d contour records; %d rows of 25 random",
+                   "shoes recomputed from the committed contour identical()",
+                   "(new_x in [%.4f, %.4f])"),
+             n_rec, nrow(sub), min(dist$new_x), max(dist$new_x)))
+
+# --- 3. step 3 ---------------------------------------------------------------
+glmm <- readRDS(rac_model_path(P, "NEW_X_NS_XY"))
+cml <- readRDS(rac_model_path(P, "CML_MODEL"))
+b_new <- basis_knots(dist)
+stopifnot(inherits(glmm, "glmerMod"), glmm@optinfo$conv$opt == 0,
+          is.null(glmm@optinfo$conv$lme4$messages),
+          length(fixef(glmm)) == 25, ngrps(glmm) == n_shoes,
+          nobs(glmm) == nrow(dist),
+          identical(as.numeric(getME(glmm, "y")), as.numeric(dist$n_Acc)),
+          identical(basis_of(glmm), b_new))
+bx <- ns(dist$new_x, knots = b_new$knots_x)
+by <- ns(dist$y, knots = b_new$knots_y)
+X <- matrix(1, nrow(dist), 1)
+for (i in seq_len(ncol(by))) {
+  for (j in seq_len(ncol(bx))) X <- cbind(X, bx[, j] * by[, i])
+}
+stopifnot(max(abs(X - unname(as.matrix(getME(glmm, "X"))))) == 0)
+stopifnot(inherits(cml, "coxph"), length(coef(cml)) == 24,
+          all(is.finite(coef(cml))), cml$n == nrow(dist),
+          cml$nevent == sum(dist$n_Acc), identical(basis_of(cml), b_new))
+b_old <- basis_knots(read.csv(rac_path(P_old, "dataCC_distance")))
+for (f in c("NEW_X_NS_XY", "CML_MODEL")) {
+  path <- rac_model_path(P, paste(f, "_oldbasis", sep = ""))
+  stopifnot(file.exists(path))
+  m <- readRDS(path)
+  stopifnot(identical(basis_of(m), b_old))
+  if (f == "NEW_X_NS_XY") {
+    stopifnot(m@optinfo$conv$opt == 0, length(fixef(m)) == 25,
+              nobs(m) == nrow(dist))
+  } else {
+    stopifnot(length(coef(m)) == 24, m$n == nrow(dist))
+  }
+}
+sigma2 <- as.numeric(VarCorr(glmm)$shoe)
+pass(sprintf(paste("step 3: GLMM converged (25 fixed effects, %d groups,",
+                   "%d rows, X rebuilt from the CSV = getME(X), sigma^2",
+                   "%.4f); CML 24 coefficients, %d events; both on the NEW",
+                   "basis; the OLD-basis refits on the OLD basis"),
+             ngrps(glmm), nobs(glmm), sigma2, cml$nevent))
+
+# --- 4. step 5 ---------------------------------------------------------------
+wt <- read.csv(rac_path(P, "wald_test"), header = TRUE)
+w <- wald_all_spatial(glmm, use_car = FALSE)
+v_rx <- identical(as.matrix(vcov(glmm)),
+                  as.matrix(vcov(glmm, use.hessian = FALSE)))
+stopifnot(nrow(wt) == 1, wt$df == 24, wt$model == "NEW_X_NS_XY",
+          abs(wt$W - w$W) <= 1e-12 * w$W, wt$method == "manual",
+          identical(wt$vcov, if (v_rx) "RX" else "hessian"))
+pass(sprintf("step 5: wald_test_new.csv W = %.4f, df %d, vcov %s",
+             wt$W, wt$df, wt$vcov))
+
+# --- 5. figures -----------------------------------------------------------------
+stems <- c("NEW_X_NS_XY_SHOE", "CML_MODEL_SHOE", "CI_shoe_cuts", "CI_cut_110",
+           "CI_cut_190", "CI_cut_250", "pixel_inten_JASAup",
+           "difference_random_cml")
+for (s in stems) {
+  pdf_path <- rac_image_path(P, s)
+  png_path <- file.path(root, "docs", "qa", "T5", "new",
+                        paste(s, P$suffix, ".png", sep = ""))
+  stopifnot(file.exists(pdf_path), file.exists(png_path),
+            identical(readBin(pdf_path, "raw", 4), charToRaw("%PDF")),
+            identical(readBin(png_path, "raw", 4),
+                      as.raw(c(0x89, 0x50, 0x4e, 0x47))))
+}
+pass(sprintf("steps 4-6: the %d NEW PDFs and their PNG twins exist",
+             length(stems)))
+
+# --- 6. no collision ------------------------------------------------------------
+listed <- system2("git", c("-C", shQuote(root), "ls-files", "-co",
+                           "--exclude-standard", "processed_data",
+                           "saved_models", "model_images", "docs/qa/T5"),
+                  stdout = TRUE)
+in_new <- vapply(strsplit(listed, "/", fixed = TRUE), function(p)
+  any(p[-length(p)] %in% RAC_NAMESPACE_FOLDERS), TRUE)
+new_files <- listed[in_new]
+stem <- sub("\\.[^.]*$", "", basename(new_files))
+stopifnot(length(new_files) > 0, all(endsWith(stem, P$suffix)))
+tier_a <- sub("^[0-9a-f]{64}  ", "", readLines(file.path(
+  root, "tests", "baseline", "committed_79247d8.sha256")))
+# the OLD files added since 79247d8, one write-once list per task (A-082)
+added <- sub("^[0-9a-f]{64}  ", "", unlist(lapply(Sys.glob(file.path(
+  root, "tests", "baseline", "old_added_*.sha256")), readLines)))
+stopifnot(length(added) >= 2)
+old_side <- listed[!in_new & !startsWith(listed, "docs/")]
+extra <- setdiff(old_side, c(tier_a, added))
+stopifnot(length(extra) == 0 || all(basename(extra) == "README.md"))
+pass(sprintf(paste("no collision: %d files in the NEW folders, every stem",
+                   "ends in %s; the OLD output folders hold only Tier A,",
+                   "the old_added lists and README files"),
+             length(new_files), P$suffix))
+cat("ALL PASS test_new_outputs\n")
