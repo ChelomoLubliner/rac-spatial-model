@@ -870,3 +870,66 @@ Chronological; newest entry at the bottom. Each entry: what was done, results (r
 - Every number I re-ran matched to the digit.
 
 **Required before T3:** none. Findings 1-3 are optional and fit into T3.
+
+## 2026-11-06 10:05, T2-profiles review of the fixes (reviewer:reproducibility)
+
+**Verdict: approve** (reproducibility lens). Both major findings are fixed, and I re-ran every OLD step myself, with my own drivers, on both platforms. Every committed OLD output came back exactly: Tier A wherever the platform allows it, Tier B on WSL where T1 showed it cannot be. Under the Windows R, all 8 committed figures now reproduce once the dates are removed. Steps 4 and 6 had not been compared there before. No finding blocks T3.
+
+**How I ran it** (`<scratch>/rv_repro_t2fix/`, scripts in `bin/`).
+- Each run used `git archive c7198fa` (its code is `24edaf6`) and deleted that step's outputs first. Only outputs newer than the run's start marker were compared.
+- WSL R ran the README way: `cd statistical_model && Rscript -e 'rmarkdown::render(...)'`, with `RAC_DATASET`, `RAC_PROFILE_FILE` and `RAC_DISTANCE_IMPL` unset.
+- For the Windows R 4.4.3 I wrote my own driver, not `win_r.sh`. It calls `rmarkdown::render(run_pandoc = FALSE)` with a markdown-only format and `error = FALSE`. I checked first with a `stop()` chunk: the render exits 1 and the next chunk does not run. It also counts `## Error` lines (0 in every run).
+- Step 0 ran `python -m contour_algorithm.main`, with the thesis venv on WSL and venv-wind on Windows.
+- Every comparison is my own: `cmp` against `git show 79247d8:<path>`; my own R field extraction (25 GLMM fields plus the frame, 14 CML fields, my own b'V^-1 b); my own PDF date stripper. I did not use `regress_old.sh`, `dump_models.R`, `compare_models.R` or `pdf_normalize.py`.
+
+**Results.**
+- **Tier A list.** My recomputed sha256 of the `79247d8` blobs match `committed_79247d8.sha256` and the work tree, 24 of 24. Since `79247d8`, the only changes under `data/`, `processed_data/`, `saved_models/` and `model_images/` are the two additions `shoe_codes.csv` and `wald_test.csv`. Under `tests/baseline/`, only `README.md` changed and `old_added_t2.sha256` is new.
+- **Major 1 (`wald_test.csv`) is fixed.** Step 5 on the committed models writes the bytes of HEAD (`aa249ed4...`, the `old_added_t2` value) on WSL without car, and under the Windows R with car 3.1-3. car's W equals the manual W to a relative 4.8e-15. The values are those of the T2 file (W 428.693335001072, p 9.42581267047078e-76, W_rx 427.767419273715), without the two NA columns.
+- **WSL, steps 1-6 chained from the committed inputs** (every render exit 0; all 17 outputs regenerated).
+  - The five step-1/2 CSVs equal the `79247d8` bytes, and `shoe_codes.csv` equals its first commit (`012753f`) and the list.
+  - Step 2 printed `distance implementation: vectorized`, with 0 progress messages in its HTML.
+  - GLMM: `identical()` in 25 of 25 fields to **my own refit with the unmodified `79247d8` step 3**, which takes the separate Tier B reference out of the comparison. The fields: fixef, both vcovs, theta, beta, u, VarCorr, logLik, deviance, optinfo, X, Zt, mu, eta and the others. The frame is `all.equal` at tolerance 0.
+  - The GLMM and CML also equal the Tier B dump in 19 of 19 fields, and my legacy refit equals it as well.
+  - CML: `identical()` to the `79247d8` blob in 14 of 14 fields.
+  - My own W = 427.7804472165131 (and W_rx) and W_CML = 420.6712420035153 are bit-identical to Tier B.
+  - 8 of 8 PDFs equal Tier B once the dates are removed.
+- **Windows R 4.4.3 at HEAD, each step from the committed inputs.**
+  - Step 1: the three CSVs equal `79247d8`, and `shoe_codes.csv` equals the list.
+  - Step 2: both CSVs equal `79247d8`.
+  - Step 3: `identical()` to the `79247d8` GLMM blob in 25 of 25 fields plus the frame, W 428.693335001072 (the stored Hessian).
+  - Steps 4 (both models), 5 and 6: **all 8 figures equal the committed PDFs once the dates are removed.** The implementer had compared only the four step-5 figures.
+  - So the refactored code reproduces every committed OLD output as Tier A on at least one platform, each step from the committed inputs: the CSVs on both platforms, the CML on WSL (not run under the Windows R), the GLMM and the figures under the Windows R, and the contour under venv-wind (below).
+- **Step 0.**
+  - venv-wind (Python 3.13.14, Store 3.13.3824.0): the contour is byte-identical to `79247d8` (0 of 386 records differ, CRLF at every stride). The four npy files equal Tier B, and `active-contour_all.npy` equals the thesis run (`cmp`).
+  - WSL: the contour equals Tier B with CRLF (`e18d50df...`). The 30 records (19,027 px) that differ from the committed contour are exactly the records of `contour_linux_diff.csv`. All 1,556 intermediates were regenerated and equal Tier B.
+- **RNG.** Step 1 still calls `set.seed(P$r$seed)` (313, a double, like the literal) right before the only `sample()`. In steps 3-6 it follows `source("config.R")`, and those steps draw no random numbers. A check showed that `source("config.R")` and `rac_profile("new")` leave `.Random.seed` unchanged. `dataCC.csv` is byte-identical on WSL and under the Windows R, so the 38,600 sampled controls are the same.
+- **Collisions.**
+  - Static check: I enumerated 8,873 NEW output paths from the Python profile methods (a superset of the real outputs), and the 18 R outputs. Every one has a NEW folder and a `_new` stem, and none equals an OLD output, a file of `79247d8` or a tracked file at HEAD. No NEW output lies in an OLD work folder.
+  - No write call in `statistical_model/` or `contour_algorithm/` bypasses the profile paths (grep).
+  - I wrote 8 colliding NEW profiles of my own, different from the implementer's 5. Among them: `models_dir = saved_models`, `log_dir = logs/old`, `wald_test` set to the OLD file, the 2023 cross-check file as an output, and `new/processed_data/dataCC.csv`. Both readers refuse all 8, with the same messages.
+  - By experiment: `RAC_DATASET=new tools/run_pipeline.sh --steps 0-6` in a git-tracked copy of `c7198fa`.
+    - All 9 steps exited 0 (s: 790 / 235 / 27 / 501 / 297 / 13 / 13 / 25 / 18).
+    - Every file that existed before is byte-identical afterwards (`sha256sum -c`), and no file was modified or deleted.
+    - The new files are the 18 profile outputs, all namespaced, plus 2,550 work files in `images_new/` (4 x 631 + 9, all with `_new` stems), `logs/new/` and `logs/knit/new/`. None lies outside the NEW namespace.
+    - The NEW contour (631 records, CRLF), the six NEW CSVs and both NEW models (25 of 25 and 14 of 14 fields) are byte-identical, or `identical()`, to the previous reviewer's NEW run at the T2 head. Its provisional NEW W is 613.364049004295.
+- **Fast suite.** `bash tests/run_all.sh old`: my first run passed every test but failed its last check. The engineer reviewer's commit `1e7116e` changed `docs/progress/LOG.md` during that run, and that file was the only difference. The rerun on the quiet tree (HEAD `1e7116e`, whose code is `24edaf6`) gave ALL PASS in 6 min 37 s, under load: 100 Python tests (3 skipped), 14 R scripts, flake8 46, shellcheck 14, work tree unchanged.
+- The sentinel fixture regenerates byte-identically: `make_sentinel.py` into a scratch folder, 7 of 7 files.
+- The implementer's kept gate folders exist with `exit_status 0`. Their logs match the pasted numbers, including `runall_final.log` (3 min 27 s). The `.git` object the report mentions is the 5-byte blob "fake" (`git fsck --unreachable`).
+- **Images I opened.**
+  - Windows `NEW_X_NS_XY_SHOE.pdf`: hot on the left forefoot, the centre line, the right midfoot edge and the left heel; blue at the toe tip and the heel edge; scale about 0.0003-0.0019.
+  - Windows `pixel_inten_JASAup.pdf`: Random and CML side by side, nearly the same map.
+  - WSL `CI_cut_110.pdf`: the two bands overlap; the peak is about 0.00195 left of centre and the dip about 0.00115; the band is widest at the right edge.
+  - WSL snake of shoe 11: a partial print. The snake bows into the left arch, and a thin streak above the toe stays outside it. No sticker.
+  - From the NEW run (provisional values; T4 and T5 judge them):
+    - NEW shoe 428, the smallest print: very faint, mostly the outline. The snake follows the outer outline around the toe, both sides and the heel. No sticker.
+    - `pixel_inten_JASAup_new.pdf`: drawn in the OLD frame, scale up to about 0.0032. It is hottest along the right forefoot and midfoot edge, as the previous review saw.
+- **Times** (s, with up to six of my jobs and the engineer review running at once; load 13-19):
+  - WSL: step 1 122, step 2 24, GLMM 485, CML 524, step 4 34 and 31, step 5 48, step 6 30; legacy GLMM 296; step 0 1,498.
+  - Windows R: step 1 271, step 2 90, step 3 knit 951, step 4 65 and 59, step 5 30, step 6 79.
+  - venv-wind step 0: 1,070.
+- **Caveat about my own tooling.** I edited my Windows driver while its step-3 job was running, so that bash wrapper hit a syntax error after the knit. A watcher had copied the model, `.md` and log 3 s after the knit wrote them. The log shows `seconds 951.3`, the R version line and 0 `## Error` lines. The comparison above used that copy.
+
+**Findings** (none required).
+1. **Recommendation:** add steps 4 and 6 to `tests/legacy/run_windows_r_steps.sh`, and assert that all 8 figures equal the committed PDFs without dates. My runs show they do, so the committed runner can state Tier A for every figure. This is the implementer's own open point.
+2. **Nit:** after a WSL refit, `regress_old.sh` checks the step-5 CSV only on W (tolerance 1e-12) and df. The file is deterministic: `...,427.780447216513,24,1.45350215057922e-75,"manual","RX",...` in my run. A sha256 of it in a Tier B addendum list would also check p, `method` and `vcov`.
+3. **For Shlomo (A-075):** the in-place refusal is what keeps the Windows-made Tier A files safe from WSL reruns. In none of my runs did it change any output. It is a workflow change only, and I support confirming it.
