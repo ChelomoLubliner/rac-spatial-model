@@ -246,7 +246,9 @@ def active_contour_shoe(profile, list_contour, plot_img, save_img_bool,
     record: None, or a dict that receives the initial ellipse ('init') and
     the two snakes ('first', 'second'), (n_points, 2) float arrays (row,
     col), for the QA figures and metrics (T4, `--qa`); it changes nothing
-    in the computation."""
+    in the computation. Checks the profile's OpenBLAS thread count and
+    kernel first (check_blas_threads; nothing to check for OLD)."""
+    check_blas_threads(profile)
     sp = snake_params(profile, im_num + 1)
     original_img = get_image(profile, True, im_num, list_contour)
     # First active-contour: beta = beta_first
@@ -307,7 +309,9 @@ def prototype_mask_from(profile, original_img, record=None):
     """The filled two-pass snake of a superposition image (uint8 0/255,
     (H, W)), as a bool (H, W) array; writes nothing (the T4 threshold
     comparison calls it for several thresholds). record: as in
-    active_contour_shoe."""
+    active_contour_shoe. Checks the profile's OpenBLAS thread count and
+    kernel first, as every snake does (second T4 review)."""
+    check_blas_threads(profile)
     sp = profile.snake
     init = init_snake(profile)
     first_snake = active_contour(gaussian(original_img, sp.gaussian_sigma,
@@ -332,9 +336,11 @@ def prototype_mask_from(profile, original_img, record=None):
     return final_arr
 
 
-def _numpy_openblas_call(names, restype):
-    """The result of the first of `names` found in numpy's bundled
-    OpenBLAS (called without arguments), or None."""
+@functools.lru_cache(maxsize=None)
+def _numpy_openblas_function(names):
+    """The first of `names` (a tuple) found in numpy's bundled OpenBLAS,
+    as a ctypes function, or None (looked up once per process: every
+    snake checks the thread count)."""
     libs = os.path.dirname(np.__file__) + '.libs'
     for lib in sorted(glob.glob(os.path.join(libs, '*openblas*'))):
         try:
@@ -344,9 +350,18 @@ def _numpy_openblas_call(names, restype):
         for name in names:
             getter = getattr(dll, name, None)
             if getter is not None:
-                getter.restype = restype
-                return getter()
+                return getter
     return None
+
+
+def _numpy_openblas_call(names, restype):
+    """The result of the first of `names` found in numpy's bundled
+    OpenBLAS (called without arguments), or None."""
+    getter = _numpy_openblas_function(tuple(names))
+    if getter is None:
+        return None
+    getter.restype = restype
+    return getter()
 
 
 def numpy_blas_threads():
@@ -371,8 +386,12 @@ def numpy_blas_corename():
 
 def check_blas_threads(profile):
     """The OpenBLAS thread count of this process; raises RuntimeError when
-    the profile fixes one (python.blas_threads) and the process runs
-    another: the snakes depend on it (decision A-092)."""
+    the profile fixes a thread count (python.blas_threads) or a kernel
+    (python.blas_kernel) and the process runs another: the snakes depend
+    on both (decisions A-092, A-103, A-108). Called by every code path
+    that runs a snake (main.run, prototype_mask_from,
+    active_contour_shoe); OLD fixes neither, so nothing is checked there
+    (its gate checks the baselines' values, tests/regress_old.sh)."""
     threads = numpy_blas_threads()
     want = profile.blas_threads
     if want is not None and threads != want:
@@ -380,6 +399,18 @@ def check_blas_threads(profile):
             f'numpy OpenBLAS runs {threads} threads, the {profile.dataset} '
             f'profile needs {want}: set OPENBLAS_NUM_THREADS={want} before '
             'numpy is imported (python -m contour_algorithm.main does)')
+    kernel = profile.blas_kernel
+    if kernel is not None:
+        got = numpy_blas_corename()
+        if got != kernel:
+            raise RuntimeError(
+                f'numpy OpenBLAS runs the {got} kernel, and the '
+                f'{profile.dataset} contour was built with {kernel} '
+                '(python.blas_kernel): another kernel gives other snakes '
+                '(A-103, A-108). Unset OPENBLAS_CORETYPE; on a machine '
+                'whose OpenBLAS picks another kernel the committed contour '
+                'cannot be rebuilt, and changing python.blas_kernel is a '
+                'decision to record')
     return threads
 
 

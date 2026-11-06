@@ -50,13 +50,16 @@ Command line (from the repository root, after step 0 with --qa):
 
 --metrics writes the metrics table (`prep.snake_qa`) and, for a profile
 with a sheets folder, its copy under the task's name
-`<prep.sheets_dir>/snake_qa<suffix>.csv` (A-100); --sheets the contact
+`<prep.sheets_dir>/snake_qa<suffix>.csv` (A-104); --sheets the contact
 sheets (`prep.sheets_dir`/<kind>/); --figures one two-panel QA figure per
 shoe (images*/qa_snake/); --flagged a large figure of every flagged shoe
-(`prep.snake_qa_dir`/flagged/). --sheets and --thresholds need the
-profile's sheets folder (OLD has none: refused); --thresholds runs
-prototype snakes, so it checks the OpenBLAS thread count first (A-092);
---jobs N > 1 forks and is refused where fork is not available (Windows).
+(`prep.snake_qa_dir`/flagged/; the figures of shoes that are no longer
+flagged are removed); --crosscheck the 2023 cross-check table. Refused
+before anything is written (exit 2): --sheets and --thresholds without
+the profile's sheets folder (OLD has none), --crosscheck without its 2023
+file (inputs.cross_check; OLD has none), --jobs N > 1 where fork is not
+available (Windows). --thresholds runs prototype snakes, so it checks the
+OpenBLAS thread count and kernel first (A-092, A-108).
 """
 
 import argparse
@@ -989,7 +992,7 @@ def threshold_figure(profile, masks, out, chosen=None):
 
 def task_copy_path(profile):
     """The metrics table under the task's name, in the profile's sheets
-    folder: <prep.sheets_dir>/snake_qa<suffix>.csv (A-100); None for a
+    folder: <prep.sheets_dir>/snake_qa<suffix>.csv (A-104); None for a
     profile without a sheets folder (OLD)."""
     folder = profile.prep_path('sheets_dir')
     if folder is None:
@@ -997,18 +1000,44 @@ def task_copy_path(profile):
     return folder / f'snake_qa{profile.suffix}.csv'
 
 
+def prune_flagged(folder, keep, suffix):
+    """Delete the flagged-shoe figures of `folder` that are not in `keep`
+    (file names): the figures of shoes that are no longer flagged
+    (second T4 review; im_164_new.png had to be removed by hand). Only
+    files named like a per-shoe image, im_<index><suffix>.png, are
+    touched. Returns the removed names, sorted."""
+    import re
+    pattern = re.compile(rf'im_\d+{re.escape(suffix)}\.png')
+    keep = set(keep)
+    removed = []
+    if folder.is_dir():
+        for f in sorted(folder.iterdir()):
+            if (f.is_file() and pattern.fullmatch(f.name)
+                    and f.name not in keep):
+                f.unlink()
+                removed.append(f.name)
+    return removed
+
+
 def refusal(profile, args):
     """Why the command line cannot run for this profile ('' when it
-    can): --sheets and --thresholds write into the sheets folder, which
-    OLD has not; --jobs > 1 needs fork (not on Windows)."""
+    can), checked before anything is written: --sheets and --thresholds
+    write into the sheets folder, which OLD has not; --crosscheck needs
+    the profile's 2023 file (inputs.cross_check; OLD has none); --jobs > 1
+    needs fork (not on Windows)."""
     import multiprocessing
     if profile.prep_path('sheets_dir') is None:
         wants = [o for o, on in (('--sheets', args.sheets),
                                  ('--thresholds', args.thresholds)) if on]
         if wants:
-            return (f'{" and ".join(wants)} need the profile\'s sheets '
+            verb = 'need' if len(wants) > 1 else 'needs'
+            return (f'{" and ".join(wants)} {verb} the profile\'s sheets '
                     f'folder (prep.sheets_dir), and the {profile.dataset} '
                     'profile has none')
+    if args.crosscheck and profile.cross_check is None:
+        return (f'--crosscheck needs the profile\'s 2023 cross-check file '
+                f'(inputs.cross_check), and the {profile.dataset} profile '
+                'has none')
     if args.jobs > 1 and 'fork' not in multiprocessing.get_all_start_methods():
         return (f'--jobs {args.jobs} runs forked processes, and this '
                 'platform has no fork; use --jobs 1')
@@ -1093,10 +1122,6 @@ def main(argv=None):
                                           lineterminator='\n')
             print(f'wrote {out}')
     if args.crosscheck:
-        if profile.cross_check is None:
-            print('contour_algorithm.qa_snake: the profile has no '
-                  'cross_check file', file=sys.stderr)
-            return 2
         out = snake_qa_path(profile, 'crosscheck_2023', 'csv')
         crosscheck_2023(profile, run).round(3).to_csv(
             out, index=False, lineterminator='\n')
@@ -1112,10 +1137,13 @@ def main(argv=None):
                             title=f'{profile.dataset} shoe {shoe}')
     if args.flagged:
         folder = profile.prep_path('snake_qa_dir') / 'flagged'
+        names = []
         for _, row in table[table['qa_flags'] != ''].iterrows():
             i = int(row['shoe']) - 1
-            flagged_figure(run, row, folder / profile.image_path(
-                'qa_snake', i).name)
+            names.append(profile.image_path('qa_snake', i).name)
+            flagged_figure(run, row, folder / names[-1])
+        for name in prune_flagged(folder, names, profile.suffix):
+            print(f'removed {folder / name} (no longer flagged)')
     return 0
 
 

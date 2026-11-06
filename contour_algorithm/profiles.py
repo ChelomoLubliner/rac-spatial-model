@@ -177,6 +177,10 @@ class Profile:
     blas_threads: int | None = None
     # per-shoe snake fallbacks (inputs.snake_overrides, T4, A-097)
     snake_overrides: Path | None = None
+    # the OpenBLAS kernel the committed contour was built with (None: not
+    # checked; NEW: the kernel of its committed contour, A-108): another
+    # kernel gives other snakes, so step 0 refuses to run with one
+    blas_kernel: str | None = None
 
     # --- dimensions -----------------------------------------------------
     @property
@@ -459,6 +463,11 @@ def load_profile(dataset: str | None = None, file: Path | str | None = None,
             or blas_threads < 1):
         raise ValueError(f'profile {dataset!r}: python.blas_threads must be '
                          'null or a positive integer')
+    blas_kernel = py.get('blas_kernel')
+    if blas_kernel is not None and (not isinstance(blas_kernel, str)
+                                    or not blas_kernel.strip()):
+        raise ValueError(f'profile {dataset!r}: python.blas_kernel must be '
+                         'null or the name of an OpenBLAS kernel')
     s = py['snake']
     snake = SnakeParams(
         center_rc=tuple(s['center_rc']), radii_rc=tuple(s['radii_rc']),
@@ -518,4 +527,5 @@ def load_profile(dataset: str | None = None, file: Path | str | None = None,
         stems=_freeze(py['stems']), r=_freeze(d['r']), prep=_freeze(prep),
         blas_threads=blas_threads,
         snake_overrides=p_opt(inputs.get('snake_overrides'),
-                              'inputs.snake_overrides'))
+                              'inputs.snake_overrides'),
+        blas_kernel=blas_kernel)

@@ -217,11 +217,14 @@
           "proportional 29 of A-014); the 2023 init ellipse (A-019",
           "confirmed); the first snake runs on the cleaned shoe closed with",
           "a disk of radius 10, so separate heel pads and lugs form one",
-          "silhouette (A-094); every other snake value as OLD"
+          "silhouette (A-094); every other snake value as OLD. Second T4",
+          "review fixes (A-108): blas_kernel is the OpenBLAS kernel the",
+          "committed NEW contour was built with; step 0 refuses another"
         ],
         "images_dir": "images_new",
         "contact_flip_shoes": [],
         "blas_threads": 1,
+        "blas_kernel": "Haswell",
         "superpose_threshold": 18,
         "snake": {
           "center_rc": [185, 128],

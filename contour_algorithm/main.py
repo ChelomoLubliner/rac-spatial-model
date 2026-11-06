@@ -23,7 +23,12 @@ Refused (exit 2, before anything is written):
     data/contour_Active_Contour.txt is the Tier A baseline and a rerun on
     another platform differs (30 of 386 records on WSL, A-060). OLD runs
     happen in a scratch copy (tests/regress_old.sh), which deletes the
-    file first.
+    file first;
+  - a run of snake steps whose numpy OpenBLAS does not run the thread
+    count or the kernel that the profile fixes (python.blas_threads,
+    python.blas_kernel; NEW: 1 thread, the kernel its committed contour
+    was built with; A-092, A-108): another count or kernel gives other
+    snakes, so an in-place NEW run would rewrite the committed contour.
 """
 
 import argparse
@@ -35,6 +40,8 @@ import time
 from .profiles import env, load_profile
 
 STEPS = ('create', 'contour', 'snake', 'distance')
+# the steps that run snakes: the prototype snake (0a) and the shoe snakes
+SNAKE_STEPS = frozenset(('create', 'snake'))
 FOLDERS = ('shoes', 'saved', 'shoe_on_prototype', 'cleaned_shoes',
            'active-contour')
 HTML_FOLDERS = ('extreme_values', 'snake_rac_html')
@@ -47,12 +54,19 @@ def make_folders(profile, html):
 
 
 def run(profile, steps=STEPS, html=None, log=print, qa=False, jobs=1):
-    """Run the given steps of step 0 in order; return {step: seconds}."""
+    """Run the given steps of step 0 in order; return {step: seconds}.
+
+    When the steps run snakes (create: the prototype snake of step 0a;
+    snake: step 0c), the profile's OpenBLAS thread count and kernel are
+    checked first, before anything is written (RuntimeError; nothing to
+    check for OLD; second T4 review)."""
     # imported here, so that the refusals of main() need no numpy, and
     # with a headless matplotlib backend (figures of step 0c)
     os.environ.setdefault('MPLBACKEND', 'Agg')
     from . import (active_contour_snake, contour, create_files_shoes,
                    distance_extremities)
+    if SNAKE_STEPS & set(steps):
+        active_contour_snake.check_blas_threads(profile)
     html = profile.write_html if html is None else html
     make_folders(profile, html)
     seconds = {}
@@ -132,6 +146,19 @@ def main(argv=None):
         # before numpy is imported (run() imports it): the snake depends on
         # the OpenBLAS thread count (A-092); OLD keeps the library default
         os.environ['OPENBLAS_NUM_THREADS'] = str(profile.blas_threads)
+    if (SNAKE_STEPS & set(args.steps)
+            and (profile.blas_threads is not None
+                 or profile.blas_kernel is not None)):
+        # the thread count and the kernel that the profile fixes (A-092,
+        # A-108; NEW only): refused here with the reason, before anything
+        # is written (run() checks again for in-process callers)
+        os.environ.setdefault('MPLBACKEND', 'Agg')
+        from .active_contour_snake import check_blas_threads
+        try:
+            check_blas_threads(profile)
+        except RuntimeError as e:
+            print(f'contour_algorithm.main: {e}', file=sys.stderr)
+            return 2
     print(f'dataset {profile.dataset}: {profile.num_shoe} shoes of '
           f'{profile.W} x {profile.H} px, profile {profile.file}')
     run(profile, args.steps, html=args.html or profile.write_html,
