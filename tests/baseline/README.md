@@ -22,6 +22,15 @@ again only the timestamp, the commit and the new lines changed
 Checked by `tests/run_all.sh` (`sha256sum -c`), `tests/python/test_baseline_raw_data.py` and
 `tests/r/test_baseline_committed.R`.
 
+## OLD files added after `79247d8`
+
+| File | Content | Made by |
+|---|---|---|
+| `old_added_t2.sha256` | sha256 of the two OLD files that T2 added (plan section 5): `processed_data/shoe_codes.csv` (step 1) and `processed_data/wald_test.csv` (step 5, in its form without the car columns, decision A-082). Added in the T2 review fixes (2026-11-06, LOG entry), written once like the lists above; a later task that adds OLD files adds its own list | `sha256sum processed_data/shoe_codes.csv processed_data/wald_test.csv > tests/baseline/old_added_t2.sha256` |
+
+Checked by `tests/run_all.sh` (`sha256sum -c`); `tests/regress_old.sh` compares the regenerated files
+with it (never with the work-tree files, A-070).
+
 ## Tier B: `local/`, the unmodified code re-run on this machine (T1)
 
 | File | Content |

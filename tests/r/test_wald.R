@@ -91,7 +91,45 @@ err <- tryCatch(wald_all_spatial(lm(dist ~ speed, cars)),
 stopifnot(grepl("unsupported model class", err))
 pass("unsupported model class is an error")
 
-if (requireNamespace("car", quietly = TRUE)) {
+# method is "manual" with and without car, so the step-5 CSV does not
+# depend on car (A-082); car_status and print() tell the three cases apart
+# (T2 review nit: "not run" without a reason when car was not asked for)
+has_car <- requireNamespace("car", quietly = TRUE)
+stopifnot(w$method == "manual", w_i$method == "manual", wc$method == "manual",
+          identical(w_i$car_status, "not requested"),
+          identical(w$car_status, if (has_car) "run" else "not installed"))
+out_i <- capture.output(print(w_i))
+out_w <- capture.output(print(w))
+stopifnot(identical(out_i[2], "  car::linearHypothesis: not run"),
+          grepl("(manual): W = 428.6933, df = 24", out_w[1], fixed = TRUE))
+if (has_car) {
+  stopifnot(startsWith(out_w[2], "  car::linearHypothesis: W = 428.6933"))
+} else {
+  stopifnot(identical(out_w[2],
+                      "  car::linearHypothesis: not run (car not installed)"))
+}
+pass(sprintf(paste("method always manual; car_status %s / not requested;",
+                   "print(): \"%s\""), w$car_status, trimws(out_w[2])))
+
+# The committed OLD processed_data/wald_test.csv (step 5 on the committed
+# models) holds only values that do not depend on car (A-082): no car
+# column, and its numbers are this test's W, p and the RX-vcov W at the 15
+# significant digits of write.csv.
+wt <- read.csv(file.path(root, "processed_data", "wald_test.csv"))
+# (lme4 warns that the Hessian and RX vcovs differ: plan K11, expected)
+w_rx <- wald_all_spatial(g, V = as.matrix(suppressWarnings(
+  vcov(g, use.hessian = FALSE))), use_car = FALSE)
+close15 <- function(a, b) abs(a - b) <= 1e-14 * abs(b)
+stopifnot(identical(names(wt), c("model", "W", "df", "p", "method", "vcov",
+                                 "W_rx", "p_rx")),
+          nrow(wt) == 1, wt$model == "NEW_X_NS_XY", wt$df == 24,
+          wt$method == "manual", wt$vcov == "hessian",
+          close15(wt$W, w$W), close15(wt$p, w$p),
+          close15(wt$W_rx, w_rx$W), close15(wt$p_rx, w_rx$p))
+pass(sprintf(paste("committed wald_test.csv: no car column; W %.15g and",
+                   "W_rx %.15g as computed here"), wt$W, wt$W_rx))
+
+if (has_car) {
   stopifnot(isTRUE(all.equal(w$W, w$W_car, tolerance = 1e-8)),
             isTRUE(all.equal(wc$W, wc$W_car, tolerance = 1e-8)))
   pass(sprintf("car::linearHypothesis W = %.6f equals the manual W", w$W_car))

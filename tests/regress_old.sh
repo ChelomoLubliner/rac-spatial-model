@@ -17,7 +17,10 @@
 #              and all 1,556 intermediate .npy/.png files = Tier B
 #   steps 1-2  the five CSVs = Tier A by raw sha256 (the OLD profile writes
 #              the committed line endings, A-005); step 1 also writes
-#              processed_data/shoe_codes.csv, compared with the committed one
+#              processed_data/shoe_codes.csv, compared with its sha256 in
+#              tests/baseline/old_added_t2.sha256 (the OLD files T2 added;
+#              never with the work-tree file, which an in-place run could
+#              have replaced, A-070, A-082)
 #   step 3     the dump of both models identical() to Tier B in every field
 #              (tests/lib/dump_models.R, compare_models.R; the WSL GLMM refit
 #              differs from Tier A, A-055; tests/legacy/run_windows_r_step3.sh
@@ -26,9 +29,10 @@
 #              the same run (Tier B drew them from the WSL refit); with the
 #              committed models (step 3 not run) they have no byte baseline
 #              on this machine and are reported as INFO
-#   step 5     processed_data/wald_test.csv: equal to the committed file when
-#              step 5 reads the committed models (step 3 not run); W = Tier
-#              B's W (a WSL refit, 427.7804) when step 3 ran
+#   step 5     processed_data/wald_test.csv: its sha256 in
+#              tests/baseline/old_added_t2.sha256 when step 5 reads the
+#              committed models (step 3 not run); W = Tier B's W (a WSL
+#              refit, 427.7804) when step 3 ran
 # and runs the live checks that the steps cover (test_snake_old_regression
 # for step 0, test_old_regression.R for steps 1-3, test_live_r_pdfs for steps
 # 3-6).
@@ -225,17 +229,16 @@ if has 0; then
   fi
 fi
 tier_a=$repo/tests/baseline/committed_79247d8.sha256
+# The OLD files that T2 added (not in Tier A): their sha256 list, written
+# once like the Tier A list (A-082)
+added=$repo/tests/baseline/old_added_t2.sha256
 if has 1; then
   for f in data/all_cont.csv processed_data/dataCC.csv \
     processed_data/shoe_pixel_counts.csv; do
     check_sha "step 1 $(basename "$f") = Tier A" "$f" "$(want_sha "$tier_a" "$f")"
   done
-  if [[ -f "$repo/processed_data/shoe_codes.csv" ]]; then
-    check_sha "step 1 shoe_codes.csv = committed" processed_data/shoe_codes.csv \
-      "$(sha "$repo/processed_data/shoe_codes.csv")"
-  else
-    record INFO "step 1 shoe_codes.csv" "no committed file yet (written by T2)"
-  fi
+  check_sha "step 1 shoe_codes.csv = old_added_t2" processed_data/shoe_codes.csv \
+    "$(want_sha "$added" processed_data/shoe_codes.csv)"
 fi
 if has 2; then
   for f in processed_data/dataCC_distance_temp.csv \
@@ -307,11 +310,9 @@ if has 5; then
       record FAIL "step 5 Wald W = Tier B (WSL refit)" \
         "see logs/wald_check.txt"
     fi
-  elif [[ -f "$repo/$wald" ]]; then
-    check_sha "step 5 wald_test.csv = committed (committed models)" "$wald" \
-      "$(sha "$repo/$wald")"
   else
-    record INFO "step 5 wald_test.csv" "no committed file yet (written by T2e)"
+    check_sha "step 5 wald_test.csv = old_added_t2 (committed models)" \
+      "$wald" "$(want_sha "$added" "$wald")"
   fi
 fi
 

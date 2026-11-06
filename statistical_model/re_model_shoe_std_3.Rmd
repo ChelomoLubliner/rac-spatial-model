@@ -23,6 +23,11 @@ library(smoothie)
 # MODEL_FEATURE comes from RAC_MODEL_FEATURE (config.R):
 # NEW_X_NS_XY (default) or CML_MODEL
 
+# The model this run writes, checked before the data are read and the model
+# is fitted: an OLD run in place stops here, never over a committed OLD
+# model (decision A-075)
+model_out <- rac_new_output(P, rac_model_path(P, MODEL_FEATURE))
+
 ```
 
 
@@ -58,7 +63,7 @@ Random <- function(nknotsx = 3, nknotsy = 5, dat = dataCC, model_feat = MODEL_FE
   else { stop("Invalid model_feat value. Use 'NEW_X_NS_XY' or 'CML_MODEL'.")}
 
   cat("file_saving")
-  file_name <- rac_new_output(P, rac_model_path(P, MODEL_FEATURE)) # never over a committed OLD model (A-075)
+  file_name <- model_out # checked before the fit (A-075)
   saveRDS(est, file = file_name)
   return(est)
 }

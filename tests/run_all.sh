@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Fast test suite (plan section 4.5): committed checksums, every Python unit
+# Fast test suite (plan section 4.5): committed checksums (Tier A, the OLD
+# baseline subset, and the OLD files T2 added, A-082), every Python unit
 # test under tests/python/, every R test under tests/r/, and the code-style
 # rules (flake8 on every Python file, shellcheck on every shell script;
 # user rule 5). Old-regression mode: nothing is written to the repository.
@@ -87,6 +88,8 @@ run_check "sha256 committed_79247d8 (Tier A, 24 files)" \
   sha256sum --quiet -c tests/baseline/committed_79247d8.sha256
 run_check "sha256 old_baseline (11 OLD artifacts)" \
   sha256sum --quiet -c tests/baseline/old_baseline.sha256
+run_check "sha256 old_added_t2 (the 2 OLD files T2 added)" \
+  sha256sum --quiet -c tests/baseline/old_added_t2.sha256
 run_check "python unittest discover tests/python" \
   "$py" -B -m unittest discover -s tests/python -t . -v
 for t in tests/r/test_*.R; do

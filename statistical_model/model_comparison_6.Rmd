@@ -23,6 +23,11 @@ col_proto <- P$prototype$col_shoe # the number of columns of the prototype
 row_proto <- P$prototype$row_shoe # the number of rows of the prototype
 proto_rel_col_shoe <- P$prototype$coords$rel_col_shoe
 proto_rel_Y_cord <- P$prototype$coords$rel_Y_cord
+
+# The figures of this step, checked before anything is computed: an OLD
+# run in place stops here, never over a committed OLD figure (A-075)
+cmp_pdf <- vapply(c("pixel_inten_JASAup", "difference_random_cml"),
+                  function(s) rac_new_output(P, rac_image_path(P, s)), "")
 ```
 
 ```{r}
@@ -130,7 +135,7 @@ mtext("CML", side=1, at=0.75, line=0.5, cex=2)
 ```
 
 ```{r}
-pdf(file = rac_new_output(P, rac_image_path(P, "pixel_inten_JASAup")), height=8, width=8)
+pdf(file = cmp_pdf[["pixel_inten_JASAup"]], height=8, width=8)
 par(mar = c(2, 0, 0, 4))
 image.plot(t(com_2_est[nrow(com_2_est):1,]), axes=FALSE, xlab='')
 mtext("Random", side=1, at=0.25, line=0.5, cex=2)
@@ -162,7 +167,7 @@ image.plot(intens_diff_display, axes=FALSE, main='Difference (Random - CML)')
 ```
 
 ```{r}
-pdf(file = rac_new_output(P, rac_image_path(P, "difference_random_cml")), height=8, width=8)
+pdf(file = cmp_pdf[["difference_random_cml"]], height=8, width=8)
 par(mar = c(2, 0, 1, 4))
 image.plot(intens_diff_display, axes=FALSE, main='Difference (Random - CML)')
 dev.off()

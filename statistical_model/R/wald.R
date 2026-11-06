@@ -19,7 +19,11 @@
 # tests/r/test_wald.R); a V without dimnames is used by position (decision
 # A-063).
 # If car is installed (and use_car = TRUE), its statistic is added as W_car
-# so that both can be compared.
+# so that both can be compared; car_status says whether car ran ("run"),
+# was asked for but is missing ("not installed") or was not asked for
+# ("not requested"). W, df, p and method ("manual") do not depend on car,
+# so the step-5 CSV built from them is the same with and without car
+# (decision A-082).
 
 wald_all_spatial <- function(model, V = NULL, use_car = TRUE) {
   if (inherits(model, "merMod")) {
@@ -49,15 +53,18 @@ wald_all_spatial <- function(model, V = NULL, use_car = TRUE) {
   w <- as.numeric(crossprod(b, solve(vb, b)))
   df <- length(b)
   out <- list(W = w, df = df, p = stats::pchisq(w, df, lower.tail = FALSE),
-              method = "manual")
-  if (use_car && requireNamespace("car", quietly = TRUE)) {
-    hm <- diag(length(co))[idx, , drop = FALSE]
-    lh <- car::linearHypothesis(model, hypothesis.matrix = hm,
-                                rhs = rep(0, df), test = "Chisq",
-                                vcov. = vc, coef. = co)
-    out$W_car <- as.numeric(lh$Chisq[2])
-    out$p_car <- as.numeric(lh[["Pr(>Chisq)"]][2])
-    out$method <- "manual+car"
+              method = "manual", car_status = "not requested")
+  if (use_car) {
+    out$car_status <- "not installed"
+    if (requireNamespace("car", quietly = TRUE)) {
+      hm <- diag(length(co))[idx, , drop = FALSE]
+      lh <- car::linearHypothesis(model, hypothesis.matrix = hm,
+                                  rhs = rep(0, df), test = "Chisq",
+                                  vcov. = vc, coef. = co)
+      out$W_car <- as.numeric(lh$Chisq[2])
+      out$p_car <- as.numeric(lh[["Pr(>Chisq)"]][2])
+      out$car_status <- "run"
+    }
   }
   class(out) <- "rac_wald"
   out
@@ -68,10 +75,13 @@ print.rac_wald <- function(x, ...) {
                      " W = %.4f, df = %d, p = %.3g\n"),
               x$df, x$method, x$W, x$df, x$p))
   if (!is.null(x$W_car)) {
-    cat(sprintf("  car::linearHypothesis: W = %.4f, p = %.3g\n",
-                x$W_car, x$p_car))
-  } else {
+    cat(sprintf(paste0("  car::linearHypothesis: W = %.4f, p = %.3g",
+                       " (relative difference from the manual W: %.2g)\n"),
+                x$W_car, x$p_car, abs(x$W_car - x$W) / abs(x$W)))
+  } else if (identical(x$car_status, "not installed")) {
     cat("  car::linearHypothesis: not run (car not installed)\n")
+  } else {
+    cat("  car::linearHypothesis: not run\n")
   }
   invisible(x)
 }

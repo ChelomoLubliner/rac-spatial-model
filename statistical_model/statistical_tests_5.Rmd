@@ -25,6 +25,13 @@ col_proto <- P$prototype$col_shoe
 row_proto <- P$prototype$row_shoe
 proto_rel_col_shoe <- P$prototype$coords$rel_col_shoe
 proto_rel_Y_cord <- P$prototype$coords$rel_Y_cord
+
+# The figures of this step, checked before anything is read or written: an
+# OLD run in place stops here, before the Wald-test CSV is written (the
+# committed figures come from the Windows R and are never overwritten in
+# place, decisions A-075, A-082)
+ci_pdf <- vapply(c("CI_shoe_cuts", "CI_cut_110", "CI_cut_190", "CI_cut_250"),
+                 function(s) rac_new_output(P, rac_image_path(P, s)), "")
 ```
 
 ```{r}
@@ -116,8 +123,8 @@ cat("Random model mean (log-odds):", m, "\n")
 # W = b' V^-1 b over the spatial coefficients, df = their number, from
 # wald_all_spatial() (statistical_model/R/wald.R): car is not installed on
 # every machine; when it is, car::linearHypothesis runs as well and its
-# statistic is reported next to the manual one (decisions A-057, A-063;
-# on the committed model both give 428.6933).
+# statistic is printed next to the manual one as a cross-check (decisions
+# A-057, A-063; on the committed model both give 428.6933).
 # V = vcov(random_model), lme4's default: the finite-difference Hessian when
 # the fit stored one (the committed Windows fit), else the RX-based
 # estimate (lme4 1.1-38 stores no Hessian for more than 10,000 rows); the
@@ -128,13 +135,14 @@ print(testing)
 V_default <- as.matrix(vcov(random_model))
 V_rx <- as.matrix(vcov(random_model, use.hessian = FALSE))
 testing_rx <- wald_all_spatial(random_model, V = V_rx, use_car = FALSE)
+# The CSV holds only values that do not depend on an optional package, so
+# it is the same with and without car; car's statistic is printed above and
+# not written (decision A-082).
 wald_test <- data.frame(
   model = "NEW_X_NS_XY",
   W = testing$W, df = testing$df, p = testing$p, method = testing$method,
   vcov = if (identical(V_default, V_rx)) "RX" else "hessian",
-  W_rx = testing_rx$W, p_rx = testing_rx$p,
-  W_car = if (is.null(testing$W_car)) NA_real_ else testing$W_car,
-  p_car = if (is.null(testing$p_car)) NA_real_ else testing$p_car)
+  W_rx = testing_rx$W, p_rx = testing_rx$p)
 print(wald_test)
 rac_write_csv(wald_test, P, "wald_test")
 ```
@@ -204,7 +212,7 @@ sho[250,] <- 0
 # Display: same orientation as file 4/6
 image.plot(t(sho)[, nrow(sho):1], axes=FALSE, xlab="CML probability with cut lines at rows 110, 190, 250")
 
-pdf(file = rac_new_output(P, rac_image_path(P, "CI_shoe_cuts")), height=8, width=5)
+pdf(file = ci_pdf[["CI_shoe_cuts"]], height=8, width=5)
 image.plot(t(sho)[, nrow(sho):1], axes=FALSE, xlab="CML probability with cut lines at rows 110, 190, 250")
 dev.off()
 ```
@@ -262,17 +270,17 @@ print(CI_cut_250)
 ```
 
 ```{r}
-pdf(file = rac_new_output(P, rac_image_path(P, "CI_cut_110")), height=4, width=8)
+pdf(file = ci_pdf[["CI_cut_110"]], height=4, width=8)
 print(CI_cut_110)
 dev.off()
 
-pdf(file = rac_new_output(P, rac_image_path(P, "CI_cut_190")), height=4, width=8)
+pdf(file = ci_pdf[["CI_cut_190"]], height=4, width=8)
 print(CI_cut_190)
 dev.off()
 
-pdf(file = rac_new_output(P, rac_image_path(P, "CI_cut_250")), height=4, width=8)
+pdf(file = ci_pdf[["CI_cut_250"]], height=4, width=8)
 print(CI_cut_250)
 dev.off()
 
-cat("All CI PDFs saved to", dirname(rac_image_path(P, "CI_cut_250")), "\n")
+cat("All CI PDFs saved to", dirname(ci_pdf[["CI_cut_250"]]), "\n")
 ```

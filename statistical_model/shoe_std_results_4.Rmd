@@ -32,6 +32,10 @@ proto_rel_Y_cord <- P$prototype$coords$rel_Y_cord
 # MODEL_FEATURE comes from RAC_MODEL_FEATURE (config.R):
 # NEW_X_NS_XY (default) or CML_MODEL
 
+# The figure this run writes, checked before anything is computed: an OLD
+# run in place stops here, never over a committed OLD figure (A-075)
+map_pdf <- rac_new_output(P, rac_image_path(P, paste(MODEL_FEATURE, "_SHOE", sep = "")))
+
 ```
 
 
@@ -117,8 +121,7 @@ old_matrix <- intens
 intens[img==0] <- NA
 rotated_intens <- t(intens)[, nrow(intens):1]
 image.plot(rotated_intens, axes = TRUE)
-file_name <- rac_new_output(P, rac_image_path(P, paste(MODEL_FEATURE, "_SHOE", sep = ""))) # never over a committed OLD figure (A-075)
-pdf(file = file_name, height = 6, width = 6)
+pdf(file = map_pdf, height = 6, width = 6)
 image.plot(rotated_intens, axes = TRUE)
 abline(v = 0.5, col = "black", lty = 1, lwd = 1)
 abline(h = 0.5, col = "black", lty = 1, lwd = 1)
