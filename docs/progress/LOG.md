@@ -1242,3 +1242,62 @@ Several first reads came back blank because of the viewer limit; I reopened each
 **Open for people.** Shlomo: the erase-list judgements of A-100 (580's heel envelope, 586's block: about 9 px of real toe tip erased with it) and the visual override of 376 (A-102, no band flagged it); A-096 and A-094 still to confirm (unchanged). The 97% target of the task is not met by the pass rate under the stricter bands; every flagged shoe is reviewed.
 
 **Blockers.** None.
+
+## 2026-11-06 19:15, T4-snake review fixes review (reviewer:engineer)
+
+**Verdict: approve** (engineering lens). The three major findings are fixed, and the new tests catch what they claim to catch. Every committed NEW output I rebuilt came back byte for byte, and every number I recomputed matches the docs. Nothing OLD changed. The findings below are minor and need no rebuild.
+
+**Verified by re-running** (`<scratch>/rv_eng_t4fix/`; load about 20 from the other reviews):
+- `bash tests/run_all.sh` at `cbba2ef`: ALL PASS. 178 Python tests (3 skipped live checks), 14 R scripts, flake8, shellcheck, work tree unchanged; 8 min 9 s.
+- `tests/rebuild_new.sh --keep` at `cbba2ef`: ALL PASS. The contour `0af52b05...`, `snake_metrics_new.csv`, `sticker_erased_new.csv` and the task copy are byte-identical (step 0 336 s, metrics 145 s).
+- **Beyond the gate**, in the gate's copy:
+  - `qa_snake --sheets --flagged --crosscheck`, `--thresholds 13,18,24,29,36 --compare 18,29` and `t4_overrides_figure.py`.
+  - All 83 committed PNGs (52 sheets, `prototype_mask_new.png`, 30 flagged figures), `crosscheck_2023_new.csv`, `mask_threshold_new.csv` and `overrides_before_after_new.png` are byte-identical. The flagged folder holds exactly the 30 flagged shoes.
+- **Independent recomputation of the A-099 triggers:**
+  - Method: my own record reader and row-span fill, KD-tree distances; RAC pixels from step 0's `locations_pixels_new.csv` (NEW) and from the R aspix formula written out again (OLD, with the committed `data/freq_min_18.png`).
+  - `rac_out_max_px` and `contact_out_max_px` match for 631/631 NEW and 386/386 OLD shoes.
+  - OLD: 3 and 23 triggers, p95 8.062.
+- **Headline numbers re-derived from the committed tables:**
+  - NEW: 601/631 pass; 618 under the T4 bands; 588 with the literal 0.95; 18 shoes below 0.95.
+  - T4 contour: 619 and 602 (20 shoes below 0.95).
+  - OLD: 352 and 365.
+  - Review: 30 flagged, all resolved (25 `ok_after_review`, 5 `override`); classes 28/1/3/9; 48 rectangles on 11 shoes, 4,143 px (2,010 in the mask); 23 overrides (22 at r24, 1 at r16); 2023 cross-check 19,998 of 20,013.
+  - Flags recomputed from the CSV equal `qa_flags`. In the OLD reference every T4 column is unchanged except `qa_flags`, which changes on 24 rows by design.
+- **Mutants**, in a fresh clone, against the 5 modules of the T4 review (51 tests, none skipped without `images_new/`):
+  - erase list removed: 2 failures;
+  - overrides removed in `snake_params`: 4;
+  - closing removed in `first_snake_image`: 2;
+  - the two A-099 bands removed: 25;
+  - the `main.py` fork guard removed: 1 error;
+  - the task-copy write removed: 0. Only `rebuild_new.sh` catches it, because it deletes and regenerates the copy.
+- **Refusals:**
+  - `taskset -c 0-3 regress_old.sh --steps 0`: exit 2, no run folder.
+  - OLD `qa_snake --sheets` / `--thresholds`: exit 2.
+  - NEW `--thresholds` without one thread: exit 2.
+- **`t4fix_erase_list.py`** rebuilds the committed 48-row list byte for byte (580: 199 px; 105: the 96-px blob).
+- **Repo state:**
+  - Raw data unchanged since `79247d8`. No OLD output, `config/`, R or `tools/` file changed since `72f857e`; on the OLD path only log lines and fork guards changed.
+  - No CR in code or docs (only the CRLF contour, by design). No attribution lines.
+  - R uses the reference BLAS (`libblas.so.3`), so dropping the thread variables in `regress_old.sh` cannot touch steps 1-6.
+
+**Findings** (all minor):
+1. **`CommandLine.test_jobs_need_fork` has an unsafe failure mode.**
+   - With the `main.py` guard removed, `step0.main(['--jobs', '2'])` really runs NEW step 0a-0b in the repository root, in-process with the suite's 16 BLAS threads. It writes `images_new/` (the untracked step-0 inputs of `qa_snake` and the probes) before it errors at the step-0c thread check (seen in my clone).
+   - Fix: patch `contour_algorithm.main.run` (or `load_profile`) to raise inside the test, so that a missing guard fails without writing.
+2. **The prototype snake of step 0a still runs before any BLAS-thread check.** `check_blas_threads` is called by step 0c and `--thresholds` only.
+   - The CLI is safe: `main` sets one thread before numpy loads.
+   - An in-process run with 16 threads gave the same mask here (34,509 px, 0 px differ), so no output is affected.
+   - Fix: call the check at the start of `main.run()` or in `prototype_mask_from`.
+3. **Automated coverage of the committed NEW QA artefacts is partial.**
+   - `rebuild_new.sh` compares 4 files. No gate or test checks the 52 sheets, the 30 flagged figures, `mask_threshold_new.csv`, `prototype_mask_new.png` or the overrides figure.
+   - `--flagged` never deletes a stale figure: `im_164_new.png` was removed by hand.
+   - All of these are current today (my rebuild above).
+   - Fix: an optional full mode of the gate (about 5 more minutes here), and a unit test that `flagged/` holds exactly the flagged shoes.
+4. **Nits:**
+   - `qa_snake.py:53`, `:992` and `test_qa_snake.py:560` cite A-100 for the task copy; it is A-104.
+   - The refusal says "--sheets need" (one option: "needs").
+   - `--crosscheck` without a cross-check file is refused only after `--metrics` has written; it could go into `refusal()`.
+   - Nothing checks that `resolution == override` implies an override row (true for 8, 113, 120, 140, 506).
+   - The corename getter was not run under venv-wind. It works the same way as the thread getter that already runs there.
+
+**Not verified:** the full OLD step-0 gate (the reproducibility reviewer is running it), the venv-wind builds, and the visual judgements (vision lens).
