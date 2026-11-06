@@ -18,12 +18,26 @@
 # fit_common_basis(data, knots_x, knots_y, bknots_x, bknots_y, feature)
 #     the step-3 model (feature NEW_X_NS_XY: glmer with (1 | shoe), the
 #     nlminbwrap optimizer; CML_MODEL: clogit with strata(shoe)) fitted to
-#     data on the given basis; its fixed effects have the step-3 order.
+#     data on the given basis; its fixed effects have the step-3 order and
+#     are named bx<j>:by<i> (spatial_term_key() maps them). The formula's
+#     basis variables are bx and by, so a column of data named bx or by
+#     would replace them: such data are refused (T5 review fixes, A-118).
+#     (The check binds no variable: the fit's formula environment, saved
+#     with the model, keeps exactly the bindings it had before.)
 # basis_of(model)
 #     list(knots_x, knots_y, bknots_x, bknots_y) read back from a fitted
 #     step-3 or common-basis model (the attributes of its two ns() terms);
 #     attaches splines when it is not attached (the CML's model frame is
 #     rebuilt by evaluating its formula, which calls ns()).
+# spatial_term_key(nm)
+#     the coefficient names of a step-3 model ("(Intercept)" and
+#     "ns(dat$new_x, knots = knots_new_x)<j>:ns(dat$y, knots = knotsy)<i>")
+#     or of a common-basis refit ("bx<j>:by<i>") as "x<j>:y<i>"
+#     ("(Intercept)" stays); an error for any other name. Step 3 and
+#     fit_common_basis() name the same columns differently, so OLD, NEW and
+#     OLD-basis coefficients are aligned by these keys, never by position
+#     alone (A-118; tests/r/test_compare.R checks that the keys of every
+#     committed model are x1:y1, x2:y1, ..., new_x varying fastest).
 
 basis_knots <- function(data, nknotsx = 3, nknotsy = 5) {
   list(knots_x = as.numeric(quantile(data$new_x, 1:nknotsx / (1 + nknotsx))),
@@ -33,6 +47,10 @@ basis_knots <- function(data, nknotsx = 3, nknotsy = 5) {
 
 fit_common_basis <- function(data, knots_x, knots_y, bknots_x, bknots_y,
                              feature) {
+  if (any(c("bx", "by") %in% names(data))) {
+    stop("fit_common_basis: data has a column named bx or by, which would ",
+         "replace the spline basis in the formula", call. = FALSE)
+  }
   dat <- data
   shoe <- dat$shoe
   bx <- splines::ns(dat$new_x, knots = knots_x, Boundary.knots = bknots_x)
@@ -68,4 +86,17 @@ basis_of <- function(model) {
        knots_y = as.numeric(attr(by, "knots")),
        bknots_x = as.numeric(attr(bx, "Boundary.knots")),
        bknots_y = as.numeric(attr(by, "Boundary.knots")))
+}
+
+spatial_term_key <- function(nm) {
+  step3 <- paste("^ns\\(dat\\$new_x, knots = knots_new_x\\)([0-9]+):",
+                 "ns\\(dat\\$y, knots = knotsy\\)([0-9]+)$", sep = "")
+  out <- sub(step3, "x\\1:y\\2", nm)
+  out <- sub("^bx([0-9]+):by([0-9]+)$", "x\\1:y\\2", out)
+  ok <- out == "(Intercept)" | grepl("^x[0-9]+:y[0-9]+$", out)
+  if (!all(ok)) {
+    stop("spatial_term_key: not a step-3 or common-basis coefficient name: ",
+         paste(nm[!ok], collapse = ", "), call. = FALSE)
+  }
+  out
 }
