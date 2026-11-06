@@ -1,0 +1,191 @@
+{
+  "_comment": [
+    "Dataset profiles (plan section 4; decisions A-003, A-074). One entry per",
+    "dataset, selected by RAC_DATASET=old|new (default old; empty means old).",
+    "Read by contour_algorithm/profiles.py and statistical_model/R/profile.R.",
+    "Paths are relative to the repository root. OLD = the committed values and",
+    "paths exactly; every NEW output sits in a new folder and carries the",
+    "suffix _new. Shoe ids are 1-based. Keys starting with _ are comments."
+  ],
+  "version": 1,
+  "datasets": {
+    "old": {
+      "dataset": "old",
+      "suffix": "",
+      "col_shoe": 307,
+      "row_shoe": 395,
+      "num_shoe": 387,
+      "shoes_without_racs": [127],
+      "excluded_shoes": [],
+      "coords": {
+        "divisor": 1,
+        "rel_col_shoe": 150,
+        "rel_row_shoe": 300,
+        "rel_x_cord": 0.25,
+        "rel_Y_cord": 0.5
+      },
+      "inputs": {
+        "contacts": "data/contacts_data.txt",
+        "locations": "data/locations_data.csv",
+        "locations_format": "csv",
+        "cross_check": null,
+        "sticker_masks": null
+      },
+      "prototype": {
+        "col_shoe": 307,
+        "row_shoe": 395,
+        "coords": {
+          "rel_col_shoe": 150,
+          "rel_row_shoe": 300,
+          "rel_x_cord": 0.25,
+          "rel_Y_cord": 0.5
+        },
+        "contour": "data/contour_prototype.png",
+        "mask": "data/freq_min_18.png"
+      },
+      "r": {
+        "contact_flip_shoes": [9],
+        "stamp_threshold": 8,
+        "stamp_sweep_bound": 300,
+        "n_controls": 100,
+        "seed": 313,
+        "mean_offset_fallback_pixels": 10615,
+        "knit_dir": "statistical_model",
+        "log_dir": "logs/old",
+        "paths": {
+          "dataCC": "processed_data/dataCC.csv",
+          "pixel_counts": "processed_data/shoe_pixel_counts.csv",
+          "all_cont": "data/all_cont.csv",
+          "shoe_codes": "processed_data/shoe_codes.csv",
+          "dataCC_distance_temp": "processed_data/dataCC_distance_temp.csv",
+          "dataCC_distance": "processed_data/dataCC_distance.csv",
+          "wald_test": "processed_data/wald_test.csv",
+          "models_dir": "saved_models",
+          "images_dir": "model_images"
+        },
+        "eol": {
+          "dataCC": "\r\n",
+          "pixel_counts": "\r\n",
+          "all_cont": "\r\n",
+          "shoe_codes": "\n",
+          "dataCC_distance_temp": "\n",
+          "dataCC_distance": "\n",
+          "wald_test": "\n"
+        }
+      },
+      "python": {
+        "images_dir": "images",
+        "contact_flip_shoes": [],
+        "superpose_threshold": 18,
+        "snake": {
+          "center_rc": [200, 155],
+          "radii_rc": [162, 90],
+          "n_points": 400,
+          "gaussian_sigma": 3,
+          "alpha": 0.015,
+          "beta_first": 10,
+          "beta_second": 0.10,
+          "gamma": 0.001
+        },
+        "write_html": false,
+        "contour_out": "data/contour_Active_Contour.txt",
+        "stems": {
+          "superposed": "old_freq_min_{t}",
+          "prototype_mask": "freq_min_{t}",
+          "locations_pixels": "locations_new"
+        }
+      }
+    },
+    "new": {
+      "dataset": "new",
+      "suffix": "_new",
+      "col_shoe": 255,
+      "row_shoe": 367,
+      "num_shoe": 631,
+      "shoes_without_racs": [],
+      "excluded_shoes": [],
+      "coords": {
+        "_comment": "provisional: the legacy 300 px per unit; T3 calibrates",
+        "divisor": 2,
+        "rel_col_shoe": 150,
+        "rel_row_shoe": 300,
+        "rel_x_cord": 0.25,
+        "rel_Y_cord": 0.5
+      },
+      "inputs": {
+        "contacts": "data/new_shoes/contacts_data_new.txt",
+        "locations": "data/new_shoes/locations_data_new_raw.txt",
+        "locations_format": "space_no_header",
+        "cross_check": "data/new_shoes/locations_new_snake_2023.csv",
+        "sticker_masks": null
+      },
+      "prototype": {
+        "_comment": "the OLD prototype frame for both datasets (A-001, A-006)",
+        "col_shoe": 307,
+        "row_shoe": 395,
+        "coords": {
+          "rel_col_shoe": 150,
+          "rel_row_shoe": 300,
+          "rel_x_cord": 0.25,
+          "rel_Y_cord": 0.5
+        },
+        "contour": "data/contour_prototype.png",
+        "mask": "data/freq_min_18.png"
+      },
+      "r": {
+        "_comment": "stamp_threshold provisional (8 x 631/387, A-014; T3)",
+        "contact_flip_shoes": [],
+        "stamp_threshold": 13,
+        "stamp_sweep_bound": 255,
+        "n_controls": 100,
+        "seed": 313,
+        "mean_offset_fallback_pixels": null,
+        "knit_dir": "logs/knit/new",
+        "log_dir": "logs/new",
+        "paths": {
+          "dataCC": "processed_data/new/dataCC_new.csv",
+          "pixel_counts": "processed_data/new/shoe_pixel_counts_new.csv",
+          "all_cont": "processed_data/new/all_cont_new.csv",
+          "shoe_codes": "processed_data/new/shoe_codes_new.csv",
+          "dataCC_distance_temp": "processed_data/new/dataCC_distance_temp_new.csv",
+          "dataCC_distance": "processed_data/new/dataCC_distance_new.csv",
+          "wald_test": "processed_data/new/wald_test_new.csv",
+          "models_dir": "saved_models/new",
+          "images_dir": "model_images/new"
+        },
+        "eol": {
+          "dataCC": "\n",
+          "pixel_counts": "\n",
+          "all_cont": "\n",
+          "shoe_codes": "\n",
+          "dataCC_distance_temp": "\n",
+          "dataCC_distance": "\n",
+          "wald_test": "\n"
+        }
+      },
+      "python": {
+        "_comment": "superpose_threshold and snake init provisional (A-014, A-019; T4)",
+        "images_dir": "images_new",
+        "contact_flip_shoes": [],
+        "superpose_threshold": 29,
+        "snake": {
+          "center_rc": [185, 128],
+          "radii_rc": [162, 95],
+          "n_points": 400,
+          "gaussian_sigma": 3,
+          "alpha": 0.015,
+          "beta_first": 10,
+          "beta_second": 0.10,
+          "gamma": 0.001
+        },
+        "write_html": false,
+        "contour_out": "data/new_shoes/contour_Active_Contour_new.txt",
+        "stems": {
+          "superposed": "superposed_min_{t}",
+          "prototype_mask": "freq_min_{t}",
+          "locations_pixels": "locations_pixels"
+        }
+      }
+    }
+  }
+}
