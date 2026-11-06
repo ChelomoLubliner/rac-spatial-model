@@ -8,8 +8,13 @@ whole shoe at 2x: S white, S outside the fill orange, the contour blue, the
 fill boundary implied by the contour (the row ends) as drawn, RAC pixels
 green, controls yellow (controls outside the fill: red 5 x 5 squares).
 
-Usage (repo root, thesis venv python): RAC_DATASET=new
-  PYTHONPATH=. python -B docs/qa/T5/probes/t5_step1_zoom.py OUT_DIR
+Usage (repo root, thesis venv python), after t5_step1_sheets.py has
+written s_outside_contour_new.csv into the same OUT_DIR (T5 review fixes;
+docs/qa/T5/new holds the committed copy):
+  RAC_DATASET=new PYTHONPATH=. python -B \
+      docs/qa/T5/probes/t5_step1_sheets.py OUT_DIR
+  RAC_DATASET=new PYTHONPATH=. python -B \
+      docs/qa/T5/probes/t5_step1_zoom.py OUT_DIR
 """
 import sys
 from pathlib import Path

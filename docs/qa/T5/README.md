@@ -1,6 +1,6 @@
 # T5 QA evidence: R steps 1-6 on the NEW shoes
 
-Written by T5-newmodel (2026-11-06). Every image below was opened and looked at; what was seen is in `docs/tests/T5-new-pipeline-results.md` (sections named per file). Decisions A-110 to A-112 (`docs/decisions.md`).
+Written by T5-newmodel (2026-11-06), extended by the T5 review fixes (2026-11-07). Every image below was opened and looked at; what was seen is in `docs/tests/T5-new-pipeline-results.md` (sections named per file) and, for the review-fix files, in `docs/tests/T5-review-fixes-results.md`. Decisions A-110 to A-112 and A-113 to A-118 (`docs/decisions.md`).
 
 ## `new/` (NEW only, `_new` names)
 
@@ -14,6 +14,7 @@ Written by T5-newmodel (2026-11-06). Every image below was opened and looked at;
 | `s_outside_zoom_new.png` | The shoes with a control outside the fill (8, 28, 148, 432, 583) and the six with the largest distance of S from it, 2x; section 4 |
 | `model_summary_new.csv` | Estimates and SEs of the four NEW fits (step-3 GLMM and CML, the OLD-basis refits of A-112), term order intercept, x1:y1 ... x4:y6 |
 | `<stem>_new.png` (8 files) | PNG twins of `model_images/new/<stem>_new.pdf`, drawn by `tools/figures_png.R` with the Rmds' own code (A-111); section 7 |
+| `heel_front_band_shoes_new.png` | *(T5 review fixes, A-114)* For each block of 49 NEW ids (13 rows), the 7 shoes with the most contact in the band y (-0.18, -0.10], cropped to rows 150-300: S white, RAC pixels green, the band between cyan lines; label: id, group (A = ids 1-343 and 442-490), contact px and RAC px in the band; `docs/tests/T5-review-fixes-results.md` section 3 |
 
 ## `old/` (OLD reference, no suffix)
 
@@ -30,7 +31,9 @@ Written by T5-newmodel (2026-11-06). Every image below was opened and looked at;
 | `step2_distributions_old_vs_new.png` | Densities of `new_x` and y (controls, cases), `min_dist` and `horiz_dist - min_dist` (px), OLD blue, NEW orange, knots dotted; section 5 |
 | `step2_standardized_old_vs_new.png` | The controls and cases of each dataset on the standardized shoe (new_x, y) with the OLD prototype outline; section 5 |
 | `k8_edges_old_vs_new.csv` | The K8 edges of both GLMMs: eta pinned to the intercept on the left and heel edges, the free edges' range, rows near the pinned edges; section 7 |
+| `residual_cells_old_vs_new.csv` | *(T5 review fixes, A-114)* O/E of each step-3 GLMM (fitted with the shoes' BLUPs) on 0.04 (new_x) x 0.08 (y) cells, both datasets: rows, cases, controls, E, O/E, z; review-fixes results section 3 |
+| `heel_front_band_old_vs_new.png` | *(T5 review fixes, A-114)* NEW group A, NEW group B, OLD: the share of shoes with contact per pixel, the RAC pixels per contact pixel (6 x 6 px blocks), and both along y (with the OLD prints of the 50 group-A reprints), the band y (-0.18, -0.10] marked; review-fixes results section 3 |
 
 ## `probes/`
 
-`t5_stamp_mask.R`, `t5_stamp_figure.py`, `t5_stamp_ring.py` and `t5_t4_table_diff.py` (section 2), `t5_step1_sheets.py` and `t5_step1_zoom.py` (section 4), `t5_step2_figures.py` (section 5), `t5_model_summary.R` and `t5_side_by_side.R` (section 6), `t5_k8_edges.R` (section 7), `t5_new_rerun.sh` (section 10.4: a fresh rerun of NEW steps 1-6 compared with HEAD). Each states its usage in its header; they read committed files and write only to the folders named on their command line.
+`t5_stamp_mask.R`, `t5_stamp_figure.py`, `t5_stamp_ring.py` and `t5_t4_table_diff.py` (section 2), `t5_step1_sheets.py` and `t5_step1_zoom.py` (section 4), `t5_step2_figures.py` (section 5), `t5_model_summary.R` and `t5_side_by_side.R` (section 6), `t5_k8_edges.R` (section 7), `t5_new_rerun.sh` (section 10.4: a fresh rerun of NEW steps 1-6 compared with HEAD; since the T5 review fixes `--oldbasis` also refits and compares the two OLD-basis models and `--png` the 16 PNG twins). T5 review fixes (`docs/tests/T5-review-fixes-results.md`): `t5_gof.R` (goodness of fit, the heel-front band, A-114), `t5_band_figure.py` (its two figures), `t5_inference.R` (convergence, robust Wald, the cost of K8, the map levels; A-115, A-116), `t5_sigma2.R` (what sigma^2 measures; `--offset-refit` refits NEW with the offset, about 8-12 minutes; A-115). Each states its usage in its header and writes only to the folders named on its command line. They read committed files, with three exceptions (corrected by the T5 review fixes; checked in a fresh clone, review-fixes results section 5): `t5_step1_zoom.py` reads `s_outside_contour_new.csv` from its OUT_DIR, so run `t5_step1_sheets.py` into the same folder first (or use `docs/qa/T5/new`, which holds the committed copy); `t5_stamp_figure.py` reads the gitignored `images_new/saved/freq_min_18_new.png`, so NEW step 0 must have run in the tree (`RAC_DATASET=new python -m contour_algorithm.main --jobs 14`, which on this machine rewrites the committed contour with the same bytes; or run from the `repo/` folder of a `tests/rebuild_new.sh --keep` run), and the masks and counts that `t5_stamp_mask.R` writes, so run that first with the same NEW_DIR and SCRATCH.
