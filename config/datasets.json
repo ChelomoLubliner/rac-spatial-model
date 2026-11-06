@@ -179,9 +179,19 @@
         "mask": "data/freq_min_18.png"
       },
       "r": {
-        "_comment": "stamp_threshold provisional (8 x 631/387, A-014; T3)",
+        "_comment": [
+          "T5 (decision A-110, replacing the provisional proportional 13 of",
+          "A-014): the R stamp mask keeps the pixels in contact on >= 8",
+          "shoes, the OLD value. NEW prints carry no police stamp: the",
+          "sweep removes 0 px at 8 (OLD: 1,110 px of stamps), and 8 already",
+          "removes every frame-artefact remnant and margin debris; 13 would",
+          "remove 5,661 more contact px on 99 more shoes, 99.4% of them",
+          "inside the shoe's own contour (real sole edge). Evidence:",
+          "docs/qa/T5/compare/stamp_threshold_old_vs_new.csv,",
+          "docs/qa/T5/new/stamp_mask_new.png, stamp_worst_new.png"
+        ],
         "contact_flip_shoes": [],
-        "stamp_threshold": 13,
+        "stamp_threshold": 8,
         "stamp_sweep_bound": 255,
         "n_controls": 100,
         "seed": 313,
