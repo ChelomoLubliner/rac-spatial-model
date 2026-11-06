@@ -1784,3 +1784,68 @@ Decisions A-110 to A-112; plan revision 12 (F72-F77). Results with exact command
 - **A-110 (threshold 8).** It is the right call statistically: the mask removes 0.2% of NEW contact.
 
 **Blockers.** None. Finding 1 must be corrected in the docs before T6 uses the NEW maps.
+
+## 2026-11-07 00:58, T5-newmodel review (reviewer:reproducibility)
+
+**Verdict: changes required** (reproducibility lens). I re-ran every OLD gate myself (WSL steps 0-6; Windows R steps 1, 2, 3 and 5) and checked each output with my own comparisons against the `79247d8` blobs and the Tier B files. OLD is reproduced exactly: Tier A where the platform allows it, Tier B on WSL. The RNG sequence is unchanged, and no NEW file can overwrite an OLD one. On the NEW side, I re-ran steps 1-6, both OLD-basis refits, every T5 QA probe, the PNG twins and the full NEW rebuild gate. Every output came back as the committed bytes, and every model as `identical()`. What blocks is the documented stale-output guarantee, which is false: engineer finding 1, reproduced independently here with my own mutant. There are also two minor doc errors.
+
+**How I ran it** (`<scratch>/rv_repro_t5/`, HEAD `988716a`). The docs-only `b980c86` and `4e26cbb` landed during my runs; they change only this file. My comparison scripts `cmp_models_rv.R`, `cmp_glmm_rv.R` and `step2_shoe.R` use no repository helper. Load reached about 19 while three reviews ran.
+
+**OLD (re-run, not trusted).**
+- **Tier A list.** My sha256 of the 24 `79247d8` blobs = `committed_79247d8.sha256` = the work tree. `tests/baseline/` has not changed since `8fefa20`. The OLD block of `config/datasets.json` equals the one at `f3b5d6e` and at `088457d`.
+- **Steps 1-6, WSL** (`regress_old.sh --steps 1-6 --keep`): ALL PASS. My own checks:
+  - The five step-1/2 CSVs `cmp`-equal the `79247d8` blobs, and `shoe_codes.csv` equals its `012753f` blob.
+  - The GLMM is `identical()` to the Tier B model file (`t1/legacy_r_oTZO3x`) in 14 of 14 fields: fixef, both vcovs, VarCorr, theta, logLik, deviance, ranef, y, X, Zt, u, conv, and no Hessian stored.
+  - The CML is `identical()` to Tier B and to the `79247d8` blob in 8 of 8 fields.
+  - Against the blob, the GLMM differs only by the F42 platform effect: fixef max 7.67e-4, sigma^2 0.9597959 vs 0.9597791.
+  - My W = b'V^-1 b: refit 427.7804472165; committed GLMM 428.6933350011 (Hessian) and 427.7674192737 (RX); CML 420.6712420035.
+- **Step 3, Windows R 4.4.3 / lme4 1.1-37** (`run_windows_r_step3.sh` at `b980c86`, whose code equals `988716a`): 27 of 27 fields = Tier A. My own check: fixef, both vcovs, VarCorr, theta, logLik, deviance, ranef, u, y, X and the stored Hessian are `identical()` to the `79247d8` GLMM, and W is 428.6933350011 for both.
+- **Steps 1, 2 and 5, Windows R** (`run_windows_r_steps.sh --steps 1,2,5` at `988716a`): ALL PASS.
+  - The five CSVs `cmp`-equal the `79247d8` blobs. `shoe_codes.csv` and `wald_test.csv` equal their HEAD blobs (W 428.693335001072, df 24, p 9.43e-76).
+  - car gives 428.6933, a relative difference of 4.8e-15 from the manual W. The 4 CI PDFs equal the committed ones once their dates are removed.
+  - The shared profile, whose NEW block T5 changed, parses under both R builds.
+- **Step 0, WSL** (`--steps 0 --keep`): ALL PASS (16 threads, Haswell). My check: the contour equals the Tier B file (`t1/legacy_py_MXmkvc`) after LF -> CRLF, and exactly the 30 records of `contour_linux_diff.csv` differ from the `79247d8` blob, each with its recorded pixel count.
+- **RNG.** Each Rmd has one `set.seed(P$r$seed)` where `79247d8` had `set.seed(313)`, and the seed is 313 in both profiles. The only consumer is step 1's `sample()`, and none of the code inserted before it draws a random number (no RNG call in `R/*.R`). `dataCC.csv`, which holds the 38,600 drawn controls, is byte-identical on WSL and under the Windows R.
+- **Collisions.**
+  - T5 modified no OLD-named file. Of the files it added, 46 are NEW (`new/` folder, `_new` stem), 4 are in `compare/` with `_old_vs_new`, and 9 are OLD-only twins in `docs/qa/T5/old/`.
+  - Every profile key resolves to different OLD and NEW paths: the 9 CSVs, both models, the image folder and the OLD-basis refits.
+  - The committed OLD outputs keep their February/March mtimes, and the two T2 files keep theirs (2026-11-06 05:12 and 07:53). So nothing rewrote them during T5, not even with equal bytes.
+  - `figures_png.R` for OLD steps 4-6 in a clean clone wrote nothing outside its own folder.
+  - No knit HTML landed in `statistical_model/`; the NEW knits are in `logs/knit/new/`.
+  - R uses the reference BLAS, so no R step depends on thread variables.
+
+**NEW (re-run).**
+- **`t5_new_rerun.sh`** (my run): ALL SAME. My own checks: the 7 CSVs `cmp`-equal the `988716a` blobs, so the case-control draw is reproduced too. The 8 PDFs are equal once their 2 date fields are blanked. GLMM and CML are `identical()` in 14 + 8 fields (W 585.8887740527, CML 576.0264202299, sigma^2 0.7556134062).
+- **The OLD-basis refits (A-112), which no gate covers.** Both, rerun in a clean clone, are `identical()` in every field and byte-identical as `.rds` (W 623.1165640002 and 612.4972768718).
+- **The QA probes, in a clean clone.** Every output is byte-identical:
+  - `t5_stamp_mask.R`: both CSVs, and the committed `all_cont_new.csv` byte-equals the t = 8 mask;
+  - `t5_model_summary.R` and `t5_k8_edges.R`;
+  - `t5_stamp_ring.py`: 5,661 px, 5,628 of them inside, 33 outside on 11 shoes;
+  - `t5_step1_sheets.py`: the 13 sheets and both `s_outside_contour` CSVs;
+  - `t5_step1_zoom.py`, `t5_step2_figures.py` and `t5_stamp_figure.py`;
+  - `figures_png.R`: all 16 twins.
+- **`rebuild_new.sh --full --keep`**: ALL PASS (contour `f7703bcd`, the three tables A-110 rewrote, 52 sheets, 29 flagged figures). From the blobs, against `f3b5d6e`: only `coverage_r` changed, on 10 shoes (8, 35, 142, 148, 185, 294, 432, 551, 583, 585) by -0.0013 to -0.0001; `mask_threshold_new.csv` lost only its two `r13` columns.
+- **`run_all.sh` in a fresh clone at `988716a`**: ALL PASS (184 Python tests, 3 skipped; 17 R scripts; flake8 87 files; shellcheck 17; work tree unchanged).
+
+**Findings.**
+1. **Major (engineer finding 1, reproduced independently). The stale-output guard of `test_new_outputs.R` does not hold.**
+   - The step-2 recompute samples only 25 of the 631 shoes (`set.seed(25)`: 4, 49, 59, ..., 630).
+   - In a clean clone I translated contour record 591 by one column (703 px). Recomputing step 2 for shoe 591 then changes all 107 of its rows (`min_dist` and `horiz_dist` by up to 1 px, `new_x` by up to 0.0042), yet `Rscript tests/r/test_new_outputs.R` reports ALL PASS.
+   - 591, 148 and 125, the T4 fallbacks the docs name, all lie outside the sample. The documented mutant used record 49, which lies inside it.
+   - Results 8.1 ("a NEW contour changed after step 2 ... fails the test until steps 2-6 are rerun") and the T5 open issue in this LOG say the opposite. The OLD-basis refits are no better covered (only basis, convergence, count and nobs are checked), and the figures are checked only for existence.
+   - A caution for the fix: first show that a mutant changes the output. Shifting only row 200 of record 591 changed none of shoe 591's 107 rows, so that mutant's "not caught" proves nothing.
+   - Fix: as the engineer proposes. Recompute all 631 shoes (about 11 s) or check a recorded sha256 of the inputs step 2 read; tie the OLD-basis refits to the CSV through y and X; then correct the statements.
+2. **Minor. A-111 puts the OLD seam in the wrong place.** It says "OLD at y = 0.49, NEW at y = 0.41". In all four committed heat-map PNGs (OLD and NEW, GLMM and CML) the seam is pixel row 489 of 900, which is y = 0.413 in the plot box (rows 122.5-746.5). Fix: "y = 0.41 in all four".
+3. **Minor. Two T5 probes do not rerun from a clean clone as documented.** `docs/qa/T5/README.md` says the probes "read committed files". But `t5_stamp_figure.py` also needs NEW step 0's gitignored `images_new/saved/freq_min_18_new.png` (its header names it) and `stamp_shoes_new.csv` in its NEW_DIR. `t5_step1_zoom.py` needs `t5_step1_sheets.py`'s `s_outside_contour_new.csv` in its OUT_DIR. Without these, both stop with FileNotFoundError; with them, both reproduce byte for byte. Fix: give the order and the prerequisites in the usage lines and the README.
+4. **Carried over from T4 (not a T5 change), still open.** `README.md:141-142` still says the kernel pin stops an in-place NEW run from silently rewriting the committed contour. A-108 still says 13 of 631 records, where the T4 second reproducibility review found 14 at `088457d`.
+
+**Not verified:**
+- venv-wind step 0 at HEAD. T5 changed nothing on that path except the NEW block of the shared JSON, which my WSL step 0 parsed; it was last verified at `088457d`.
+- The visual and statistical judgements (other lenses).
+
+**Times** (s, load up to about 19):
+- OLD steps 1-6 gate: 715 (step 1 114, step 2 21, GLMM 273, CML 222, steps 4-6 72). Step-0 gate: 1,082 (snake 999).
+- Windows R: steps 1, 2 and 5 took 164, 105 and 39; the GLMM 628.
+- NEW rerun: 1,646 (step 1 374, step 2 45, GLMM 713, CML 405, steps 4-6 91).
+- OLD-basis refits: GLMM 726, CML 347.
+- `rebuild_new.sh --full`: 458. Probes: 46-78 each. Fast suite: 355.
