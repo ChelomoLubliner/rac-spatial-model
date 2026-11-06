@@ -41,8 +41,17 @@
 #                              legacy (the row loops of step 2)
 # Reading a profile does not use the random number generator (tested in
 # tests/r/test_profile.R), so it can run before set.seed().
+# User rule 1 is checked when a profile is read (T2 review; decision
+# A-083): rac_profile() refuses a non-OLD profile in which an output file or
+# folder lies in no NEW folder (RAC_NAMESPACE_FOLDERS), an output file lacks
+# the suffix, an output file is an input of any dataset of the file or an
+# output of another dataset, or an output lies in a work folder of another
+# dataset; the same rule as contour_algorithm/profiles.py. So an edited
+# path can never make a NEW run overwrite an OLD output or a raw input
+# (rac_write_csv() itself does not check paths).
 
 RAC_DATASETS <- c("old", "new")
+RAC_NAMESPACE_FOLDERS <- c("new", "new_shoes", "images_new")
 
 rac_env <- function(name, default) {
   v <- Sys.getenv(name, unset = NA_character_)
@@ -91,6 +100,86 @@ rac_env <- function(name, default) {
   invisible(v)
 }
 
+# The output files and folders named by a (cleaned) profile entry E, as
+# named character vectors of relative paths.
+.rac_output_paths <- function(E) {
+  paths <- E$r$paths
+  is_dir <- endsWith(names(paths), "_dir")
+  key <- paste("r.paths", names(paths), sep = ".")
+  list(files = c(python.contour_out = E$python$contour_out,
+                 setNames(unlist(paths[!is_dir]), key[!is_dir])),
+       dirs = c(python.images_dir = E$python$images_dir,
+                r.knit_dir = E$r$knit_dir, r.log_dir = E$r$log_dir,
+                setNames(unlist(paths[is_dir]), key[is_dir])))
+}
+
+# The input files named by a (cleaned) profile entry E.
+.rac_input_paths <- function(E) {
+  unname(unlist(c(E$inputs[c("contacts", "locations", "cross_check",
+                             "sticker_masks")],
+                  E$prototype[c("contour", "mask")])))
+}
+
+# User rule 1 for the non-OLD entry P (see the header); entries = every
+# cleaned entry of the profile file, by name.
+.rac_check_namespace <- function(P, entries) {
+  parts <- function(rel) strsplit(rel, "/", fixed = TRUE)[[1]]
+  inside <- function(p, d) p == d || startsWith(p, paste(d, "/", sep = ""))
+  o <- .rac_output_paths(P)
+  bad <- character(0)
+  for (k in names(o$dirs)) {
+    if (!any(parts(o$dirs[[k]]) %in% RAC_NAMESPACE_FOLDERS)) {
+      bad <- c(bad, sprintf("%s '%s' lies in no NEW folder", k, o$dirs[[k]]))
+    }
+  }
+  for (k in names(o$files)) {
+    pp <- parts(o$files[[k]])
+    stem <- sub("\\.[^.]*$", "", pp[length(pp)])
+    if (!any(pp[-length(pp)] %in% RAC_NAMESPACE_FOLDERS)) {
+      bad <- c(bad, sprintf("%s '%s' lies in no NEW folder", k, o$files[[k]]))
+    } else if (!endsWith(stem, P$suffix)) {
+      bad <- c(bad, sprintf("%s '%s' lacks the suffix '%s'", k, o$files[[k]],
+                            P$suffix))
+    }
+  }
+  protected <- character(0)  # path -> what it is
+  for (nm in names(entries)) {
+    E <- entries[[nm]]
+    inp <- .rac_input_paths(E)
+    protected <- c(protected, setNames(rep(paste("an input of the", nm,
+                                                 "profile"), length(inp)), inp))
+    if (identical(nm, P$dataset)) next
+    out <- unname(.rac_output_paths(E)$files)
+    protected <- c(protected, setNames(rep(paste("an output of the", nm,
+                                                 "profile"), length(out)), out))
+    work <- sort(c(E$python$images_dir, E$r$knit_dir, E$r$log_dir))
+    all_out <- c(o$files, o$dirs)
+    for (k in names(all_out)) {
+      for (w in work) {
+        if (inside(all_out[[k]], w)) {
+          bad <- c(bad, sprintf(paste("%s '%s' lies in '%s', a work folder",
+                                      "of the %s profile"),
+                                k, all_out[[k]], w, nm))
+        }
+      }
+    }
+  }
+  for (k in names(o$files)) {
+    f <- o$files[[k]]
+    if (f %in% names(protected)) {
+      bad <- c(bad, sprintf("%s '%s' is %s", k, f, protected[[f]]))
+    }
+  }
+  if (length(bad)) {
+    stop("profile '", P$dataset, "' breaks the NEW namespace (user rule 1: ",
+         "every NEW output lies in a folder named one of ",
+         paste(RAC_NAMESPACE_FOLDERS, collapse = ", "), ", ends with '",
+         P$suffix, "' and is never an input or another dataset's output): ",
+         paste(bad, collapse = "; "), call. = FALSE)
+  }
+  invisible(P)
+}
+
 rac_profile <- function(dataset = rac_env("RAC_DATASET", "old"),
                         root = ROOT_PATH,
                         file = rac_env("RAC_PROFILE_FILE",
@@ -105,6 +194,8 @@ rac_profile <- function(dataset = rac_env("RAC_DATASET", "old"),
   }
   if (!endsWith(root, "/")) root <- paste(root, "/", sep = "")
   if (!startsWith(file, "/")) file <- paste(root, file, sep = "")
+  # (jsonlite would read a missing file's name as JSON text)
+  if (!file.exists(file)) stop("profile file ", file, " not found", call. = FALSE)
   cfg <- jsonlite::fromJSON(file, simplifyVector = TRUE)
   P <- cfg$datasets[[dataset]]
   if (is.null(P)) {
@@ -142,6 +233,10 @@ rac_profile <- function(dataset = rac_env("RAC_DATASET", "old"),
   .rac_check_rel(P$prototype$mask, "prototype.mask")
   .rac_check_rel(P$r$knit_dir, "r.knit_dir")
   .rac_check_rel(P$r$log_dir, "r.log_dir")
+  .rac_check_rel(P$python$images_dir, "python.images_dir")
+  if (dataset != "old") {
+    .rac_check_namespace(P, lapply(cfg$datasets, .rac_clean))
+  }
   P$root <- root
   P$file <- file
   P

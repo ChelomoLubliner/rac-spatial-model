@@ -12,6 +12,13 @@ through :func:`env`, which treats an unset and an empty variable alike
 (``os.environ.get(name, default)`` returns ``""`` for a set-but-empty
 variable). ``RAC_PROFILE_FILE`` (tests only) names another profile file of
 the same schema; production entry points refuse it.
+
+User rule 1 is also checked at run time (T2 review; decision A-083):
+:func:`load_profile` refuses a non-OLD profile in which an output file or
+folder lies in no NEW folder (:data:`NAMESPACE_FOLDERS`), an output file
+lacks the suffix, or an output file is an input of any dataset of the file
+or an output of another dataset, so an edited path can never make a NEW
+run overwrite an OLD output or a raw input.
 """
 
 from __future__ import annotations
@@ -27,6 +34,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_PROFILE_FILE = 'config/datasets.json'
 DATASETS = ('old', 'new')
 LOCATION_FORMATS = ('csv', 'space_no_header')
+# The folders that hold only NEW files (user rule 1): every output of a
+# non-OLD profile lies below one of them, and its file stem ends with the
+# profile's suffix.
+NAMESPACE_FOLDERS = frozenset({'new', 'new_shoes', 'images_new'})
 # Per-shoe image folders and their legacy file-name patterns (A-018: the
 # index is the 0-based image index, im0 is shoe 1).
 IMAGE_KINDS = MappingProxyType({
@@ -256,6 +267,75 @@ class Profile:
         return out
 
 
+def _output_paths(d: Mapping) -> tuple[dict, dict]:
+    """({name: path} of the output files, {name: path} of the output
+    folders) named by the profile entry d (relative, normalized)."""
+    files = {'python.contour_out': d['python']['contour_out']}
+    folders = {'python.images_dir': d['python']['images_dir'],
+               'r.knit_dir': d['r']['knit_dir'],
+               'r.log_dir': d['r']['log_dir']}
+    for key, value in d['r']['paths'].items():
+        (folders if key.endswith('_dir') else files)[f'r.paths.{key}'] = value
+    return ({k: PurePosixPath(v) for k, v in files.items()},
+            {k: PurePosixPath(v) for k, v in folders.items()})
+
+
+def _input_paths(d: Mapping) -> set:
+    """The input files named by the profile entry d (relative)."""
+    values = [d['inputs'].get(k) for k in ('contacts', 'locations',
+                                           'cross_check', 'sticker_masks')]
+    values += [d['prototype']['contour'], d['prototype']['mask']]
+    return {PurePosixPath(v) for v in values if v is not None}
+
+
+def _check_namespace(dataset: str, d: Mapping, entries: Mapping) -> None:
+    """User rule 1 at run time, for a non-OLD profile entry d: every output
+    folder lies below a NEW folder; every output file lies below a NEW
+    folder and its stem ends with the suffix; no output file is an input of
+    any entry of the file or an output file of another entry; no output
+    lies in a work folder of another entry (its python.images_dir,
+    r.knit_dir, r.log_dir; the shared parents saved_models/ and
+    model_images/ are not work folders). Raises ValueError naming every
+    offending path."""
+    suffix = d['suffix']
+    files, folders = _output_paths(d)
+    bad = []
+    for what, p in folders.items():
+        if not set(p.parts) & NAMESPACE_FOLDERS:
+            bad.append(f"{what} '{p}' lies in no NEW folder")
+    for what, p in files.items():
+        if not set(p.parts[:-1]) & NAMESPACE_FOLDERS:
+            bad.append(f"{what} '{p}' lies in no NEW folder")
+        elif not p.stem.endswith(suffix):
+            bad.append(f"{what} '{p}' lacks the suffix '{suffix}'")
+    protected = {}
+    for name, e in entries.items():
+        for p in _input_paths(e):
+            protected.setdefault(p, f'an input of the {name} profile')
+        if name == dataset:
+            continue
+        for p in _output_paths(e)[0].values():
+            protected.setdefault(p, f'an output of the {name} profile')
+        work = {PurePosixPath(e['python']['images_dir']),
+                PurePosixPath(e['r']['knit_dir']),
+                PurePosixPath(e['r']['log_dir'])}
+        for what, p in {**files, **folders}.items():
+            for w in sorted(work):
+                if p == w or w in p.parents:
+                    bad.append(f"{what} '{p}' lies in '{w}', a work folder "
+                               f'of the {name} profile')
+    for what, p in files.items():
+        if p in protected:
+            bad.append(f"{what} '{p}' is {protected[p]}")
+    if bad:
+        raise ValueError(
+            f'profile {dataset!r} breaks the NEW namespace (user rule 1: '
+            f'every NEW output lies in a folder named one of '
+            f'{sorted(NAMESPACE_FOLDERS)}, ends with {suffix!r} and is '
+            f'never an input or another dataset\'s output): '
+            + '; '.join(bad))
+
+
 def _coords(c: Mapping, what: str) -> Coords:
     try:
         return Coords(rel_col_shoe=c['rel_col_shoe'],
@@ -332,6 +412,10 @@ def load_profile(dataset: str | None = None, file: Path | str | None = None,
         _rel(rel, f'r.paths.{key}')
     for key in ('knit_dir', 'log_dir'):
         _rel(d['r'][key], f'r.{key}')
+    _rel(py['images_dir'], 'python.images_dir')
+    _rel(py['contour_out'], 'python.contour_out')
+    if dataset != 'old':
+        _check_namespace(dataset, d, cfg['datasets'])
     return Profile(
         dataset=dataset, suffix=suffix, root=root, file=file,
         col_shoe=int(d['col_shoe']), row_shoe=int(d['row_shoe']),

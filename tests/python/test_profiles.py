@@ -2,11 +2,16 @@
 
 OLD must give exactly the legacy constants and the committed paths; every
 NEW output must be namespaced (a `new` folder component and the `_new`
-suffix) and must not collide with an OLD output, an OLD output folder or a
-tracked file (user rule 1). Reads only; temporary profile files go to a
-tempfile folder.
+suffix) and must not collide with an OLD output, an OLD output folder, an
+input, or an OLD tracked file (user rule 1). "OLD tracked file" means a
+file of the baseline commit 79247d8 or a tracked file outside the NEW
+namespace (T2 review, finding 2: the earlier rule took every tracked file
+for OLD, so it would have failed once T4 commits the NEW contour), and
+load_profile() itself refuses a profile that breaks rule 1 (A-083). Reads
+only; temporary profile files go to a tempfile folder.
 """
 
+import dataclasses
 import json
 import os
 import shutil
@@ -15,6 +20,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path, PurePosixPath
+from types import MappingProxyType
 from unittest import mock
 
 from contour_algorithm import profiles
@@ -35,16 +41,67 @@ OLD_T2_FILES = {'processed_data/shoe_codes.csv',
                 'processed_data/wald_test.csv'}
 RAC_VARS = ('RAC_DATASET', 'RAC_PROFILE_FILE', 'RAC_MODEL_FEATURE',
             'RAC_DISTANCE_IMPL')
+# The Tier A baseline commit: every file of its tree is an OLD file (code,
+# OLD outputs, the raw inputs of both datasets).
+BASELINE_COMMIT = '79247d8'
 
 
 def rel(p, root=REPO):
     return PurePosixPath(Path(p).relative_to(root).as_posix())
 
 
+def git_lines(*args):
+    return subprocess.run(['git', '-C', str(REPO), *args], check=True,
+                          capture_output=True, text=True).stdout.splitlines()
+
+
 def tracked_files():
-    out = subprocess.run(['git', '-C', str(REPO), 'ls-files'], check=True,
-                         capture_output=True, text=True).stdout
-    return {PurePosixPath(x) for x in out.splitlines()}
+    return {PurePosixPath(x) for x in git_lines('ls-files')}
+
+
+def baseline_files():
+    return {PurePosixPath(x) for x in git_lines('ls-tree', '-r', '--name-only',
+                                                BASELINE_COMMIT)}
+
+
+def new_namespaced(path):
+    """A path in the NEW namespace: a NEW folder and a _new stem."""
+    return bool(set(path.parts[:-1]) & NEW_FOLDERS) and (
+        path.stem.endswith('_new'))
+
+
+def profile_inputs(p):
+    return {rel(x, p.root) for x in (p.contacts, p.locations, p.cross_check,
+                                     p.sticker_masks, p.prototype_contour,
+                                     p.prototype_mask) if x is not None}
+
+
+def protected_files(tracked, baseline, profiles):
+    """The files that no NEW output may be: every file of the baseline
+    commit, every tracked file outside the NEW namespace (the OLD files
+    committed since 79247d8, such as T2's shoe_codes.csv and wald_test.csv,
+    and any later ones) and every input of the profiles. A committed NEW
+    output is none of these, so committing NEW outputs (T4, T5) keeps the
+    rule green."""
+    out = set(baseline) | {f for f in tracked if not new_namespaced(f)}
+    for p in profiles:
+        out |= profile_inputs(p)
+    return out
+
+
+def collisions(new, old, tracked, baseline):
+    """The NEW output files that are an OLD output or a protected file."""
+    new_files = set(all_outputs(new).values())
+    return new_files & (set(all_outputs(old).values())
+                        | protected_files(tracked, baseline, (old, new)))
+
+
+def with_r_path(p, key, value):
+    """A copy of profile p with r.paths[key] = value, built without
+    load_profile (whose rule-1 check would refuse it): it shows what the
+    tests catch on their own."""
+    paths = MappingProxyType({**p.r['paths'], key: value})
+    return dataclasses.replace(p, r=MappingProxyType({**p.r, 'paths': paths}))
 
 
 def all_outputs(p):
@@ -192,8 +249,10 @@ class New(unittest.TestCase):
         old, new = load_profile('old'), self.p
         old_files = set(all_outputs(old).values())
         new_files = set(all_outputs(new).values())
+        self.assertEqual(len(new_files), len(all_outputs(new)))  # distinct
         self.assertEqual(old_files & new_files, set())
-        self.assertEqual(new_files & tracked_files(), set())
+        self.assertEqual(collisions(new, old, tracked_files(),
+                                    baseline_files()), set())
         # no NEW output equals or lies inside an OLD output file or an OLD
         # output folder (images/, statistical_model/, logs/old/, ...);
         # saved_models/ and model_images/ hold both, NEW in new/
@@ -206,6 +265,39 @@ class New(unittest.TestCase):
         for d in new.output_dirs().values():
             self.assertNotIn(rel(d), {rel(v) for v in
                                       old.output_dirs().values()})
+
+    def test_collision_rule(self):
+        """The rule passes committed NEW outputs and still catches a NEW
+        output that is an OLD file or an input (T2 review, finding 2)."""
+        old, new = load_profile('old'), self.p
+        tracked, baseline = tracked_files(), baseline_files()
+        new_files = set(all_outputs(new).values())
+        # 1. every NEW output committed (T4 commits the NEW contour, T5 the
+        #    NEW CSVs and models): still no collision
+        with_new = tracked | new_files
+        self.assertIn(PurePosixPath(
+            'data/new_shoes/contour_Active_Contour_new.txt'), with_new)
+        self.assertEqual(collisions(new, old, with_new, baseline), set())
+        # 2. a NEW output that is an OLD tracked file or an input is caught,
+        #    also while the NEW outputs are committed
+        cases = {
+            'the committed OLD contour (79247d8)': dataclasses.replace(
+                new, contour_out=REPO / 'data/contour_Active_Contour.txt'),
+            'the OLD wald_test.csv that T2 added': with_r_path(
+                new, 'wald_test', 'processed_data/wald_test.csv'),
+            'a tracked file added after 79247d8 that no profile names':
+                with_r_path(new, 'dataCC', 'docs/decisions.md'),
+            'the raw NEW contacts (an input in the NEW namespace)':
+                dataclasses.replace(new, contour_out=REPO / 'data/new_shoes'
+                                    '/contacts_data_new.txt'),
+            'the README of data/new_shoes (79247d8)': with_r_path(
+                new, 'all_cont', 'data/new_shoes/README.md'),
+        }
+        self.assertNotIn(PurePosixPath('docs/decisions.md'), baseline)
+        self.assertIn(PurePosixPath('docs/decisions.md'), tracked)
+        for name, bad in cases.items():
+            with self.subTest(case=name):
+                self.assertTrue(collisions(bad, old, with_new, baseline))
 
     def test_inputs_are_raw_committed_files(self):
         tracked = tracked_files()
@@ -391,6 +483,61 @@ class Validation(unittest.TestCase):
     def test_comments_are_ignored(self):
         p = load_profile('new')
         self.assertFalse(any(k.startswith('_') for k in p.r))
+
+    def test_rule1_at_load(self):
+        """load_profile refuses a NEW profile that breaks user rule 1
+        (T2 review: rule 1 had no run-time guard, A-083); the real profiles
+        and the sentinel fixture load, and OLD keeps its legacy paths."""
+        def r_path(key, value):
+            return lambda d: d['new']['r']['paths'].update({key: value})
+
+        def r_val(key, value):
+            return lambda d: d['new']['r'].update({key: value})
+
+        def py_val(key, value):
+            return lambda d: d['new']['python'].update({key: value})
+
+        cases = {
+            'dataCC = the OLD dataCC.csv': r_path(
+                'dataCC', 'processed_data/dataCC.csv'),
+            'dataCC without the suffix': r_path(
+                'dataCC', 'processed_data/new/dataCC.csv'),
+            'dataCC without a NEW folder': r_path(
+                'dataCC', 'processed_data/dataCC_new.csv'),
+            'wald_test = the OLD file T2 added': r_path(
+                'wald_test', 'processed_data/wald_test.csv'),
+            'models_dir = the OLD folder': r_path('models_dir',
+                                                  'saved_models'),
+            'knit_dir = the OLD knit folder': r_val('knit_dir',
+                                                    'statistical_model'),
+            'log_dir = the OLD log folder': r_val('log_dir', 'logs/old'),
+            'log_dir inside the OLD log folder': r_val('log_dir',
+                                                       'logs/old/new'),
+            'images_dir = the OLD work folder': py_val('images_dir',
+                                                       'images'),
+            'images_dir inside the OLD work folder': py_val('images_dir',
+                                                            'images/new'),
+            'contour without a NEW folder': py_val(
+                'contour_out', 'data/contour_Active_Contour_new.txt'),
+            'contour = the raw NEW contacts': py_val(
+                'contour_out', 'data/new_shoes/contacts_data_new.txt'),
+            'contour = an OLD output (OLD entry edited)': lambda d: (
+                d['old']['python'].update(
+                    contour_out='data/new_shoes/c_new.txt'),
+                d['new']['python'].update(
+                    contour_out='data/new_shoes/c_new.txt')),
+        }
+        for name, edit in cases.items():
+            with self.subTest(case=name):
+                with self.assertRaisesRegex(ValueError, 'user rule 1'):
+                    load_profile('new', file=self.broken(edit))
+        self.assertEqual(load_profile('new').dataset, 'new')
+        self.assertEqual(load_profile('new', file=FIXTURE_PROFILE).dataset,
+                         'new')
+        # OLD is not namespaced (its paths are the legacy ones)
+        old_edit = self.broken(lambda d: d['old']['r']['paths'].update(
+            dataCC='processed_data/dataCC.csv'))
+        self.assertEqual(load_profile('old', file=old_edit).dataset, 'old')
 
     def test_image_path_checks(self):
         p = load_profile('old')

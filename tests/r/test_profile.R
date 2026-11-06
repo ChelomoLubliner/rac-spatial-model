@@ -105,29 +105,76 @@ stopifnot(identical(N$col_shoe, 255), identical(N$row_shoe, 367),
           is.null(N$r$mean_offset_fallback_pixels),
           identical(N$coords$divisor, 2))
 pass("NEW profile: 255 x 367, 631 shoes, the OLD prototype frame 307 x 395")
-tracked <- system2("git", c("-C", shQuote(root), "ls-files"), stdout = TRUE)
+git_lines <- function(...) {
+  out <- system2("git", c("-C", shQuote(root), ...), stdout = TRUE)
+  stopifnot(is.null(attr(out, "status")), length(out) > 0)
+  out
+}
+tracked <- git_lines("ls-files")
+# every file of the Tier A baseline commit is OLD (code, OLD outputs, the
+# raw inputs of both datasets)
+baseline <- git_lines("ls-tree", "-r", "--name-only", "79247d8")
 rel <- function(p) substring(p, nchar(ROOT_PATH) + 1)
-new_files <- c(vapply(names(N$r$paths)[!endsWith(names(N$r$paths), "_dir")],
-                      function(k) rel(rac_path(N, k)), ""),
-               rel(rac_path(N, "contour")),
-               vapply(c("NEW_X_NS_XY", "CML_MODEL"),
-                      function(f) rel(rac_model_path(N, f)), ""),
-               vapply(figures, function(s) rel(rac_image_path(N, s)), ""))
-old_files <- c(vapply(names(P$r$paths)[!endsWith(names(P$r$paths), "_dir")],
-                      function(k) rel(rac_path(P, k)), ""),
-               rel(rac_path(P, "contour")),
-               vapply(c("NEW_X_NS_XY", "CML_MODEL"),
-                      function(f) rel(rac_model_path(P, f)), ""),
-               vapply(figures, function(s) rel(rac_image_path(P, s)), ""))
-for (f in new_files) {
+outputs_of <- function(Q) {
+  c(vapply(names(Q$r$paths)[!endsWith(names(Q$r$paths), "_dir")],
+           function(k) rel(rac_path(Q, k)), ""),
+    contour = rel(rac_path(Q, "contour")),
+    vapply(c("NEW_X_NS_XY", "CML_MODEL"),
+           function(f) rel(rac_model_path(Q, f)), ""),
+    vapply(figures, function(s) rel(rac_image_path(Q, s)), ""))
+}
+new_files <- outputs_of(N)
+old_files <- outputs_of(P)
+namespaced <- function(f) {
   parts <- strsplit(f, "/", fixed = TRUE)[[1]]
   stem <- sub("\\.[A-Za-z]+$", "", parts[length(parts)])
-  if (!(any(parts[-length(parts)] %in% c("new", "new_shoes")) &&
-        endsWith(stem, "_new"))) {
-    stop("NEW output not namespaced: ", f)
+  any(parts[-length(parts)] %in% c("new", "new_shoes", "images_new")) &&
+    endsWith(stem, "_new")
+}
+for (f in new_files) {
+  if (!namespaced(f)) stop("NEW output not namespaced: ", f)
+}
+# The files no NEW output may be (T2 review, finding 2: the earlier rule
+# took every tracked file for OLD and would fail once T4 commits the NEW
+# contour): every file of the baseline commit, every tracked file outside
+# the NEW namespace (the OLD files committed since 79247d8, such as T2's
+# shoe_codes.csv and wald_test.csv), and every input of the profiles.
+inputs_of <- function(Q) {
+  keys <- c("contacts", "locations", "prototype_contour", "prototype_mask",
+            if (!is.null(Q$inputs$cross_check)) "cross_check",
+            if (!is.null(Q$inputs$sticker_masks)) "sticker_masks")
+  vapply(keys, function(k) rel(rac_path(Q, k)), "")
+}
+collisions <- function(Q, O, tracked, baseline) {
+  protected <- unique(c(baseline, tracked[!vapply(tracked, namespaced, TRUE)],
+                        inputs_of(O), inputs_of(Q)))
+  nf <- outputs_of(Q)
+  unname(nf[nf %in% c(outputs_of(O), protected)])
+}
+stopifnot(!anyDuplicated(new_files), !any(new_files %in% old_files),
+          length(collisions(N, P, tracked, baseline)) == 0)
+# every NEW output committed (T4: the NEW contour; T5: the NEW CSVs and
+# models): still no collision; a NEW output that is an OLD tracked file or
+# an input is still caught (mutated copies of N, built without rac_profile,
+# whose rule-1 check would refuse them)
+with_new <- c(tracked, new_files)
+stopifnot("data/new_shoes/contour_Active_Contour_new.txt" %in% with_new,
+          length(collisions(N, P, with_new, baseline)) == 0,
+          "docs/decisions.md" %in% tracked, !"docs/decisions.md" %in% baseline)
+mutants <- list(
+  list("python", "contour_out", "data/contour_Active_Contour.txt"),
+  list("r_path", "wald_test", "processed_data/wald_test.csv"),
+  list("r_path", "dataCC", "docs/decisions.md"),
+  list("python", "contour_out", "data/new_shoes/contacts_data_new.txt"),
+  list("r_path", "all_cont", "data/new_shoes/README.md"))
+for (m in mutants) {
+  M <- N
+  if (m[[1]] == "python") M$python[[m[[2]]]] <- m[[3]]
+  else M$r$paths[[m[[2]]]] <- m[[3]]
+  if (!identical(collisions(M, P, with_new, baseline), m[[3]])) {
+    stop("collision not caught: ", m[[2]], " = ", m[[3]])
   }
 }
-stopifnot(!any(new_files %in% old_files), !any(new_files %in% tracked))
 old_dirs <- c(P$r$knit_dir, P$r$log_dir, P$python$images_dir)
 new_dirs <- c(N$r$knit_dir, N$r$log_dir, N$python$images_dir,
               N$r$paths$models_dir, N$r$paths$images_dir)
@@ -138,8 +185,70 @@ for (p in c(new_files, new_dirs)) {
   }
 }
 pass(sprintf(paste("NEW outputs (%d files, %d folders) namespaced; none",
-                   "equals or lies inside an OLD output or a tracked file"),
-             length(new_files), length(new_dirs)))
+                   "equals or lies inside an OLD output, an input or an OLD",
+                   "tracked file; committed NEW outputs pass, %d mutants",
+                   "caught"),
+             length(new_files), length(new_dirs), length(mutants)))
+
+# 3b. User rule 1 at load (T2 review; A-083): rac_profile() refuses a NEW
+# profile whose outputs leave the NEW namespace, name an input or another
+# dataset's output, or lie in an OLD work folder; the real profile and the
+# sentinel fixture load; OLD keeps its legacy (not namespaced) paths.
+cfg0 <- jsonlite::fromJSON(file.path(root, "config", "datasets.json"),
+                           simplifyVector = FALSE)
+broken <- function(edit) {
+  cfg <- edit(cfg0)
+  f <- tempfile(fileext = ".json")
+  writeLines(jsonlite::toJSON(cfg, auto_unbox = TRUE, null = "null",
+                              digits = NA), f)
+  f
+}
+load_msg <- function(f, dataset = "new") {
+  tryCatch({
+    rac_profile(dataset, file = f)
+    "loaded"
+  }, error = function(e) conditionMessage(e))
+}
+edits <- list(
+  "dataCC = the OLD dataCC.csv" = function(c) {
+    c$datasets$new$r$paths$dataCC <- "processed_data/dataCC.csv"; c },
+  "dataCC without the suffix" = function(c) {
+    c$datasets$new$r$paths$dataCC <- "processed_data/new/dataCC.csv"; c },
+  "dataCC without a NEW folder" = function(c) {
+    c$datasets$new$r$paths$dataCC <- "processed_data/dataCC_new.csv"; c },
+  "wald_test = the OLD file T2 added" = function(c) {
+    c$datasets$new$r$paths$wald_test <- "processed_data/wald_test.csv"; c },
+  "models_dir = the OLD folder" = function(c) {
+    c$datasets$new$r$paths$models_dir <- "saved_models"; c },
+  "knit_dir = the OLD knit folder" = function(c) {
+    c$datasets$new$r$knit_dir <- "statistical_model"; c },
+  "log_dir inside the OLD log folder" = function(c) {
+    c$datasets$new$r$log_dir <- "logs/old/new"; c },
+  "images_dir inside the OLD work folder" = function(c) {
+    c$datasets$new$python$images_dir <- "images/new"; c },
+  "contour = the raw NEW contacts" = function(c) {
+    c$datasets$new$python$contour_out <- "data/new_shoes/contacts_data_new.txt"
+    c },
+  "contour = an OLD output (OLD entry edited)" = function(c) {
+    c$datasets$old$python$contour_out <- "data/new_shoes/c_new.txt"
+    c$datasets$new$python$contour_out <- "data/new_shoes/c_new.txt"
+    c })
+for (nm in names(edits)) {
+  msg <- load_msg(broken(edits[[nm]]))
+  if (!grepl("user rule 1", msg, fixed = TRUE)) {
+    stop("rule 1 not enforced at load for '", nm, "': ", msg)
+  }
+}
+stopifnot(identical(load_msg(file.path(root, "config", "datasets.json")),
+                    "loaded"),
+          identical(load_msg(file.path(root, "tests", "fixtures", "sentinel",
+                                       "sentinel_profile.json")), "loaded"),
+          identical(load_msg(broken(function(c) {
+            c$datasets$old$r$paths$dataCC <- "processed_data/dataCC.csv"; c
+          }), "old"), "loaded"))
+pass(sprintf(paste("rac_profile() refuses %d NEW profiles that break rule 1;",
+                   "the real profile, the fixture and OLD load"),
+             length(edits)))
 
 # 4. Selection: unset or "" -> old; new; anything else is an error.
 Sys.unsetenv("RAC_DATASET")
