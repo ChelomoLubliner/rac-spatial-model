@@ -1127,3 +1127,43 @@ Chronological; newest entry at the bottom. Each entry: what was done, results (r
    - `test_record_is_its_shoe` is circular: the table's bboxes come from the same records. `test_rac_coverage` is the real record = shoe check.
    - With OLD, `--sheets` and `--thresholds` crash on the null `sheets_dir`.
    - `--jobs > 1` crashes on Windows (no fork).
+
+## 2026-11-06 16:00, T4-snake review (reviewer:vision)
+
+**Verdict: changes required** (visual QA lens). The snake adaptation works: the contours are tight, and no police-type sticker is on any NEW print. But I found two problem classes that are still open: visibly wrong contours that no QA band flags, and frame artefacts left in cleaned shoes. They contradict the claims "Fine" in `docs/qa/snake-qa.md` and "None survives in a cleaned shoe or a contour".
+
+**Looked at (Read tool):**
+- all 52 NEW sheets (13 each: prototype, ellipse + first snake, final snake, cleaned; all 631 shoes);
+- `prototype_mask_new.png`, the 12 flagged figures, `overrides_before_after_new.png`;
+- OLD `sheet_old_01` and `sheet_old_04`;
+- about 25 zoom sheets of my own, 2x to 5x: committed contour record, saved snakes, RACs, erased and removed pixels.
+
+Several first reads came back blank because of the viewer limit; I reopened each one and wrote a note right after viewing. Scripts and notes are in `<scratch>/rv_vis_t4/` (`notes.md`, `indep.py`, `zoom.py`, `autozoom.py`, `r10_vs_r24.csv`).
+
+**Checks that passed:**
+- The sheets show the committed contour: every record lies within 3.61 px of its saved second snake, for all 631 shoes.
+- My own measures (gap-robust fill, my own reader and eraser) are at or better than the OLD contours: contact outside the contour p99 31 px vs OLD 79; outline gap p90 similar.
+
+**Findings:**
+1. **Major: visibly wrong contours not flagged; the A-097 fallback was never tried on them.** The RAC band is a share (0.9695), so a RAC-rich shoe can have one RAC far outside and still pass.
+   - Contour cuts unprinted heel or toe, with a RAC outside:
+     - 120: diagonal cut across the lower-right heel, RAC 8.5 px outside;
+     - 18: lower-left heel, RAC 15 px outside;
+     - 222: lower-right heel, RAC 4 px outside;
+     - 286: flat top cutting the toe, RAC 11 px outside;
+     - 205: dip between the lower pads, RAC 5 px outside.
+   - Cut-off or V-shaped heels: 328 (heel bottom about 18 px short), 12 (lower-left fragments up to 15 px outside), 267 (V-pointed heel).
+   - Probe `docs/qa/T4/probes/t4_fallback.py` (scratch output only): radius 24 brings RAC coverage to 1.0 on 120, 222 and 286, and coverage to 1.0 on 12, 267 and 286, without breaking any band. It does not help 18.
+   - Fix: add an absolute trigger (any RAC outside the fill by 3 px or more, or cleaned contact more than 8 px outside). Apply A-097 to those shoes, look at the before and after, and record 18 as a decision.
+2. **Major: frame artefacts survive in cleaned shoes (user rule 10).**
+   - **586 (undeclared):** about 300 px of the textured band remain at the toe tip. Rows 37-46, cols 99-156 hold 408 contact px against 98 on 587 (same design). Rows 37-42, cols 105-141 are 92% filled against 25%. 586 is not over-inked elsewhere.
+   - **584 (undeclared, not in the erase list):** a straight 1-px frame line on row 334, cols 89-180, 28 px inside the mask. 584 is the reference A-095 uses for 580's heel extent.
+   - **580 (declared):** about 195 px of the bottom bar; it gives the contour a flat, box-shaped heel bottom.
+   - Negligible: 148 (3 px) and 186 (1-2 px) line ends, a 105 debris remnant (11 px), a 481 dash (6 px).
+   - Fix: extend the erase list and rerun step 0 and the QA (the erase list feeds the mask), or have Shlomo accept the residuals with these numbers. Either way, correct A-095 and `snake-qa.md`.
+3. **Minor: envelope-of-print contours that are not sole-shaped.** 8 (V bottom, left heel outside), 163 (thumb), 112 (diagonal heel), 557 (neck), 109 (horn), 140 (diagonal heel, 3 RACs on the pad outside), 11, 69, 173, 376, 456, 506. These are consistent with OLD 11 and 153. List them in the review CSV for the T3 quality rule and the Part 2 sensitivity.
+4. **Minor: spikes to isolated marks:** 9 (an 18-px spike above the toe) and 376 (finger-shaped toe). Small cuts into printed rims: 170, 46, 294 (within the OLD range). Mask cuts of real sole on 125, 379, 422, 423 are confirmed (declared).
+5. **Minor: the initial ellipse leaves no toe margin on 34 NEW shoes against 12 of 386 OLD** (margin p5 -1.0 px vs +1.1). The largest are 14 (96 px of print outside the ellipse), 15, 125, 104, 35 and 170. The claim "every ellipse encloses its print with a margin" is wrong for these. The final contours on 14 and 15 still hug the toe.
+6. **Checked, not a finding:**
+   - The heel plate of 344 and 345 is sole: it is at the same place on both prints and carries RACs.
+   - No other frame line found by a thin-line screen over all 631 shoes. I looked at the 11 hits and the first-row and last-row straight-edge candidates.
