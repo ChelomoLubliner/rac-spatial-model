@@ -1652,3 +1652,54 @@ Decisions A-110 to A-112; plan revision 12 (F72-F77). Results with exact command
 **Next.** T5 step 3b (shoe bootstrap and Efron-cluster variances on both datasets), then T6.
 
 **Blockers.** None.
+
+## 2026-11-07 00:25, T5-newmodel review (reviewer:engineer)
+
+**Verdict: changes required** (engineering lens). The NEW outputs of steps 1-6 are correct and consistent today, nothing OLD changed, the namespace is clean, and every number I recomputed matches the docs. But the docs promise a safety net for a later contour change that does not exist. `tests/r/test_new_outputs.R` passes with a stale step 2 on 606 of the 631 shoes, including all three fallback candidates the docs name, and it never ties the OLD-basis refits to the data. Six places in the docs say the opposite. The fixes are small (about 11 s more test time).
+
+**Verified by re-running** (`<scratch>/review_t5_eng/`, HEAD `988716a`; the machine was loaded by two other reviews):
+- `bash tests/run_all.sh`: ALL PASS (184 Python tests, 3 skipped; 17 R scripts; flake8 87 files; shellcheck 17 files; work tree unchanged), 7 min 0 s.
+- `test_new_outputs.R`, `test_figures_png.R` and `test_distances_vectorized.R` run alone: ALL PASS.
+- **Numbers recomputed from the committed files**, all equal to the docs:
+  - `MEAN_OFFSET` -4.465503119 (OLD -4.614310784); 83,090 rows = 19,990 cases + 63,100 controls; S per shoe 1,345-18,504 px, median 8,925.
+  - `new_x` in [-0.185, 0.231667] (OLD [-0.191667, 0.241667]); 36 rows beyond the OLD boundary knots, all in y.
+  - NEW GLMM: sigma^2 0.7556134, logLik -41569.1219, W 585.8888, p 2.12e-108. NEW CML: exact, 4 iterations, W 576.0264.
+  - OLD: W 428.6933 with the Hessian vcov, 427.7674 with RX; CML 420.6712.
+  - OLD basis: GLMM sigma^2 0.75529, W 623.1166; CML 612.4973. The OLD basis rebuilt from the CSV is `identical()` to the bases of both committed OLD models.
+  - `s_outside_contour*.csv`: 72 shoes, 490 px, 7 controls (OLD 91 shoes, 4,585 px, 63 controls).
+- **`fit_common_basis()`** reproduces step 3's `Random()` when given the data's own basis. On 40 NEW shoes, fixef, theta, vcov and the CML coef and vcov are all `identical()`. No committed test covers this.
+- **The committed OLD-basis refits match the current CSV.** `getME(X)` and `model.matrix` equal the OLD-basis design rebuilt from it (max |diff| 0), and y is identical.
+- **Step 2 recomputed for all 83,090 NEW rows** from the committed contour: `min_dist` and `horiz_dist` are `identical()` to the CSV. It took 11.2 s.
+- **Repo state:**
+  - The Tier A, `old_baseline` and `old_added_t2` checksums pass.
+  - The T5 range touches no OLD path. On the code that OLD runs, only the NEW entry of `config/datasets.json` changed.
+  - Every new file under a `new/` folder ends in `_new`. `docs/qa/T5/old/` holds the OLD twins without a suffix, as plan section 5 says.
+  - No CR in any text file T5 touched. flake8 and shellcheck are clean. No attribution lines in the six commits.
+- **Looked at** `NEW_X_NS_XY_SHOE_new.png`: a real map. The 1-px seam that A-111 discloses is visible at y = 0.41.
+- **Mutants**, in a scratch clone (the work tree was never touched):
+  - A control moved to an off-S pixel at exact lattice precision is caught by `all(on_s)`. The documented "moved control" mutant had tripped the lattice assert instead, so this assert had not been shown to work before.
+  - Finding 1 below.
+
+**Findings:**
+1. **Major. The stale-step-2 guard checks only 25 fixed shoes.**
+   - `tests/r/test_new_outputs.R:182-196` uses `set.seed(25)`, which picks shoes 4, 49, 59, ..., 630. A contour change on one other shoe goes unnoticed: 606 of the 631 shoes (25/631 = 4% are checked).
+   - Mutant: the whole of contour record 591 shifted by one column. All 107 step-2 rows of shoe 591 are then stale, and the test still says ALL PASS. The implementer's mutant used record 49 because 49 is in the sample, which hid the gap. None of 591, 148 or 125 (the T4 fallbacks the docs name) is in the sample.
+   - Six places claim the opposite: `README.md:156`, `docs/tests/README.md:17`, results doc lines 3, 539 and 753, and `LOG.md:1650`.
+   - Fix: recompute `min_dist`, `horiz_dist`, `distance_shape` and `new_x` for every shoe (11.2 s measured for the first two), or record the sha256 of the contour that step 2 read and check it. Then correct the six statements.
+2. **Major. The OLD-basis refits are not tied to the data.**
+   - Lines 227-238 check only the basis, convergence, the coefficient count and `nobs`. Those assertions still hold against a changed CSV.
+   - `LOG.md:1650` says the test "fails until" the refits are rerun. It does not, and T6 consumes these files. `t5_new_rerun.sh` does not rerun them either.
+   - Fix: as already done for the step-3 GLMM, assert that `getME(m, "y")` equals `n_Acc` and that `getME(m, "X")` equals the OLD-basis design built from the CSV. For the CML, assert that `model.matrix(m)` equals that design without the intercept and that n and nevent match. Both differences are 0 today.
+3. **Minor. The figure checks prove only that the files exist.** Lines 258-271 check that the 8 PDFs and 8 PNGs exist and start with the right magic bytes, so a stale or swapped figure passes. Only the probe `t5_new_rerun.sh`, which no gate runs, compares the normalized PDFs.
+   - Fix: say this in the docs, and have T8's `tests/e2e/test_new_rerun.sh` re-render steps 4-6 (about 70 s) and the PNG twins.
+4. **Minor. No hard-coding scan covers `tools/*.R`.** The R scan reads only `statistical_model/` and `tests/`; the Python scan reads only `.py` and `.sh` files.
+   - The two new tools are clean today. The scanner, run on them, flags only `figures_png.R:60` `res = 150`, a DPI value (false positive).
+   - Fix: extend the R scan to `tools/` and mark that line `# rac: literal-ok`.
+5. **Nit.**
+   - The step-3 coefficients are named `ns(dat$new_x, ...)j:ns(dat$y, ...)i`, the refits' `bxj:byi` (A-112 says so). T6 must align them by position; a helper with a test would prevent a silent misalignment.
+   - `fit_common_basis()` would use a data column named `bx` or `by` instead of its own basis.
+
+**Not verified:**
+- The OLD gates `regress_old.sh --steps 1-6` and `--steps 0`: the reproducibility reviewer was running them. I relied on the checksums and the diff.
+- The 18-minute NEW rerun.
+- The visual and statistical judgements (other lenses) and the science of A-110.
