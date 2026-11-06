@@ -31,6 +31,12 @@ contact AND the prototype mask, the image the snake runs on):
                   cleaned contact pixel (how loosely the snake hangs)
   cut_max_px      largest distance from a cleaned contact pixel outside the
                   polygon to the polygon (how deep the snake cuts in)
+  rac_out_max_px  largest distance from a RAC pixel outside the record's
+                  row-span fill to the fill (0: every RAC inside; NaN: no
+                  RAC): one RAC far outside, which the rac_coverage share
+                  of a RAC-rich shoe hides (T4 review, A-099)
+  contact_out_max_px  the same for the cleaned contact pixels: printed sole
+                  (or a speck) far outside the fill (A-099)
   n_contour_px, outside_mask_frac, touches_border, bbox  of the record
 
 Flags (``flag_shoe``): a shoe fails QA when any pre-registered band of
@@ -39,12 +45,18 @@ Flags (``flag_shoe``): a shoe fails QA when any pre-registered band of
 Command line (from the repository root, after step 0 with --qa):
 
     RAC_DATASET=old|new python -m contour_algorithm.qa_snake \\
-        [--metrics] [--sheets] [--figures] [--flagged]
+        [--metrics] [--sheets] [--figures] [--flagged] [--crosscheck] \\
+        [--thresholds T,T,...] [--jobs N]
 
---metrics writes the metrics table (`prep.snake_qa`); --sheets the contact
+--metrics writes the metrics table (`prep.snake_qa`) and, for a profile
+with a sheets folder, its copy under the task's name
+`<prep.sheets_dir>/snake_qa<suffix>.csv` (A-100); --sheets the contact
 sheets (`prep.sheets_dir`/<kind>/); --figures one two-panel QA figure per
 shoe (images*/qa_snake/); --flagged a large figure of every flagged shoe
-(`prep.snake_qa_dir`/flagged/).
+(`prep.snake_qa_dir`/flagged/). --sheets and --thresholds need the
+profile's sheets folder (OLD has none: refused); --thresholds runs
+prototype snakes, so it checks the OpenBLAS thread count first (A-092);
+--jobs N > 1 forks and is refused where fork is not available (Windows).
 """
 
 import argparse
@@ -70,6 +82,11 @@ from .profiles import env, load_profile
 #   plan:  contour pixels within the OLD range +-10% [553, 816]; no border
 #          contact; coverage of the record fill and of the RACs at least the
 #          OLD p1; contour share outside the mask at most the OLD p99
+#   review (T4 review, A-099): absolute triggers beside the shares, so that
+#          one RAC or one printed part far outside cannot hide in a share:
+#          a RAC 3 px or more outside the record fill (distances are square
+#          roots of integers, so > 2.9 means >= 3), cleaned contact more
+#          than 8 px outside it (about the OLD p95, 8.06)
 BANDS = (
     ('coverage', 0.99, None),
     ('tightness', 0.9047, 1.15),
@@ -81,9 +98,14 @@ BANDS = (
     ('coverage_fill', 0.9886, None),
     ('rac_coverage', 0.9696, None),
     ('outside_mask_frac', None, 0.3393),
+    ('rac_out_max_px', None, 2.9),
+    ('contact_out_max_px', None, 8.0),
 )
+# metrics that are undefined (NaN) for a shoe without RACs: not a flag
+NO_RAC_NAN = ('rac_coverage', 'rac_out_max_px')
 TIGHTNESS_TASK_LOW = 0.95
 RESOLUTIONS = ('', 'ok_after_review', 'override', 'excluded')
+REVIEW_CLASSES = ('', 'partial_print', 'spike', 'rim_cut', 'mask_cut')
 
 FULL = int(np.iinfo(np.uint8).max)  # an 8-bit channel at its maximum
 WHITE = (240, 240, 240)
@@ -277,6 +299,14 @@ def snake_metrics(cleaned, contour, proto_mask, second, rac_rc=(),
     out['n_rac'] = len(rac)
     out['rac_coverage'] = (float(fill[rac[:, 0], rac[:, 1]].mean())
                            if len(rac) else float('nan'))
+    # how far the farthest RAC and contact pixel lie outside the fill
+    # (A-099); an empty record has no fill: everything is "outside"
+    to_fill = (distance_transform_edt(~fill) if fill.any()
+               else np.full(shape, np.inf))
+    out['rac_out_max_px'] = (float(to_fill[rac[:, 0], rac[:, 1]].max())
+                             if len(rac) else float('nan'))
+    out['contact_out_max_px'] = (float(to_fill[cleaned].max()) if n_clean
+                                 else 0.0)
     out['self_intersections'] = self_intersections(second)
     out['turning'], out['max_turn_deg'] = turning(second)
     if n_clean:
@@ -315,7 +345,7 @@ def flag_shoe(row, bands=BANDS):
             continue
         v = row[name]
         if v is None or (isinstance(v, float) and math.isnan(v)):
-            if name == 'rac_coverage':  # a shoe without RACs
+            if name in NO_RAC_NAN:  # a shoe without RACs
                 continue
             broken.append(name)
         elif ((low is not None and v < low)
@@ -423,28 +453,60 @@ def metrics_table(profile, run=None, log=print, jobs=1):
 ROUND = {'coverage': 4, 'coverage_fill': 4, 'coverage_r': 4,
          'rac_coverage': 4, 'tightness': 4, 'turning': 4,
          'max_turn_deg': 2, 'gap_mean_px': 3, 'gap_max_px': 3,
-         'cut_max_px': 3, 'outside_mask_frac': 4}
+         'cut_max_px': 3, 'outside_mask_frac': 4, 'rac_out_max_px': 3,
+         'contact_out_max_px': 3}
+
+
+REVIEW_COLUMNS = ('shoe', 'resolution', 'review_class', 'note')
+
+
+def read_review(profile):
+    """The visual review, <snake_qa_dir>/snake_review<suffix>.csv, as a
+    DataFrame indexed by shoe (REVIEW_COLUMNS; empty without a file).
+
+    resolution: what the review decided for a flagged shoe (RESOLUTIONS;
+    '' for a shoe that passes every band and is listed only for its
+    class). review_class: '' or one of REVIEW_CLASSES, a known kind of
+    contour that later tasks can select (T4 review, A-101): partial_print
+    (the contour is the envelope of what was printed, not of the sole),
+    spike (it reaches up to an isolated mark), rim_cut (it runs 1-3 px
+    inside a printed rim), mask_cut (real sole beyond the cleaning mask's
+    edge is cut). note: why, for every listed shoe."""
+    path = snake_qa_path(profile, 'snake_review', 'csv')
+    if not path.is_file():
+        return pd.DataFrame(columns=REVIEW_COLUMNS[1:],
+                            index=pd.Index([], name='shoe'))
+    review = pd.read_csv(path, keep_default_na=False)
+    if tuple(review.columns) != REVIEW_COLUMNS:
+        raise ValueError(f'{path}: columns must be '
+                         f'{",".join(REVIEW_COLUMNS)}')
+    if review['shoe'].duplicated().any():
+        raise ValueError(f'{path}: a shoe is listed twice')
+    bad = set(review['resolution']) - set(RESOLUTIONS)
+    bad |= set(review['review_class']) - set(REVIEW_CLASSES)
+    if bad:
+        raise ValueError(f'{path}: unknown resolutions or classes '
+                         f'{sorted(bad)}')
+    empty = review[(review['resolution'] == '')
+                   & (review['review_class'] == '')]
+    if len(empty) or (review['note'].str.strip() == '').any():
+        raise ValueError(f'{path}: every row needs a resolution or a class, '
+                         'and a note')
+    return review.set_index('shoe')
 
 
 def with_review(profile, table):
-    """The metrics table with the visual review merged in: resolution and
-    note from <snake_qa_dir>/snake_review<suffix>.csv (shoe, resolution,
-    note; written by the reviewer for every flagged shoe), empty for the
-    other shoes and when there is no review file."""
-    path = snake_qa_path(profile, 'snake_review', 'csv')
+    """The metrics table with the visual review merged in (read_review):
+    resolution, review_class and note, empty for the shoes the review
+    does not list."""
+    review = read_review(profile)
     out = table.copy()
-    out['resolution'] = ''
-    out['note'] = ''
-    if path.is_file():
-        review = pd.read_csv(path, keep_default_na=False).set_index('shoe')
-        bad = set(review['resolution']) - set(RESOLUTIONS[1:])
-        if bad:
-            raise ValueError(f'{path}: unknown resolutions {sorted(bad)}')
-        hit = out['shoe'].isin(review.index)
-        out.loc[hit, 'resolution'] = review.loc[out.loc[hit, 'shoe'],
-                                                'resolution'].to_numpy()
-        out.loc[hit, 'note'] = review.loc[out.loc[hit, 'shoe'],
-                                          'note'].to_numpy()
+    for col in REVIEW_COLUMNS[1:]:
+        out[col] = ''
+    hit = out['shoe'].isin(review.index)
+    for col in REVIEW_COLUMNS[1:]:
+        out.loc[hit, col] = review.loc[out.loc[hit, 'shoe'],
+                                       col].to_numpy()
     return out
 
 
@@ -925,6 +987,34 @@ def threshold_figure(profile, masks, out, chosen=None):
 
 # --- command line ----------------------------------------------------------
 
+def task_copy_path(profile):
+    """The metrics table under the task's name, in the profile's sheets
+    folder: <prep.sheets_dir>/snake_qa<suffix>.csv (A-100); None for a
+    profile without a sheets folder (OLD)."""
+    folder = profile.prep_path('sheets_dir')
+    if folder is None:
+        return None
+    return folder / f'snake_qa{profile.suffix}.csv'
+
+
+def refusal(profile, args):
+    """Why the command line cannot run for this profile ('' when it
+    can): --sheets and --thresholds write into the sheets folder, which
+    OLD has not; --jobs > 1 needs fork (not on Windows)."""
+    import multiprocessing
+    if profile.prep_path('sheets_dir') is None:
+        wants = [o for o, on in (('--sheets', args.sheets),
+                                 ('--thresholds', args.thresholds)) if on]
+        if wants:
+            return (f'{" and ".join(wants)} need the profile\'s sheets '
+                    f'folder (prep.sheets_dir), and the {profile.dataset} '
+                    'profile has none')
+    if args.jobs > 1 and 'fork' not in multiprocessing.get_all_start_methods():
+        return (f'--jobs {args.jobs} runs forked processes, and this '
+                'platform has no fork; use --jobs 1')
+    return ''
+
+
 def main(argv=None):
     if env('RAC_PROFILE_FILE', None) is not None:
         print('contour_algorithm.qa_snake: RAC_PROFILE_FILE is set; it is a '
@@ -956,9 +1046,23 @@ def main(argv=None):
     except ValueError as e:
         print(f'contour_algorithm.qa_snake: {e}', file=sys.stderr)
         return 2
+    problem = refusal(profile, args)
+    if problem:
+        print(f'contour_algorithm.qa_snake: {problem}', file=sys.stderr)
+        return 2
     if args.thresholds:
+        from .active_contour_snake import check_blas_threads
+        # the threshold study runs prototype snakes, which depend on the
+        # OpenBLAS thread count (A-092): the profile's count or nothing
+        try:
+            check_blas_threads(profile)
+        except RuntimeError as e:
+            print(f'contour_algorithm.qa_snake: {e}', file=sys.stderr)
+            return 2
         ts = [int(t) for t in args.thresholds.split(',')]
-        r_ts = sorted({8, int(profile.r['stamp_threshold'])})
+        # the R stamp masks of the OLD threshold and of this profile's
+        r_ts = sorted({int(load_profile('old').r['stamp_threshold']),
+                       int(profile.r['stamp_threshold'])})
         study, masks = threshold_study(
             profile, ts, r_thresholds=r_ts,
             shoes_of_note=sorted(set(read_sticker_shoes(profile))))
@@ -979,6 +1083,10 @@ def main(argv=None):
         out = write_table(with_review(profile, table),
                           profile.prep_path('snake_qa'))
         print(f'wrote {out}')
+        copy = task_copy_path(profile)
+        if copy is not None:
+            copy.write_bytes(out.read_bytes())
+            print(f'wrote {copy}')
         if profile.sticker_masks is not None:
             out = snake_qa_path(profile, 'sticker_erased', 'csv')
             sticker_table(profile).to_csv(out, index=False,

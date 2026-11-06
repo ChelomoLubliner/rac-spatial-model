@@ -1,13 +1,57 @@
-shoe,resolution,note
-8,override,"very faint partial print (2016 contact px, 3 RACs); per-shoe fallback closing radius 24 (snake_overrides_new.csv, A-097) gives a sole-shaped outline instead of a notch at the left; coverage 0.980 because isolated specks below the heel and left of the arch stay outside; 1 of 3 RACs lies 28 px below the heel and 27 px from any contact (off the print); kept, not excluded"
-11,ok_after_review,"1 of 30 RACs lies 10 px outside the contour beside the heel and 15 px from any contact pixel (off the print); the contour follows the printed outline (heel partly printed, T3)"
-107,ok_after_review,"2 of 22 RACs outside: one on an isolated 4-px speck 16 px beside the lower-right heel, one 4 px outside and 8 px from contact; the contour wraps the printed heel, the snake does not reach isolated specks (as on OLD); the radius-24 fallback leaves both outside too"
-121,ok_after_review,"1 of 18 RACs lies 8 px outside beside the heel and 9 px from contact (off the print); faint, partly printed heel; tightness 0.915 within the band"
-140,ok_after_review,"3 of 26 RACs at the barely printed lower-right heel pad, 1-8 px outside the contour and 6-12 px from contact (off the print, T3); the radius-24 fallback keeps the same flag, so the profile contour stays"
-165,ok_after_review,"coverage 0.9896 (just below 0.99): the missed pixels are specks around the pointed toe of a faint print; the contour follows the printed outline; the radius-24 fallback reaches coverage 0.998 but breaks the turning band (a jag at the top left of the toe), so the profile contour stays"
-170,ok_after_review,coverage 0.9875: the snake runs 1-2 px inside the outer rim of the lower-left heel pad (rim pixels outside the polygon); row-span fill coverage 0.9944; the radius-24 fallback does not improve it (0.9868)
-263,ok_after_review,1 of 19 RACs lies 2 px below the heel and 7 px from contact (off the print); the contour follows the outline
-375,ok_after_review,"tightness 0.857: a narrow-waisted (S-shaped) square-dot sole; the contour follows the waist correctly, so the contour is smaller than the convex hull of the print"
-405,ok_after_review,"tightness 0.892: strongly waisted sole; the contour follows the waist; the radius-24 fallback meets the band (0.959) only by running a few pixels wider at the waist, not by enclosing missed print (coverage 0.9988 vs 1.0), so the profile contour stays"
-503,ok_after_review,1 of 19 RACs lies 2 px outside beside the heel and 11 px from contact (off the print)
-506,ok_after_review,2 of 13 RACs lie 12-14 px above the toe and 5-10 px from contact (off the print; T3 noted the RAC above the toe)
+shoe,resolution,review_class,note
+8,override,partial_print,"very faint partial print (2,016 contact px, 3 RACs): the fallback radius 24 (A-097) replaces the notch of radius 10 by an outline with a V bottom and a straight diagonal left side; neither radius gives a sole-shaped outline (as OLD 153); isolated specks below the heel and left of the arch stay outside (up to 9.2 px; coverage 0.980); 1 of 3 RACs lies 28 px below the heel and 27 px from any contact (off the print); kept, not excluded"
+9,,spike,"the toe rises to a point at an isolated 16-px mark 14 px above the toe, in line with the forefoot's centre rib (probably its printed tip); radius 16 and 24 draw the same point"
+11,ok_after_review,partial_print,heel partly printed: a wedge-shaped contour around the printed part; 1 of 30 RACs lies 9.8 px outside beside the heel and 15 px from any contact (off the print); radius 16 and 24 keep it outside and break the turning band
+12,,partial_print,lower-left heel rim printed only as fragments; the fallback radius 24 (A-102) rounds the heel bottom over them
+14,ok_after_review,mask_cut,"the toe-stripe tips poke 1-3 px above the mask edge (20 px of real toe removed) and the contour runs along that edge (outside_mask_frac 0.343); a 3-px speck 14 px right of the toe top, beside debris outside the mask, lies 10.6 px outside; radius 24 bulges the toe out to the speck, so the profile contour stays"
+15,,mask_cut,the toe-stripe tips poke 1-3 px above the mask edge: 19 px of real toe removed
+18,ok_after_review,partial_print,"lower-left heel corner not printed: 1 of 38 RACs lies there, 15.3 px outside and 21.5 px from any contact (off the print); radius 16 and 24 leave it outside too (the review's case 18, A-102)"
+24,ok_after_review,,an isolated 5-px speck 10 px right of the heel pad lies 8.9 px outside; radius 16 and 24 do not reach it; the outline follows the print
+35,ok_after_review,,"a 2-px speck right of the over-inked toe top, 8 px from the print, lies 10 px outside; radius 16 and 24 take it in but break the outside-mask band; the outline follows the print"
+36,ok_after_review,mask_cut,over-inked forefoot whose left edge reaches the mask edge (22 px of edge removed with the debris there): 0.367 of the contour pixels lie outside the mask; radius 16 and 24 keep the flag; the outline follows the print
+69,,partial_print,toe top-left not printed; the fallback radius 24 (A-102) gives a rounded toe over the faint marks instead of a straight diagonal
+104,,mask_cut,the over-inked toe and the left forefoot edge reach the mask edge: 13 px of real edge removed (with the debris beside the toe)
+107,ok_after_review,partial_print,"lower heel printed as fragments: 2 of 22 RACs outside, one on an isolated 6-px speck 20 px right of the heel (16.4 px out), one 3.6 px out and 8.5 px from contact; radius 16 and 24 leave both outside"
+109,,partial_print,toe printed only on its left; the fallback radius 24 (A-097) adds a horn-like bump that encloses the mark and the RAC at the right toe
+112,,partial_print,"heel almost unprinted (T0, T3); on the fallback radius 24 (A-097) the heel bottom is a straight diagonal; one RAC lies 2 px outside"
+113,override,partial_print,heel partly printed; on the fallback radius 24 (A-097): two RACs at the lower-right heel lie 2-3 px outside and 10 px from any contact (off the print)
+120,override,partial_print,lower-right heel pad not printed; the fallback radius 24 (A-102) rounds the heel corner and encloses its RAC; an isolated 7-px stroke 27 px right of the heel stays outside (13 px out)
+121,ok_after_review,partial_print,"faint, fragmentary heel: 1 of 18 RACs lies 8.1 px outside left of the heel and 9.1 px from contact (off the print); a 4-px speck left of the arch lies 8.5 px out; radius 16 and 24 enclose neither"
+125,,mask_cut,the pointed toe tip pokes 1-3 px above the mask edge: 36 px of real toe removed
+140,override,partial_print,lower-right heel pad barely printed; the fallback radius 24 (A-102) encloses its rim and 2 of its 3 RACs; the third lies 2.2 px outside and 6.4 px from contact
+149,ok_after_review,,"a 1-px speck 15 px right of the toe, below the erased frame line, lies 8.9 px outside; radius 24 bulges out to it; the outline follows the print"
+163,,partial_print,"very faint partial print (1,376 px): the fallback radius 24 (A-097) gives a narrow mitten outline with a thumb at the toe fragment"
+170,ok_after_review,rim_cut,"coverage 0.9875: the contour runs 1-3 px inside the outer rim of the lower-left heel pad (53 rim px outside, 3 px deep); fill coverage 0.9944; radius 16 and 24 do not change it"
+173,,partial_print,toe top-left not printed; the fallback radius 24 (A-102) widens the toe top over the faint marks
+186,,partial_print,the print is clipped along a straight left edge; the contour follows the clipped edge
+205,,rim_cut,the contour dips between the two lower heel pads and one RAC 2 px below the dip lies outside (below the 3-px trigger); radius 16 and 24 keep the dip
+222,,partial_print,lower-right heel partly printed; the fallback radius 24 (A-102) encloses the heel corner and its RAC
+231,ok_after_review,,an isolated 5-px speck 18 px above-left of the toe lies 10.3 px outside; radius 16 and 24 widen the toe to take it in; the outline follows the print
+263,ok_after_review,partial_print,heel bottom partly printed: 1 of 19 RACs lies 2 px below the printed heel arc and 7 px from contact (off the print)
+267,,partial_print,heel lower right not printed; the fallback radius 24 (A-102) gives a rounded heel bottom instead of a V point
+274,,partial_print,narrow print: the sides of the sole did not print; the contour follows the printed part
+286,,partial_print,very faint toe; the fallback radius 24 (A-102) raises the toe top to the faint marks and encloses the RAC there
+294,,rim_cut,the contour runs 1-3 px inside the edge of the toe smear (coverage 0.991); radius 16 and 24 do not change it
+302,ok_after_review,,an isolated 3-px speck 16 px left of the toe lies 10 px outside; radius 16 and 24 bulge the toe out to it
+314,ok_after_review,,"a 1-px speck 14 px below-right of the heel, beside marks outside the mask, lies 8.5 px outside; radius 24 bulges out to it"
+328,ok_after_review,partial_print,"the bottom of the heel's U rim did not print: specks 11-16 px below the printed rim lie up to 20 px outside; the same-design 327 (aligned) ends its heel above them, so they are not sole; radius 16 and 24 drop the heel bottom into a lumpy point down to them"
+361,,partial_print,the toe did not print: a flat slanted top; the contour follows the print
+375,ok_after_review,,"tightness 0.857: a narrow-waisted (S-shaped) square-dot print; the dots reach the contour all round, so the waist is real; radius 24 still breaks the band"
+376,,partial_print,"faint toe; the fallback radius 24 (A-102) rounds the toe over the topmost speck, where radius 10 drew a narrow finger"
+379,,mask_cut,"a 2-3 px strip of the heel rim below the mask edge is removed (real sole, T4)"
+401,ok_after_review,,a 2-px speck 19 px below-right of the heel lies 16.3 px outside; radius 16 and 24 do not reach it either
+405,ok_after_review,,"tightness 0.892: strongly waisted sole; the contour follows the waist; radius 16 and 24 meet the band only by running wider at the waist, off the print"
+420,,partial_print,partial spiral-textured print (T0): the contour wraps the printed parts with an inward step at the right
+422,ok_after_review,mask_cut,"a 4-px piece 21 px below-left of the heel (most of it outside the mask) lies 15.3 px outside: debris, the same-design 423 (aligned) has no heel there; the heel-bottom corner beyond the mask edge is removed (real sole, T4)"
+423,,mask_cut,"the heel's bottom-right corner beyond the mask edge is removed (real sole, T4); the 32 px of it inside the mask lie outside the contour"
+427,,partial_print,top right of the toe not printed; the fallback radius 24 (A-102) rounds the toe over the isolated toe-tip mark
+432,ok_after_review,,a separate 39-px blob 11 px below-left of the heel lies 11.3 px outside; the same-design 433 (aligned) has no heel there: debris; radius 24 only bulges toward it
+437,ok_after_review,,a 3-px speck 20 px right of the arch lies 12 px outside; radius 24 runs wider
+456,,partial_print,toe top-left faint; the fallback radius 24 (A-102) rounds the toe over the faint marks
+486,,mask_cut,the toe-tip blob reaches beyond the mask edge: 10 px removed
+503,ok_after_review,,1 of 19 RACs lies 2 px outside beside the heel and 11 px from contact (off the print)
+506,override,partial_print,"toe top-right not printed; the fallback radius 24 (A-102) rounds the toe top; 2 of 13 RACs above the toe stay outside (5.8 and 2 px out, 5-10 px from contact: off the print)"
+557,,partial_print,faint toe tip above the forefoot blocks; the fallback radius 24 (A-097) gives a narrow neck up to it
+583,ok_after_review,,a 4-px speck 27 px right of the arch lies 10 px outside; radius 24 runs wider
+585,ok_after_review,,"a 29-px ring mark 20 px right of the arch lies 13.6 px outside; the arch of this design does not print and the same-design 583 has a speck at about that place, so it may be a feature of the arch edge; the contour follows the printed outline at the arch, as for every shoe; radius 24 bulges out to it"
+586,ok_after_review,,a 5-px stroke 9 px left of the heel bottom lies 8.2 px outside; radius 16 and 24 leave it outside too

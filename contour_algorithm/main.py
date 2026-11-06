@@ -17,6 +17,8 @@ the legacy ones (the OLD regression of tests/regress_old.sh).
 Refused (exit 2, before anything is written):
   - RAC_PROFILE_FILE set: it is a test hook; a fixture profile must never
     drive a real run (A-049);
+  - --jobs N > 1 where the platform has no fork (Windows): the snake
+    workers are forked processes;
   - an OLD run whose contour file already exists: the committed
     data/contour_Active_Contour.txt is the Tier A baseline and a rerun on
     another platform differs (30 of 386 records on WSL, A-060). OLD runs
@@ -25,6 +27,7 @@ Refused (exit 2, before anything is written):
 """
 
 import argparse
+import multiprocessing
 import os
 import sys
 import time
@@ -108,6 +111,11 @@ def main(argv=None):
     parser.add_argument('--jobs', type=positive_int, default=1,
                         help='forked processes for the shoe snakes')
     args = parser.parse_args(argv)
+    if args.jobs > 1 and 'fork' not in multiprocessing.get_all_start_methods():
+        print(f'contour_algorithm.main: --jobs {args.jobs} runs forked '
+              'processes, and this platform has no fork; use --jobs 1',
+              file=sys.stderr)
+        return 2
     try:
         profile = load_profile()
     except ValueError as e:

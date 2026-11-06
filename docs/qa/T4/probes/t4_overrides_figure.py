@@ -4,8 +4,10 @@ A-097; plan T4 step 6 asks for the before/after images of every override).
 For each shoe of the profile's snake overrides: the final snake with the
 profile's parameters alone (before; recomputed here) and with the override
 (after; the official step-0 run), each drawn on the raw shoe with the RAC
-pixels (green inside the contour's row-span fill, magenta outside). Needs
-the NEW step-0 outputs with --qa and one OpenBLAS thread (checked).
+pixels (green inside the contour's row-span fill, magenta outside); the
+labels name the closing radius of each (the profile's 10; the override's
+24, or 16 where 24 breaks another band, A-102). Needs the NEW step-0
+outputs with --qa and one OpenBLAS thread (checked).
 
 usage (repo root):
   OPENBLAS_NUM_THREADS=1 RAC_DATASET=new python -B \\
@@ -38,8 +40,10 @@ for shoe in sorted(acs.snake_overrides(p)):
                                   record=rec)
     cleaned = run['matrices'][shoe - 1] & run['mask']
     racs = run['racs'].get(shoe, np.zeros((0, 2), int))
-    for tag, record, second in (('before r10', arr, rec['second']),
-                                ('after r24', run['records'][k],
+    r_before = before.snake.first_closing_radius
+    r_after = acs.snake_params(p, shoe).first_closing_radius
+    for tag, record, second in ((f'before r{r_before}', arr, rec['second']),
+                                (f'after r{r_after}', run['records'][k],
                                  run['second'][shoe - 1])):
         r = dict(run)
         r['records'] = run['records'].copy()

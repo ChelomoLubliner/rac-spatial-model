@@ -332,23 +332,41 @@ def prototype_mask_from(profile, original_img, record=None):
     return final_arr
 
 
-def numpy_blas_threads():
-    """The thread count of numpy's bundled OpenBLAS, read through its own
-    getter; None when the library or the getter is not found."""
+def _numpy_openblas_call(names, restype):
+    """The result of the first of `names` found in numpy's bundled
+    OpenBLAS (called without arguments), or None."""
     libs = os.path.dirname(np.__file__) + '.libs'
     for lib in sorted(glob.glob(os.path.join(libs, '*openblas*'))):
         try:
             dll = ctypes.CDLL(lib)
         except OSError:
             continue
-        for name in ('scipy_openblas_get_num_threads64_',
-                     'openblas_get_num_threads64_',
-                     'openblas_get_num_threads'):
+        for name in names:
             getter = getattr(dll, name, None)
             if getter is not None:
-                getter.restype = ctypes.c_int
-                return int(getter())
+                getter.restype = restype
+                return getter()
     return None
+
+
+def numpy_blas_threads():
+    """The thread count of numpy's bundled OpenBLAS, read through its own
+    getter; None when the library or the getter is not found."""
+    n = _numpy_openblas_call(('scipy_openblas_get_num_threads64_',
+                              'openblas_get_num_threads64_',
+                              'openblas_get_num_threads'), ctypes.c_int)
+    return None if n is None else int(n)
+
+
+def numpy_blas_corename():
+    """The CPU kernel that numpy's OpenBLAS chose at run time (a
+    DYNAMIC_ARCH build picks it by CPU, e.g. 'Haswell'); None when not
+    found. Recorded in the step-0 log: the snake amplifies 1e-8 float
+    differences (A-060), so another kernel may give another contour."""
+    name = _numpy_openblas_call(('scipy_openblas_get_corename64_',
+                                 'openblas_get_corename64_',
+                                 'openblas_get_corename'), ctypes.c_char_p)
+    return None if name is None else name.decode('ascii', 'replace')
 
 
 def check_blas_threads(profile):
@@ -388,6 +406,9 @@ def run_snakes(profile, list_contour, jobs=1, qa=False):
     serial ones bit for bit). The default (jobs 1, qa False) is the legacy
     loop, unchanged."""
     n = len(list_contour)
+    if jobs > 1 and 'fork' not in multiprocessing.get_all_start_methods():
+        raise RuntimeError(f'jobs={jobs} needs fork, which this platform '
+                           'does not have; run with one job')
     _JOB.update(profile=profile, list_contour=list_contour, qa=qa)
     try:
         if jobs <= 1:
@@ -421,6 +442,7 @@ def main(profile, jobs=1, qa=False):
     skip = record_skip_idx0(profile)
     print(f'numpy OpenBLAS threads: {check_blas_threads(profile)}, '
           f'snake jobs: {jobs}')
+    print(f'numpy OpenBLAS kernel: {numpy_blas_corename()}')
     snake_all, records = run_snakes(profile, list_contour, jobs=jobs, qa=qa)
     np.save(profile.saved_path('active-contour_all', 'npy'), snake_all)
     if qa:
