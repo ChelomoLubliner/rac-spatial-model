@@ -24,7 +24,9 @@
 #                              model_images/new/<stem>_new.pdf
 # rac_write_csv(x, P, key)     write.csv(x, rac_path(P, key),
 #                              row.names = FALSE, eol = P$r$eol[[key]]),
-#                              creating the folder if needed
+#                              through a binary connection (so the eol is
+#                              written as given on every platform), creating
+#                              the folder if needed
 # rac_ensure_dir(path)         create the parent folder of a file to write
 # rac_new_output(P, path)      a model or figure about to be written: for
 #                              OLD it must not exist (the committed files
@@ -198,7 +200,12 @@ rac_write_csv <- function(x, P, key) {
          "'", call. = FALSE)
   }
   path <- rac_ensure_dir(rac_path(P, key))
-  utils::write.csv(x, path, row.names = FALSE, eol = eol)
+  # A binary connection writes eol as given. A file name would be opened in
+  # text mode, where R on Windows turns every "\n" into "\r\n" (so "\r\n"
+  # would become "\r\r\n"); on Linux both give the same bytes.
+  con <- file(path, "wb")
+  on.exit(close(con))
+  utils::write.csv(x, con, row.names = FALSE, eol = eol)
   invisible(path)
 }
 

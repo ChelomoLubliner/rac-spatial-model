@@ -212,6 +212,12 @@ stopifnot(sum(raw == as.raw(13)) == 0, sum(raw == as.raw(10)) == 3,
                             sep = "")))
 stopifnot(inherits(try(rac_write_csv(df, Q, "no_such_key"), silent = TRUE),
                    "try-error"))
+# the bytes are those of write.csv to a file name on Linux (where text and
+# binary mode agree), so the OLD outputs do not change
+ref <- tempfile(fileext = ".csv")
+write.csv(df, ref, row.names = FALSE, eol = "\r\n")
+stopifnot(identical(readBin(ref, "raw", 1000),
+                    readBin(rac_path(Q, "dataCC"), "raw", 1000)))
 pass("rac_write_csv: CRLF for OLD dataCC, LF for NEW, folders created")
 
 # 7. rac_new_output: an existing OLD model or figure is never overwritten
