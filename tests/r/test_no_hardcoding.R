@@ -2,14 +2,15 @@
 # tests/python/test_no_hardcoding.py covers Python and shell with the same
 # rules (tests/lib/hardcoding_scan.py); this is an independent R version.
 #
-# Scans the R and Rmd files of statistical_model/ and tests/ (tracked and
-# new, not ignored; the profile file statistical_model/R/profile.R is not
-# scanned). Comments are removed first (# outside a string; in an Rmd only
+# Scans the R and Rmd files of statistical_model/, tools/ (since the T5
+# review fixes, A-118) and tests/ (tracked and new, not ignored; the profile
+# file statistical_model/R/profile.R is not scanned). Comments are removed first (# outside a string; in an Rmd only
 # the code chunks are code). Forbidden everywhere: the dataset numbers 307,
 # 395, 387, 386, 255, 367, 631, 126 and the OLD pixel scale 150, 300 as
 # whole tokens, the profile constants (allcont >= <n>, the snake init,
 # set.seed(313), N_CONTROLS <- <n>) and the legacy relative paths ../data/,
-# ../images/. In statistical_model/ also: any set.seed(<number>) and string
+# ../images/. In statistical_model/ and tools/ (the pipeline code, as the
+# Python scan treats tools/) also: any set.seed(<number>) and string
 # literals that name a data or output location (processed_data,
 # saved_models, model_images, data/, images/, a file name with a data
 # extension). A line whose comment holds "rac: literal-ok" is exempt. The
@@ -96,7 +97,8 @@ string_literals <- function(code) {
 findings <- function(rel) {
   lines <- readLines(file.path(root, rel), warn = FALSE)
   code <- code_lines(lines, endsWith(rel, ".Rmd"))
-  pipeline <- startsWith(rel, "statistical_model/")
+  pipeline <- startsWith(rel, "statistical_model/") ||
+    startsWith(rel, "tools/")
   out <- character(0)
   for (i in which(!is.na(code))) {
     hit <- character(0)
@@ -119,12 +121,14 @@ findings <- function(rel) {
 
 files <- system2("git", c("-C", shQuote(root), "ls-files", "-co",
                           "--exclude-standard"), stdout = TRUE)
-files <- sort(unique(files[grepl("^(statistical_model|tests)/", files) &
+files <- sort(unique(files[grepl("^(statistical_model|tools|tests)/", files) &
                              grepl("\\.(R|Rmd)$", files) &
                              files != "statistical_model/R/profile.R" &
                              file.exists(file.path(root, files))]))
 stopifnot(length(files) > 10, "statistical_model/dataCC_1.Rmd" %in% files,
-          "statistical_model/config.R" %in% files)
+          "statistical_model/config.R" %in% files,
+          "tools/fit_oldbasis_new.R" %in% files,
+          "tools/figures_png.R" %in% files)
 
 # 1. the scanner itself: comments, chunks, exemption, each rule
 self <- c("x <- 307 # a comment with 387", "# 395 only a comment",

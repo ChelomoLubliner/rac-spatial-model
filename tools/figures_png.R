@@ -57,7 +57,7 @@ png_env <- function(out_dir) {
   e$pdf <- function(file, height, width, ...) {
     f <- file.path(out_dir, sub("\\.pdf$", ".png", basename(file)))
     grDevices::png(f, width = width, height = height, units = "in",
-                   res = 150)
+                   res = 150)  # rac: literal-ok (150 dpi, not a pixel scale)
     cat("png:", f, "\n")
     invisible(NULL)
   }
