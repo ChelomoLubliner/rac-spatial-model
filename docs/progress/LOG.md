@@ -823,3 +823,50 @@ Chronological; newest entry at the bottom. Each entry: what was done, results (r
 **Open.** A-075 needs Shlomo's confirmation (the in-place refusal changes the old RStudio workflow). A-055 and A-060 stay proposals; freezing venv-wind's base (A-071) needs the user.
 
 **Blockers.** None.
+
+## 2026-11-06 09:20, T2-profiles review fixes review (reviewer:engineer)
+
+**Verdict: approve** (engineering lens). Both major findings are fixed, and the fixes hold when I re-run them. The findings below are minor or nits; they can go into T3.
+
+**Verified by re-running, not by reading** (`<scratch>/rv_eng_t2fix/`).
+- `bash tests/run_all.sh old` at `c7198fa`: ALL PASS in 3 min 42 s. That is 100 Python tests (3 skipped live checks; the real-Windows-R `WindowsKnit` test ran), 14 R scripts, flake8 on 46 files, shellcheck on 14, and the work tree unchanged.
+- **Major 1 (`wald_test.csv`).** My `regress_old.sh --steps 5` on WSL (no car) and `run_windows_r_steps.sh --steps 5` under the Windows R 4.4.3 (car ran: relative difference 4.8e-15) both pass. My own `cmp` shows both CSVs byte-identical to the committed file and to the HEAD blob (`aa249ed4...`). The Windows `.md` has 0 `## Error` lines, and its four CI PDFs equal the committed ones once dates are removed.
+- **Negative control of `test_output_guards.R`.** I put the new test into a `git archive` of `8657651`: it fails with `+ processed_data/wald_test.csv 185`, as reported.
+- **Major 2 (collision tests).** I used a copied index with four NEW outputs (the NEW contour, a CSV, a model and a PDF; reusing an existing blob, 0 objects written). `tests.python.test_profiles` (21 tests) and `test_profile.R` pass. No other test enumerates tracked files in a way that T4/T5 commits would break.
+- **Rule 1 at load.** The five T2 colliding profiles are refused by `load_profile` and by `rac_profile` with identical messages. I also ran a differential check: 663 profiles, each with one NEW output path mutated (OLD outputs, raw inputs, `..`, `//`, `./`, case variants, OLD work folders...). Python and R agree on 650. No profile that both accept points an output file at an OLD output or a raw input.
+- **Sentinel (A-085).** Three hard-coding mutations of my own, each in a scratch copy: `beta=10` in the first shoe snake; the earlier review's alpha/beta/gamma/sigma mutation; `gamma=0.001` in the prototype snake only. All three are caught (7, 20 and 2 failures). I opened `sentinel_snakes.png`: with the fixture values all six blue contours enclose their soles (129/131/125/132/125/133 px), including shoe 2's lower-left bump, as described.
+- **README.** The new OLD instruction `regress_old.sh --steps 4-6 --keep` works as written: ALL PASS, 3 min 13 s under load, `wald_test.csv` matches `old_added_t2`. I opened my WSL `difference_random_cml.pdf` next to the committed one, and they look the same: the same sole outline, red peaks at the left forefoot and left heel, an orange right midfoot, deep blue along the right arch edge and the top-right toe, and a scale of about -8e-06 to 6.5e-06.
+- **Docs.** The step-2 counts are real: 0/0/102 progress messages in the HTML and 0 in every log. The cited gate folders exist, at `24edaf6`, with 0 FAIL lines; the 22/22 and 27/27 field tables are real. The corrections to `T2-profiles-results.md` are marked as corrections.
+- **Repo state.** No attribution lines. No CR in any changed code file; `PIPELINE_DETAILS.md` stays all-CRLF as it was at `79247d8`. No new dimension literals in step code. The one unreachable 5-byte blob (07:51) is as reported; the two other unreachable objects predate this round.
+
+**Findings.**
+1. **Minor: rule 1 protects only files that a profile names and tracked files outside the NEW namespace.**
+   - A NEW output aimed at a committed NEW-namespaced file that is not a NEW output passes both the run-time guard and the collision tests.
+   - Demonstrated: `r.paths.all_cont = docs/qa/T0/new/superposition_new.png` loads, and `collisions()` returns `set()`. Today that covers `docs/qa/T0/new/*_new.png`; T3 and T4 will add more QA images under `docs/qa/T*/new/`.
+   - These are not OLD files or raw inputs, so rule 1 as stated holds. But the visual QA evidence (rule 10) is unprotected.
+   - Similarly, with the test hook `RAC_PROFILE_FILE`, the guard protects only the inputs named in that file. The Rmds accept the hook; only `run_pipeline.sh` and Python `main` refuse it.
+   - Fix (T3):
+     - In the tests, protect every tracked file except the outputs of the real NEW profile.
+     - Optionally, at load, accept NEW outputs only under the NEW output roots, which keeps `docs/` out.
+     - Always protect the default profile's inputs.
+2. **Nit: `test_snake_parameters_shape_the_snakes` requires every reset value to change all six snakes.**
+   - The fixture values were chosen by scoring exactly that ("6 of 6").
+   - My prototype-only `gamma` mutant also failed the `beta_second` subtest, because an upstream change left one shoe unchanged.
+   - So a legitimate T4 change to the prototype or the cleaning could trip the test and invite weakening it.
+   - The call-recording test already proves that every call gets the values; "at least one shoe changes" is enough here.
+3. **Nit: Python/R parity of the guard is close but not "the same rule".**
+   - Python's `_rel` accepts empty parts (`a//b`) and then normalizes them; R rejects them.
+   - Python accepts a dot-file output `processed_data/new/.x_new`; R refuses it.
+   - R does not run `.rac_check_rel` on `inputs.cross_check` or `inputs.sticker_masks`; Python does.
+   - All 13 differential disagreements are of these kinds, and none is a path that could overwrite an OLD or raw file.
+
+**What is good.**
+- The CSV fix removes the platform dependence at the source, instead of loosening the gate.
+- The guards now run before any work, and a test proves it, with a negative control.
+- The collision rule now separates committed NEW outputs from OLD files.
+- The run-time guard gives the same messages in both languages.
+- The Windows driver can no longer turn a chunk error into a pass.
+- The sentinel values were chosen after looking at the snakes.
+- Every number I re-ran matched to the digit.
+
+**Required before T3:** none. Findings 1-3 are optional and fit into T3.
