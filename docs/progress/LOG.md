@@ -1301,3 +1301,70 @@ Several first reads came back blank because of the viewer limit; I reopened each
    - The corename getter was not run under venv-wind. It works the same way as the thread getter that already runs there.
 
 **Not verified:** the full OLD step-0 gate (the reproducibility reviewer is running it), the venv-wind builds, and the visual judgements (vision lens).
+
+## 2026-11-06 19:25, T4-snake review fixes review (reviewer:reproducibility)
+
+**Verdict: approve** (reproducibility lens). I re-ran the whole OLD regression at `cbba2ef` myself, on both platforms, and checked the outputs with my own comparisons. Every OLD output came back exactly: Tier A where the platform allows it, Tier B on WSL. The RNG sequence is unchanged, no NEW run writes an OLD path, and every committed NEW output that a command writes rebuilds byte for byte in a clean clone. The findings below are minor; none needs a rebuild.
+
+**How I ran it** (`<scratch>/rv_repro_t4fix/`, scripts in `bin/`): the gates `tests/regress_old.sh` and `tests/rebuild_new.sh`, plus my own comparisons: `cmp` against `git show 79247d8:<path>`, file-by-file comparison with the Tier B run folders (`<scratch>/t1/legacy_py_MXmkvc`, `legacy_r_oTZO3x`), my own R field extraction and b'V^-1 b, and a perl date blanking for the PDFs. The NEW runs used clean `git clone`s at `cbba2ef`.
+
+**Results.**
+- **Tier A list.** My sha256 of the 24 `79247d8` blobs = the list = the work tree. The list covers every file of the four output folders at `79247d8` except `data/new_shoes/README.md`. The Tier B lists and dumps are unchanged since `594171d`, and `old_added_t2` since `2951c5f`. Since `72f857e` no OLD output, raw input, `config/`, R or `tools/` file changed.
+- **OLD step 0, WSL** (`regress_old.sh --steps 0`): ALL PASS. 16 threads, kernel Haswell, contour `e18d50df...`, 1,556 intermediates, live check; 1,447 s at load 20-40.
+  - My own check: the contour equals the Tier B run's file after LF -> CRLF.
+  - Exactly the 30 records of `contour_linux_diff.csv` differ from Tier A.
+  - 1,556 of 1,556 npy/png files are byte-equal to the Tier B run folder, none extra.
+- **OLD step 0, venv-wind** (`tests/legacy/run_windows_python_step0.sh`, Python 3.13.14, at `cbba2ef`):
+  - The contour is the `79247d8` blob (my `cmp`), the four npy = Tier B, and `active-contour_all.npy` = the thesis run of 2025-11-13 (`cmp`).
+  - The new kernel getter works there too (`numpy OpenBLAS kernel: Haswell`, 16 threads). The implementer did not rerun this check, and the engineer lists it as not run.
+- **OLD steps 1-6, WSL** (`regress_old.sh --steps 1-6`): ALL PASS. My own checks:
+  - The five step-1/2 CSVs `cmp`-equal the `79247d8` blobs; `shoe_codes.csv` = the HEAD blob.
+  - GLMM `identical()` to the Tier B refit in 15 of 16 fields: fixef, vcov, RX vcov, VarCorr, theta, logLik, deviance, u, beta, X, y, ranef, nobs, conv and derivs. The 16th, the model frame, has identical data and terms. Only its formula environment differs: it holds the run's own output path (`file_name`) and the model itself.
+  - CML `identical()` to Tier B and to the `79247d8` blob in 11 of 11 fields.
+  - My W (df 24): GLMM 427.7804472165 (= Tier B), CML 420.6712420035. The committed GLMM gives 428.6933350011.
+  - All 8 PDFs equal the Tier B PDFs after my date blanking.
+  - Times (s): step 1 196, step 2 39, GLMM 723, CML 390, step 4 24 and 21, step 5 34, step 6 20.
+- **OLD steps 4-6 on the committed models:** ALL PASS. `wald_test.csv` = the HEAD blob (`aa249ed4...`, W 428.693335001072).
+- **The A-103 guard.**
+  - With `OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=3 GOTO_NUM_THREADS=2` inherited: ALL PASS (the log shows 16 threads; the live check passes), 809 s.
+  - `taskset -c 0-3`: exit 2, and no run folder is made.
+  - The earlier finding 1 is fixed.
+- **RNG.**
+  - `set.seed(P$r$seed)` gives the same `.Random.seed` as `set.seed(313)`.
+  - The erase-list read draws nothing (OLD: NULL; NEW: 48 rows).
+  - Steps 1-6 have the same 6 `set.seed` calls and 1 `sample()` as at `79247d8`, and `dataCC.csv` is byte-identical.
+  - Neither step 0 nor `qa_snake` uses an RNG.
+- **Collisions.**
+  - Static: all 27 path values of the NEW profile lie in NEW folders with `_new` names; the prototype files are the shared read-only inputs. No pipeline code holds a literal OLD output path.
+  - Experiment: in a clean clone, I ran the README's NEW commands plus `--figures`, `--thresholds 13,18,24,29,36 --compare 18,29` and `t4fix_erase_list.py`, with `OPENBLAS_NUM_THREADS=8 OMP_NUM_THREADS=3` in the environment (the log shows 1 thread).
+  - 89 committed NEW files were rewritten, all byte-identical: the contour `0af52b05...`, 5 QA tables (with the task copy), 30 flagged figures, 52 sheets and `prototype_mask_new.png`.
+  - `git status` is clean apart from the ignored `images_new/`, and no file outside the NEW namespace is newer than the start. The erase-list probe writes the committed list (`equal: True`).
+- **NEW contour by the pipeline runner** (`RAC_DATASET=new tools/run_pipeline.sh --steps 0`, in a second clone, with the contour deleted first): one process, no `--qa`. The result is `0af52b05...` = the HEAD blob (768 s), so T5's documented path reproduces it. `tests/rebuild_new.sh`: ALL PASS.
+- **Independent numbers.**
+  - My own `rac_out_max_px` and `contact_out_max_px` (own record reader and row-span fill, KD-tree distances, R aspix written out again) equal the committed tables for 386/386 OLD and 631/631 NEW shoes. Triggers: OLD 3 and 23, NEW 7 and 19.
+  - Headline from the table: 601/631 pass; 30 flagged (25 `ok_after_review`, 5 `override`); 618 under the T4 bands; 588 with the literal 0.95.
+  - In the OLD reference every T4 column is identical except `qa_flags`, where 24 rows gain the new trigger names.
+- **Fast suite** in a fresh clone at `cbba2ef`: ALL PASS. 178 Python tests with 3 skips (the forked = serial test no longer skips), 14 R scripts; 455 s.
+
+**Findings** (all minor).
+1. **`OPENBLAS_CORETYPE` is neither removed nor checked, and it changes the snakes.**
+   - With `OPENBLAS_CORETYPE=Sandybridge`, numpy's OpenBLAS runs the Sandybridge kernel with 16 threads, so the OLD pre-check passes.
+   - `test_snake_old_regression` then fails with pixel counts and no reason: shoe 176 differs by 115 px, 354 by 147 px.
+   - NEW (one thread): my rerun of shoes 1-30 reproduces 30 of 30 committed records with Haswell. With Sandybridge, 2 records differ (shoe 2: 26 px, shoe 9: 403 px).
+   - So the OLD gate would fail only as "contour != Tier B": the same failure class as the earlier finding 1. Its row "threads = baseline" passes and shows the kernel only as text.
+   - Worse, an in-place NEW step 0 (the README's `--steps 0-6`) would rewrite the committed NEW contour without any warning.
+   - Fix: add `-u OPENBLAS_CORETYPE` to `blas_env` and to `run_all.sh`. Make `regress_old.sh` fail when the logged kernel is not the recorded one, and make `rebuild_new.sh` fail too (it only reports INFO now). Have NEW `main` refuse a set `OPENBLAS_CORETYPE`, or record the NEW kernel next to the contour.
+2. **`rebuild_new.sh` compares with the work-tree files, not the committed blobs** (`cmp -s "$got" "$repo/$f"`). A-070 rejected this pattern for OLD.
+   - After an uncommitted in-place NEW rebuild (a code edit, or finding 1), the gate passes against that file while HEAD holds another one. It records `git status` but does not act on it.
+   - Fix: compare with `git show HEAD:<path>`, or fail when a compared path is modified.
+3. **The override CSV is not reproducible by its documented command.**
+   - I reran `t4fix_overrides.py` on the committed file in my clone. Every number of the 23 rows comes back identical.
+   - But the tags of 376 and 427 change from `(T4 review, A-102)` to `(A-097)`. The tag depends on whether the shoe was already in the input file, so a rerun is not idempotent.
+   - Fix: tag from a fixed list, or record in the results doc which input file produced the committed one.
+4. **Doc nits.**
+   - For the OLD reference, the LOG entry and the report say "every T4 column identical". Every column except `qa_flags` is, as the results doc says.
+   - Note for later reviewers (not a defect): `identical()` on a GLMM's model frame always differs between two runs, because of the formula environment. `compare_models.R` rightly leaves it out.
+
+**Not verified:** the venv-wind NEW build (A-098) and the visual judgements (vision lens). I did not run a whole OLD gate with a forced kernel; the snake reruns above show the effect.
+
+**Times** (s; load 10-40 while the other reviews ran): WSL OLD step-0 gate 1,447 (snake 1,396); the same with inherited variables 809; venv-wind OLD snake 823; the R chain as above; NEW clone step 0 (14 jobs) 409, QA 443, thresholds 53; NEW serial step 0 768; `rebuild_new.sh` step 0 182 and metrics 47; fast suite 455.
