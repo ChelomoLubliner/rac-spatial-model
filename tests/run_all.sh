@@ -90,7 +90,11 @@ run_check "sha256 old_baseline (11 OLD artifacts)" \
   sha256sum --quiet -c tests/baseline/old_baseline.sha256
 run_check "sha256 old_added_t2 (the 2 OLD files T2 added)" \
   sha256sum --quiet -c tests/baseline/old_added_t2.sha256
+# the OLD snake reruns need numpy's OpenBLAS at the library default, as the
+# baselines (tests/baseline/local/openblas_tier_b.txt, A-103); the NEW tests
+# that need one thread set it in their own subprocesses
 run_check "python unittest discover tests/python" \
+  env -u OPENBLAS_NUM_THREADS -u GOTO_NUM_THREADS -u OMP_NUM_THREADS \
   "$py" -B -m unittest discover -s tests/python -t . -v
 for t in tests/r/test_*.R; do
   run_check "Rscript $t" Rscript "$t"

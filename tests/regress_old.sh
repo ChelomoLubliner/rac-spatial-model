@@ -369,8 +369,11 @@ live() {
 }
 if [[ $status -eq 0 ]]; then
   if has 0; then
-    live test_snake_old_regression live_snake.txt env -C "$repo" \
-      RAC_REGRESS_PY_RUN="$run" MPLBACKEND=Agg PYTHONDONTWRITEBYTECODE=1 \
+    # the live check reruns snakes too: the same OpenBLAS environment as
+    # the pipeline (the library default, A-103)
+    live test_snake_old_regression live_snake.txt "${blas_env[@]}" \
+      -C "$repo" RAC_REGRESS_PY_RUN="$run" MPLBACKEND=Agg \
+      PYTHONDONTWRITEBYTECODE=1 \
       "$py" -B -m unittest tests.python.test_snake_old_regression
   fi
   if has 1 && has 2 && has 3; then

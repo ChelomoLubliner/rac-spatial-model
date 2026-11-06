@@ -30,6 +30,14 @@ was not written from is evidence: Tier B came from
 <scratch>/t1/legacy_py_MXmkvc, so that folder can only pass (A-066); the
 T1 run folders predate the manifest and are refused.
 
+OpenBLAS precondition (T4 review fixes, A-103): the snake depends on numpy's
+OpenBLAS thread count, and both OLD baselines were written with the count
+recorded in tests/baseline/local/openblas_tier_b.txt (16, the library
+default on this machine). The reruns fail with that explanation when the
+process runs another count (an inherited OPENBLAS_NUM_THREADS,
+OMP_NUM_THREADS or GOTO_NUM_THREADS, or another CPU count), instead of
+with a pixel difference.
+
 Run from the repo root with the thesis venv python:
   MPLBACKEND=Agg python -B -m unittest tests.python.test_snake_old_regression
 """
@@ -74,6 +82,24 @@ def run_folder_base(run):
     return run, ''
 
 
+def blas_precondition():
+    """'' when numpy's OpenBLAS runs the thread count of the OLD baselines
+    (tests/baseline/local/openblas_tier_b.txt), else the reason why a
+    snake rerun cannot reproduce them."""
+    want = None
+    for line in (LOCAL / 'openblas_tier_b.txt').read_text().splitlines():
+        if line.startswith('threads '):
+            want = int(line.split()[1])
+    got = active_contour_snake.numpy_blas_threads()
+    if got == want:
+        return ''
+    return (f'numpy OpenBLAS runs {got} threads; the OLD baselines were '
+            f'written with {want} (tests/baseline/local/openblas_tier_b.txt)'
+            ' and the snake depends on the count (A-092): run without '
+            'OPENBLAS_NUM_THREADS, OMP_NUM_THREADS and GOTO_NUM_THREADS on a '
+            f'machine where the library default is {want}')
+
+
 def linux_records():
     """{record index: bool (H, W) array} of the Tier B (Linux) rerun where it
     differs from the committed contour."""
@@ -105,6 +131,9 @@ class SnakeOld(unittest.TestCase):
         cls.tmp.cleanup()
 
     def rerun(self, idx0):
+        problem = blas_precondition()
+        if problem:
+            self.fail(problem)
         remove_noise.save_cleaned_shoes(self.profile, self.shoes, idx0)
         return active_contour_snake.active_contour_shoe(
             self.profile, None, plot_img=False, save_img_bool=False,
