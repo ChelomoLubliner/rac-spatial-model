@@ -933,3 +933,9 @@ Chronological; newest entry at the bottom. Each entry: what was done, results (r
 1. **Recommendation:** add steps 4 and 6 to `tests/legacy/run_windows_r_steps.sh`, and assert that all 8 figures equal the committed PDFs without dates. My runs show they do, so the committed runner can state Tier A for every figure. This is the implementer's own open point.
 2. **Nit:** after a WSL refit, `regress_old.sh` checks the step-5 CSV only on W (tolerance 1e-12) and df. The file is deterministic: `...,427.780447216513,24,1.45350215057922e-75,"manual","RX",...` in my run. A sha256 of it in a Tier B addendum list would also check p, `method` and `vcov`.
 3. **For Shlomo (A-075):** the in-place refusal is what keeps the Windows-made Tier A files safe from WSL reruns. In none of my runs did it change any output. It is a workflow change only, and I support confirming it.
+
+## 2026-11-06 10:40, T3-newdata (implementer), in progress
+
+**What.** Started T3-newdata (plan T3, first part: the NEW locations CSV, the pixel calibration, the shoes without RACs and with RACs off the contact surface). Baseline at `48f6f89`: `bash tests/run_all.sh old` ALL PASS (3 min 36 s). Pre-registered the calibration grids, criteria and the reading of rule (i) in A-086 before any grid ran on the real data (exploration so far: file formats, parsing and the 2023 `COL/ROW`, no calibration grid).
+
+**Found while exploring (real output in the results doc):** R's `read.csv` / `read.table` parse 11 OLD x values and 4 OLD y values 1 ulp away from the correctly rounded double (Python's `float()` and pandas agree with each other); the R `aspix` pixels nevertheless equal the Python division form for all 13,287 OLD and 20,013 NEW RACs. The 2023 `COL/ROW` equal R `aspix` for all 20,013 NEW RACs.
