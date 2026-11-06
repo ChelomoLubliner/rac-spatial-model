@@ -1703,3 +1703,84 @@ Decisions A-110 to A-112; plan revision 12 (F72-F77). Results with exact command
 - The OLD gates `regress_old.sh --steps 1-6` and `--steps 0`: the reproducibility reviewer was running them. I relied on the checksums and the diff.
 - The 18-minute NEW rerun.
 - The visual and statistical judgements (other lenses) and the science of A-110.
+
+## 2026-11-07 00:45, T5-newmodel review (reviewer:statistician)
+
+**Verdict: changes required** (statistics lens). The computations are right: every model number reproduces, the NEW GLMM is at a real optimum, the units are consistent, and no OLD file changed. But the reading of the NEW maps goes beyond what the data support. One of the four NEW "peaks" is contradicted by its own data, and CI cut 250 is biased high on NEW. The cause is a sole-design effect that one pooled surface cannot represent. No goodness-of-fit check was run. The fixes are docs plus one diagnostic table. Nothing needs rerunning, and OLD is unaffected.
+
+**Verified with my own scripts** (`<scratch>/t5stat/`, HEAD `988716a`/`b980c86`; about 3 min of R plus one 12-min refit):
+- **Wald, my own Cholesky code:** NEW GLMM 585.8888, CML 576.0264; OLD-basis 623.1166 and 612.4973; OLD 428.6933 (Hessian) / 427.7674 (RX) and CML 420.6712.
+- **Model fields:** sigma^2 0.7556134, logLik -41569.1219, 83,090 rows, 631 groups.
+- **Convergence:** lme4 1.1-38 ran no gradient check here (nobs > 10,000, no derivatives stored). The Laplace deviance at the stored optimum is 83,138.2438 = -2 logLik. Its central-difference gradient is at most 0.024 (theta) and at most 0.0051 for every fixed effect. So the fit is converged; the docs should say that lme4 skipped its checks.
+- **Units:** in both frames, `dataCC` x and y are exact pixel centres at 1/300 (max deviation from the integer lattice < 1e-6).
+- **Repo state:** the Tier A, `old_baseline` and `old_added_t2` checksums pass. `test_new_outputs.R` ALL PASS.
+- **Looked at:** the NEW and OLD heat-map PNGs, `CI_shoe_cuts_new.png`, `CI_cut_250_new.png`, `step2_standardized_old_vs_new.png`, `s_sheet_01_new.png` (3 shoes enlarged), and my own `<scratch>/t5stat/groupAB.png` (cases and controls of NEW group A, NEW group B, and OLD on the standardized shoe).
+
+**Findings.**
+1. **Major. A NEW map peak and the NEW CI cut 250 are artefacts of a sole-design effect; no goodness-of-fit check was run.**
+   - **Residuals:** I computed O/E of the committed GLMM (fitted values including BLUPs) on 0.04 x 0.08 cells with E >= 15:
+
+     | | cells with \|z\| > 3 | \|z\| > 2 | sum z^2 |
+     |---|---|---|---|
+     | NEW | 8 of 113 | 28 | 319 |
+     | OLD | 0 of 112 | 10 | 154 |
+
+   - **A whole band is overpredicted.** All seven cells with E >= 15 across y in (-0.20, -0.12] have O/E 0.59-0.81 (z -2.2 to -5.3, six beyond -3).
+     - In 0.02-wide y bins, y in (-0.16, -0.10] has O/E 0.43-0.67 (z -4.2 to -7.9), while the heel pads (-0.30, -0.26] are underpredicted (O/E 1.13-1.18, z +4.4 and +6.2).
+     - OLD shows only a mild dip (O/E 0.73-0.80, z -2.4 to -3.1).
+   - **The "right heel-midfoot" peak (map maximum at new_x 0.135, y -0.155; plot 0.63, 0.38) is contradicted by its own data.** In a +-0.025 x +-0.04 window, O = 111 against O/E 0.668, z -5.26. Its raw case/control ratio is 0.73x the NEW average.
+     - The other peaks are supported: midfoot centre O/E 0.99, left heel 1.07, left forefoot spot 0.95, right forefoot edge 0.95-1.16. OLD's peaks are 0.91-1.09 (one more, at the right midfoot edge, has only 14 rows).
+   - **Cut 250 (y = -0.175) runs through this band.** Pooled over +-0.02 in y, O/E is 0.805 (z -4.4). In the seven 0.04-wide bins with 22 or more cases it is 0.70-0.97, and 0.72 (z -2.9) at the curve's right peak. The model-based band there is about +-12%, while the data sit 28% below the curve. Rows 110 and 190 fit (O/E 0.85-1.17, |z| < 2, in the bins with 5 or more cases).
+   - **Cause.** I found the split post hoc, from O/E per block of 49 ids in y (-0.16, -0.10]: blocks 1-7 and 10 are at 0.00-0.37, blocks 8, 9, 11 and 12 at 0.84-0.98 (block 13, at 0.67, is counted in group B).
+     - Group A: 392 shoes (ids 1-343 and 442-490), 70.6% of the NEW case pixels. In y in (-0.18, -0.10] they print but have almost no RACs: case/control 0.091 against 0.360 overall (O/E 0.32, z -12.4). 225 of these shoes have contact there, but only 37 have a RAC.
+     - Group B: the other 239 shoes, no dip (0.244 against 0.246).
+     - `groupAB.png` shows it: group A has four round heel pads and a printed shank bridge, with its RACs on the pads and the forefoot lugs.
+   - **It is the soles, not NEW's marking.** Group A holds 50 of the 67 `same_shoe` reprints. In the band, the OLD prints of those 50 soles carry 7 of 2,232 RAC px (0.31%; all OLD shoes: 2.8%), and their NEW prints 4 of 2,420. Group-B reprints: OLD 4.6%, NEW 2.3%.
+   - **A richer basis does not fix it.** Efron CML, at the peak's cell: the full tensor gives z -5.42 and a 5 x 9-knot full tensor -3.52; in the peak window, O/E 0.67 and 0.78.
+   - **Fix:**
+     - Add the residual table, for both datasets, to the T5 results.
+     - Correct the map reading in results section 7, F77, the LOG entry and the summary: drop the right heel-midfoot peak, and say that NEW cut 250 is about 20% high.
+     - Tell T6 that the OLD-vs-NEW map differences mix design composition with any real difference: show them with and without group A.
+     - Tell T7 that Part 2 will reject in the shank band for design reasons: report residuals by group.
+     - Record it as evidence for the editor's sole-design point and R1 point 4.
+
+2. **Minor. K8 has a measurable cost, larger on NEW, and T6 maps on that basis.**
+   - Efron CML, K8 basis vs full tensor: LR 94.6 on 10 df on NEW, 39.0 on OLD. These are model-based; the robust deflation (about x0.57, see item 5) leaves both far beyond chi^2_10.
+   - At the real band edges (2nd and 98th percentiles of new_x in 10 y bands), the right edge hardly moves (within 0.06 in 9 of 10 bands, on both datasets).
+   - The left edge moves by -0.13 to +0.49 log units on NEW, by more than 0.1 in 6 of the 10 bands (heel bottom -0.09 -> +0.40), and by -0.17 to +0.18 on OLD.
+   - The O/E across the width shows the same thing on NEW: u in (-0.85, -0.70] has O/E 1.09 (z 4.0), and (-0.95, -0.85] has 0.78 (z -2.7).
+   - So the left-right contrast of the NEW maps is partly a basis artefact. The right-edge stripe itself is supported.
+   - Fix: say this in T5, and add the full tensor to T6's map comparison (the plan has it only in T7).
+
+3. **Minor. "OLD's shapes at higher levels" is mostly the K3 convention.**
+   - The case pixels per S pixel are 0.003448 on NEW and 0.003247 on OLD (ratio 1.06), but the map means differ by a factor 1.36.
+   - Calibration from the committed models (predicted RAC total, with each shoe's sum over S estimated from its controls, against the observed total):
+
+     | factor | OLD | NEW |
+     |---|---|---|
+     | each shoe's own BLUP (checks the method) | 0.999 | 0.995 |
+     | b = 0 | 0.636 | 0.706 |
+     | x exp(+sigma^2/2) | 1.028 | 1.028 |
+     | x exp(-sigma^2/2), as steps 4-6 do | 0.394 | 0.484 |
+
+   - So the coded factor understates the level 2.5-fold on OLD and 2.1-fold on NEW. That is a 23% difference between the datasets, and the +sigma^2/2 version calibrates both within 3%.
+   - Fix: drop "at higher levels", or say that the levels are not comparable under K3. Pass these numbers to D-009 (Naomi).
+
+4. **Minor. sigma^2 measures the spread of the per-shoe RAC counts, not anything spatial.**
+   - The BLUPs correlate 0.992 (OLD) and 0.989 (NEW) with log n_i.
+   - var log(n_i/100) minus its sampling variance is 1.03 on OLD and 0.86 on NEW.
+   - cor(log n, log px) is 0.15 on OLD and 0.36 on NEW, so an offset refit should lower NEW's sigma^2, while OLD's rose (0.979, F35).
+   - **Confirmed:** a NEW GLMM refit with `offset(log((px - n)/100))` (F35's sign; `<scratch>/t5stat/offset_new.R`, 725 s, conv 0) gives sigma^2 **0.6410** against 0.7556 without the offset. Its intercept is -6.3481 against the predicted -6.3522, and its spatial coefficients move by at most 0.084. With the offset, the OLD-NEW gap widens from 0.20 to 0.34.
+   - Fix: describe sigma^2 in T5 and T6 as dispersion of RAC density between shoes (wear and marking), not as a spatial quantity, and give T6 these numbers before its comparison.
+
+5. **Minor. Inference wording.**
+   - p = 2.1e-108 is model-based. With cluster(shoe), the Efron CML Wald on NEW is 329.0 against 580.9 model-based for the same fit (OLD 234.4 and 394.2, = F29). The conclusion stands, but the p-value's digits are meaningless.
+   - W cannot be compared between datasets as a strength of spatial structure: it grows with the number of cases (19,990 against 13,249). W per case is 0.0293 on NEW and 0.0324 on OLD.
+   - Fix: write "p < 1e-16, model-based; robust W in step 3b", and do not compare W across datasets.
+
+**Checked, no change needed:**
+- **Off-contact cases.** Cases with no contact anywhere in their 3 x 3 neighbourhood: NEW 508 (2.5%), OLD 138 (1.0%). They are most frequent at the heel bottom (4.6% of the cases in the lowest y decile) and the toe (3.8%), and they do not drive the midfoot-centre peak: its raw ratio goes from 0.414 to 0.398 without them.
+- **Wearer pairs.** Clustering consecutive ids as pairs changes the robust SEs little (median ratio 1.009 against cluster(shoe)).
+- **A-110 (threshold 8).** It is the right call statistically: the mask removes 0.2% of NEW contact.
+
+**Blockers.** None. Finding 1 must be corrected in the docs before T6 uses the NEW maps.
