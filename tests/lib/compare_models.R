@@ -6,7 +6,11 @@
 # tolerance 0 (values only), max |a - b|, max |a - b| / max |a|, and the
 # number of elements. Stops if a field is present in only one dump.
 # CLI: Rscript tests/lib/compare_models.R <dump_a.rds> <dump_b.rds>
-#   prints the table; exit 0 if every numeric field is identical().
+#   prints the table; exit 0 only if every field (numeric or character, of
+#   any length) is identical(), else 1. A NaN, a length change or a changed
+#   character field gives no max |a - b| (NA) but still fails (decision
+#   A-069; T1 review 2, engineering finding 1: the old exit status counted
+#   only the rows with a numeric max |a - b|).
 
 compare_dumps <- function(a, b) {
   # Both dumps must have the same fields: a field missing from one side
@@ -51,6 +55,5 @@ if (sys.nframe() == 0) {
   stopifnot(length(args) == 2)
   tab <- compare_dumps(readRDS(args[1]), readRDS(args[2]))
   writeLines(format_compare(tab))
-  numeric_fields <- !is.na(tab$max_abs_diff)
-  quit(status = if (all(tab$identical[numeric_fields])) 0 else 1)
+  quit(status = if (all(tab$identical)) 0 else 1)
 }
