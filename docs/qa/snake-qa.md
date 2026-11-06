@@ -65,3 +65,115 @@ python -B tests/legacy/old_snake_metrics.py
 
 ## Platform: the committed contour is a Windows result
 The verbatim legacy code under the thesis **Windows** venv (venv-wind: Python 3.13.14, numpy 2.2.6, scipy 1.16.3, scikit-image 0.25.2; its base is the self-updating Microsoft Store Python, 3.13.9 when the venv was created, so every venv-wind check logs its interpreter, A-071) reproduces **all 386** committed records. Under the WSL venv (Python 3.12.3, the same package versions), 356 records are identical and **30 differ**, by a mean distance of up to 1.50 px and a maximum of 8.94 px (`tests/baseline/local/contour_linux_diff.csv`). The cause is floating-point differences of about 1e-8 px between the two numeric builds: `np.int32` truncation in `cv2.polylines` and the 2,500-iteration snake amplify them for some shoes (shoe 176: first snakes 3e-9 px apart, second snakes 5 px apart). Each platform is deterministic, on this evidence (A-066). On WSL, three full runs that do not depend on each other wrote the same contour file (sha256 `d43fda7e...`) and the same 1,556 intermediate images and arrays: the T1 Tier B run, the reproducibility reviewer's run, and the run of the T1 review fixes. On Windows, the 386-shoe snake run and the gallery reproduce the committed records. Where the platforms differ is shown in `docs/qa/T1/old/contour_platform_diff_old.png` (white = both, green = Windows/committed only, magenta = WSL only). Shoe 176 is a parallel one-pixel offset almost all the way round, with a small bump at the top right of the toe. Shoes 21 and 11 differ by one pixel on most of the outline, but at the left arch the Windows contour bows several pixels further into the concavity than the WSL contour, and for shoe 11 the toe's top left differs too (up to 8-9 px). Shoe 354 differs in 18 single pixels. That is why the gallery was built with venv-wind: its snake panels are exactly the snakes that produced the committed contour. A first build on WSL (kept in the T1 scratch folder) differed in 8 of the 67 gallery shoes (11, 21, 80, 152, 176, 221, 349, 354). Decision A-060 records what this means for T2 and T4.
+
+---
+
+# NEW shoes (T4, 2026-11-06): what the snake does on the 631 new shoes
+
+**Written by:** the T4 implementer, after opening every image named here with the Read tool (user rule 10). Decisions A-091 to A-098; numbers and commands in `docs/tests/T4-snake-results.md`. Several images I opened during the work came back without their picture (a request limit of the viewer); I reopened every image that this page describes, and nothing here rests on an image I did not see.
+
+## How the images were made
+
+```bash
+RAC_DATASET=new python -m contour_algorithm.main --qa --jobs 14          # step 0, saves the ellipses and snakes
+RAC_DATASET=new python -m contour_algorithm.qa_snake --metrics --sheets --figures --flagged --crosscheck --jobs 14
+RAC_DATASET=new OPENBLAS_NUM_THREADS=1 python -m contour_algorithm.qa_snake --thresholds 13,18,24,29,36 --compare 18,29
+OPENBLAS_NUM_THREADS=1 RAC_DATASET=new python -B docs/qa/T4/probes/t4_overrides_figure.py
+```
+
+| File | Content |
+|---|---|
+| `docs/qa/sheets_new/prototype/prototype_mask_new.png` | The cleaning mask for thresholds 18 (chosen) and 29: superposition count, mask boundary (green), initial ellipse (red dashed), prototype snakes 1 (light blue) and 2 (blue); the filled masks; their difference over the union of all prints |
+| `docs/qa/sheets_new/prototype/prototype_sheet_<kk>_new.png` (13) | 49 shoes per sheet (7 x 7): raw contact kept by the mask (white), removed by the mask (red), erased by the erase list (magenta), mask boundary (green); label: shoe, pixels removed by the mask |
+| `docs/qa/sheets_new/ellipse_first_snake/..._sheet_<kk>_new.png` (13) | Cleaned shoe (grey), initial ellipse (red dashed), **first** snake (blue); label: coverage, tightness, `!` and yellow when the shoe is flagged |
+| `docs/qa/sheets_new/final_snake/..._sheet_<kk>_new.png` (13) | Raw shoe (white kept, red removed by the mask, magenta erased) and the **final (second)** snake (blue) |
+| `docs/qa/sheets_new/cleaned/cleaned_sheet_<kk>_new.png` (13) | The cleaned shoe (raw AND mask, after the erase list): what the snake and the contour see; label: cleaned pixels |
+| `docs/qa/T4/new/flagged/im_<i>_new.png` (12) | Each flagged shoe at twice the size: init + first snake, init + second snake, raw shoe with mask boundary, removed and erased pixels, final snake and RAC pixels |
+| `docs/qa/T4/new/overrides_before_after_new.png` | The 9 per-shoe fallbacks: final snake with the profile radius 10 (before) and radius 24 (after), RAC pixels green inside the contour fill, magenta outside |
+| `images_new/qa_snake/im_<i>_new.png` (631, gitignored) | The plan's two-panel QA figure of every shoe (init red dashed + first snake blue; init + second snake), rebuilt by `qa_snake --figures` |
+
+## The prototype (`prototype_mask_new.png`)
+- The superposition of the 631 new shoes is a sole silhouette with toe up, the round-lug forefoot and the four heel pads of the most common design as high counts; the ellipse (2023 values: centre row 185, column 128; radii 162 and 95) encloses it with margins at the sides and the heel and touches it at the toe tip, as the OLD ellipse does for the OLD prototype.
+- Both prototype snakes follow the silhouette; the mask boundary hugs it. The mask from >= 18 shoes (35,156 px) and from >= 29 (33,250 px) differ only in a ring of 1-3 px all around the outline (1,908 px), widest at the toe and along the right side of the forefoot.
+- The union of all prints (grey) shows what the mask must remove: frame and debris regions above the toe, beside the forefoot and right of the heel (580's wedge); all of them lie outside both masks.
+- 18 was chosen (A-096): it keeps more real sole. Of the 21 shoes with the most contact in the 18-29 ring (looked at before the erase list), the ring held sole edges on 36, 104, 14, 105, 125, 15, 35, 114, 37, 156 and others, and frame artefacts only on 586, 186 and 580, which the erase list now removes.
+
+## Prototype sheets (raw shoes against the mask)
+
+| Sheet | Shoes | What I saw |
+|---|---|---|
+| 1 | 1-49 | Every print inside the boundary. Specks removed beside the toe on 3, 6, 13, 14, 15, 23, 24; the margin debris of 35 (236 px, top left of the toe and left of the forefoot) and 36 (303 px, left of the forefoot and right of the toe) removed. 8 is the very faint partial print. No sole cut |
+| 2 | 50-98 | All inside. Removed: specks left of the forefoot and heel of 55 (155 px), small marks on 56, 66, 67, 73, 92, 96; 93's thin frame line right of the heel (53 px) |
+| 3 | 99-147 | All inside. Removed: debris above and right of the toe of 104 (141 px) and 105 (129 px), the fragment left of the toe of 114 (136 px), a speck top left of 133; **125 loses 22 px of its toe tip**, which pokes 1-3 px above the mask edge (zoomed: real toe pixels) |
+| 4 | 148-196 | The frame lines of 148, 149 (top) and 186 (top and bottom) in magenta (erased) and red; all prints inside |
+| 5 | 197-245 | All inside; specks removed on 216 and 231 |
+| 6 | 246-294 | All inside; small debris removed on 260, 264, 285 |
+| 7 | 295-343 | All inside; specks removed on 314, 329, 330 |
+| 8 | 344-392 | All inside. **379 loses 40 px**, a 2-3 px strip of its heel rim below the mask edge (zoomed) |
+| 9 | 393-441 | All inside. **422 and 423 lose 75 and 59 px** at the bottom-left and bottom-right corners of the heel, beyond the mask edge (zoomed; 422 also a separate blob right of the heel) |
+| 10 | 442-490 | All inside; 462's margin debris (98 px) removed |
+| 11 | 491-539 | All inside; specks removed on 493, 520, 524, 539 |
+| 12 | 540-588 | The artefacts of 580 (band above the toe, wedge and bars at the heel), 582 (tilted line above the toe), 585 (thin line under the heel), 586 (thick band over the toe) in magenta (erased) and red; debris right of the toe of 581 (57 px) and 588 (81 px) removed |
+| 13 | 589-631 | 589's wedge and specks at the top right (140 px) removed (its tip erased); 611's blob right of the heel (123 px) and a speck below 610's heel removed; the different image type 598-599 and the flat soles 628-631 inside |
+
+**Prototype fit:** the mask fits every new print. Real sole beyond the mask edge is cut on four shoes (125 toe tip 22 px; 379, 422, 423 heel bottom 40-75 px; 0.3-0.6% of each print), the same effect as on OLD 80 and 9: there the contour follows the mask edge. The plan's criteria hold (every RAC pixel inside the mask, the median shoe keeps 100% of its contact, p5 99.76%).
+
+## Ellipse and first-snake sheets
+
+| Sheet | Shoes | What I saw |
+|---|---|---|
+| 1 | 1-49 | Every ellipse encloses its print with a margin (at the toe tip the margin is smallest, as on OLD). With the closing (radius 10) the first snakes wrap forefoot and heel pads as one silhouette; 8 (fallback radius 24) a sole-shaped outline of a faint print; 11 includes its partly printed heel; the wide forefoots of 14 and 15 and the over-inked forefoots of 35 and 36 are followed |
+| 2 | 50-98 | Every first snake wraps forefoot and all four heel pads; no cut |
+| 3 | 99-147 | Fine; 112 (fallback) reaches its heel fragments; 107, 121, 140 have sound outlines |
+| 4 | 148-196 | Fine; 163 (fallback) follows a narrow faint print with a small bump at the toe fragment; 165 a pointed toe; 186 wraps its smeared print with no frame line left |
+| 5 | 197-245 | Fine; on the boots the first snake bridges the arch, which is its role |
+| 6 | 246-294 | Boots, all fine; 286 (very faint) and 274 (partial) follow their printed parts |
+| 7 | 295-343 | Fine |
+| 8 | 344-392 | Fine; on 354 and 355 the first snake bridges the narrow waist with a straight edge |
+| 9 | 393-441 | Fine; 427's first snake dips where the top right of the toe did not print; 428 (the faintest print) follows its outline |
+| 10 | 442-490 | Fine |
+| 11 | 491-539 | Fine |
+| 12 | 540-588 | 580's first snake hugs the real print (no band, no wedge); 586's follows the toe; 557 (fallback) includes its faint toe tip |
+| 13 | 589-631 | Fine; 598-599 and the flat soles 628-631 wrapped closely |
+
+## Final-snake sheets (the contour that step 2 uses)
+
+| Sheet | Shoes | What I saw |
+|---|---|---|
+| 1 | 1-49 | Every second snake follows the outline, arch included, heel pads enclosed; the debris of 35 and 36 (red) lies outside the contour |
+| 2 | 50-98 | Fine; 93's frame line (red) outside |
+| 3 | 99-147 | Fine; the debris of 104, 105, 114 outside |
+| 4 | 148-196 | Fine; the erased frame lines of 148, 149, 186 (magenta) and 186's vertical line right of the print (red) do not touch the contours |
+| 5 | 197-245 | Fine; the boots' second snakes follow the arch concavity |
+| 6 | 246-294 | Fine |
+| 7 | 295-343 | Fine |
+| 8 | 344-392 | Fine; 375 (flagged: tightness) follows its S-shaped narrow print |
+| 9 | 393-441 | Fine; 405 (flagged: tightness) follows its waist; the heel-edge losses of 422 and 423 are small red marks at the heel bottom |
+| 10 | 442-490 | Fine; on 486 a small blob at the toe tip lies just outside the contour (coverage 0.994, above the band) |
+| 11 | 491-539 | Fine; 503 and 506 (flagged only for RACs off the print) have sound outlines |
+| 12 | 540-588 | The contours of 580, 582, 585, 586 follow the real sole; the artefacts (magenta, red) lie outside |
+| 13 | 589-631 | Fine |
+
+No loop, no self-intersection (0 of 631 by the metric), no border contact, no cut-off toe or heel among the 631 contours; contours 611-766 px (OLD 614-742).
+
+## Cleaned sheets (what the snake runs on)
+
+Looked at all 13 (shoes 1-631): every cleaned record holds sole only. The frame artefacts of 148, 149, 186, 580, 582, 585, 586, 589 are gone (erased or outside the mask); the debris beside the sole is gone; tiny specks remain at the toe edge of 35 and 36 inside the mask. Two known residuals (A-095): the middle of 580's straight bottom bar merges with the heel bottom and stays (about 195 px of bar in its contact surface; the heel's extent equals that of 584), and 223's thin 1-px stroke between the heel pads (37 px) stays inside the outline. 344 and 345 keep their transverse heel band, which is moulded sole (T3: RACs on it).
+
+## Stickers (מדבקות)
+
+**No police-type sticker or label (a solid rectangle or a label with text, as on OLD 59, 66, 142, 150, 374) is on any of the 631 new prints**: not on the raw sheets (T3), not on the 13 prototype sheets, not on the 13 cleaned sheets, not on the 42 shoes with the most contact between the Python mask and the R stamp mask. What the new prints carry instead are straight-edged frame artefacts (the edge of the lifting medium or the scanner plate) and margin debris. Those outside the mask are removed by the AND-cleaning, as the stickers were on OLD; the ones that overlap the mask (8 shoes, list above) are erased explicitly (`data/new_shoes/sticker_masks_new.csv`, 25 rectangles), in Python and in R. **None survives in a cleaned shoe or in a contour** (looked at on all 631 cleaned shoes and final snakes).
+
+## Flagged shoes (`docs/qa/T4/new/flagged/`)
+
+Looked at all 12 at twice the size: 8 (faint partial print, fallback contour sole-shaped; specks and one RAC off the print outside), 11, 107, 121, 140, 263, 503, 506 (RACs off the print: the contours follow the printed outline, and 107's missed RAC sits on an isolated speck right of the heel), 165 and 170 (coverage 0.990 and 0.988: specks at a faint toe; a snake 1-2 px inside a heel-pad rim), 375 and 405 (tightness 0.86 and 0.89: narrow or waisted soles, contours that follow them correctly). Before/after of the 9 fallbacks (`overrides_before_after_new.png`): with radius 24 the contours enclose the heel fragments of 112, 113, 163, the heel bottom of 63 and 185, the toe parts of 109 and 557, and replace 8's notch by a sole-shaped outline.
+
+## Against the OLD bar (the eight points above)
+1. Initial ellipse: encloses every new print; the toe-tip margin is small, as on OLD.
+2. First snake: smooth, on the outer envelope; with the closing it no longer stops between separate elements (the 2023-style failure on heel pads and partial prints).
+3. Second snake: follows the outline within a few pixels (median contour 7, 6, 7, 5 px beyond the outermost print at top, bottom, left, right; OLD 7, 5, 7, 5); no loop.
+4. Final contour: 611-766 px; no border contact.
+5. Coverage: the row-span fill holds at least 98.4% of the cleaned contact in every shoe (p1 99.5%), the snake polygon at least 98.0% (p1 99.1%); RAC coverage p1 0.953 (missed RACs lie off the print).
+6. Stickers: none on NEW; artefacts removed or erased; none in a cleaned shoe or contour.
+7. Mask vs sole: the mask contains the sole except four small edge cuts (125, 379, 422, 423).
+8. Contour vs mask: share of contour pixels outside the mask median 0, p99 0.22 (OLD median 0.057, p99 0.34).

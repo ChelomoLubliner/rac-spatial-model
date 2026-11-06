@@ -1055,3 +1055,27 @@ Chronological; newest entry at the bottom. Each entry: what was done, results (r
    - Fix: add it as a fact, as a dataset-shift item for T6, T7 and the T8 limitations. Ask Yoram or Sarena whether the codes and the marking protocol were the same in both collections.
 
 **For Shlomo:** I support A-087 (keep the legacy mapping) and the D-014 proposal (no correction; report K5 as a limitation). The shift of 0.5-1.25 px is common to both datasets and small against spline knots 26-82 px apart.
+
+## 2026-11-06 14:42, T4-snake (implementer), done
+
+**What.** Plan task T4: the snake adapted and checked on the 631 NEW shoes (it failed in 2023). Started 11:39 from `687e507`. Commits `1771960` (code, profile, erase list, overrides, tests), `e758dab` (NEW contour and QA outputs), `8c5f6b9` (contour tests, 2023 cross-check), then the docs commit. Decisions A-091 to A-098; plan Revision 9 with facts F56-F62. Results with exact commands and real outputs: `docs/tests/T4-snake-results.md` (`docs/tests/T4-results.md` points to it); visual review, sheet by sheet: `docs/qa/snake-qa.md` (NEW section).
+
+**Results.**
+- **NEW contour** `data/new_shoes/contour_Active_Contour_new.txt`: 631 records (none skipped or excluded), CRLF stride, sha256 `88d55933...`; **619 of 631 shoes (98.10%) pass every QA band**; the 12 flagged shoes reviewed (8 on the fallback with remaining flags, 11 `ok_after_review`: RACs off the print, specks at a faint toe, narrow or waisted soles).
+- **Why it works now** (24 variants scored on all 631 shoes, F57): the legacy snake passes 91.3% (OLD contours 94.6% under the same bands); its first snake stops between separate heel pads and lugs and on faint prints. A closing (disk radius 10) of the cleaned shoe before the first snake makes one silhouette: 96.8%, outline width unchanged on average (+0.08 px); radius 24 on 9 shoes where radius 10 fails (A-097) gives 98.1%.
+- **Determinism** (A-092): the snake depends on numpy's OpenBLAS thread count (52 of 72 arrays differ on 24 shoes); NEW runs one thread, set by `main` and checked by the snake step; forked runs (`--jobs`) equal serial ones; the thesis venv on `/mnt/c` rewrote the official contour byte for byte. A venv-wind build differs in 13 of 631 records by about 1 px (A-098, F61).
+- **Mask** (A-096): threshold 18, not the proportional 29: both pass the plan's criteria, 18 keeps more sole (removed 4,221 vs 5,035 px) and scores 96.8% vs 93.7%. Departs from the plan's tie-break: **Shlomo to confirm**.
+- **Stickers** (A-095): no police-type sticker on any NEW print (all 631 looked at on 13 prototype and 13 cleaned sheets). Frame artefacts that overlap the mask on 148, 149, 186, 580, 582, 585, 586, 589 are erased by `data/new_shoes/sticker_masks_new.csv` (25 rectangles, 3,406 px) in Python and in R (step 1). None survives in a cleaned shoe or a contour. Residuals reported: about 195 px of 580's bottom bar merge with its heel; 223's 1-px stroke inside the outline; real sole cut at the mask edge on 125, 379, 422, 423 (0.3-0.6% of each print).
+- **2023 cross-check** (F62): 19,993 of 20,013 RACs inside the new contours (2023: 19,960); distances correlate 0.98 with the 2023 ones.
+
+**Tests.** New: `tests/python/test_qa_snake.py` (26: geometry and metrics on synthetic shapes, bands, R mask port = `data/all_cont.csv`, erase list, overrides, profile isolation, BLAS guard, forked = serial, committed outputs and review), `tests/python/test_contour_new.py` (3), `tests/r/test_sticker_masks.R` (4 checks incl. step 1 on the sentinel fixture). `bash tests/run_all.sh` at `8c5f6b9`: ALL PASS (172 Python tests with 3 skipped live checks, 16 R scripts, flake8, shellcheck, work tree unchanged), about 5 min 10 s.
+
+**OLD regression.** `regress_old.sh --steps 0` at `e758dab`: ALL PASS (contour = Tier B `e18d50df...`, 1,556 intermediates = Tier B, live check), 398 s; `--steps 1`: ALL PASS (three Tier A CSVs and `shoe_codes.csv` byte-identical), 121 s. Steps 2-6 are untouched by T4. No committed OLD file changed (Tier A, old_baseline and old_added_t2 checksums pass).
+
+**Timings.** NEW step 0 1 min 52 s (snakes 80 s with 14 jobs); QA metrics, 52 sheets, 631 figures 3 min 16 s; a snake variant on 631 shoes 70-93 s; venv-wind NEW step 0 562 s (serial); OLD step-0 gate 398 s, step-1 gate 121 s; fast suite about 5 min.
+
+**Side effects outside the repo.** Only `<scratch>/t4/` (variants, gates kept with `--keep`, the venv-wind scratch copy). The thesis repo was only read (its venv run with `-B`).
+
+**Next.** T5 (R steps 1-6 on NEW): step 1 now reads the erase list (NEW only); the NEW contour exists. Open for people: A-096 (mask 18 vs the plan's 29) and A-094 (closing radius for NEW) for Shlomo; the residuals of A-095 (580's bar) if anyone wants a hand-drawn heel. Not done: a separate reviewer pass (the plan's independent look at 10% and the flagged shoes) belongs to the next workflow step.
+
+**Blockers.** None.

@@ -17,6 +17,14 @@ Derived file (T3, 2026-11-06; not a copy of an original, decision A-088):
 |---|---|---|
 | `locations_data_new.csv` | `RAC_DATASET=new python -m contour_algorithm.locations` (`--check` compares) | The raw locations in the column format of `data/locations_data.csv`: `shoe,x,y,type,rac_num` (OLD has `orientation, grade` instead of `rac_num`; the NEW data have neither). x and y = raw / 2 in exact decimal arithmetic, 7 decimals, LF line endings, file order. Equal to the 2023 file's x and y for all 20,013 RACs (to the last bit, in Python and in R); the pipeline still reads the raw file through the profile (divisor 2), with the same values |
 
+T4 files (2026-11-06; decisions A-095, A-097, A-098):
+
+| File | Written by | Content |
+|---|---|---|
+| `contour_Active_Contour_new.txt` | `RAC_DATASET=new python -m contour_algorithm.main --qa --jobs 14` | The snake contour of every NEW shoe: 631 records of 255 x 367 characters `0`/`1`, each followed by `\r\n` (the stride of `contacts_data_new.txt`); record k = shoe k (no shoe skipped or excluded). Built on WSL with one OpenBLAS thread, sha256 `88d55933...`; QA in `docs/qa/snake-qa.md` |
+| `sticker_masks_new.csv` | the T4 reviewer, from pixel dumps | Erase list (`shoe,row0,row1,col0,col1,reason`, 1-based inclusive ranges of the stored record): 25 rectangles of frame artefacts on 8 shoes that overlap the prototype region; erased when the contacts are read by step 0 (Python) and step 1 (R). The raw file itself is never changed |
+| `snake_overrides_new.csv` | the T4 reviewer | Per-shoe snake fallbacks (`shoe,first_closing_radius,center_r,center_c,radius_r,radius_c,reason`; empty = the profile's value): closing radius 24 for 9 shoes whose profile contour failed QA, each with its before/after metrics |
+
 ## Notes
 - Comparing the first rows: raw x = -0.409554 corresponds to x = -0.204777 in the 2023 file. That is exactly a factor of 2.
 - The 2023 snake distances were computed before the final Active_Contour settings used in the paper. Recompute them with the adapted snake before relying on them.

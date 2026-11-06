@@ -121,6 +121,17 @@ baselines; `RAC_SCRATCH` must name a scratch folder):
 RAC_SCRATCH=<scratch folder> bash tests/regress_old.sh --steps 0-6 --keep
 ```
 
+The NEW snake contour is committed (`data/new_shoes/contour_Active_Contour_new.txt`, T4): the NEW
+profile adapts the snake (a closing of the cleaned shoe before the first snake, one OpenBLAS thread,
+the cleaning mask from >= 18 shoes, an erase list of frame artefacts that Python and R apply, and
+per-shoe fallbacks), and 619 of 631 shoes pass every QA band; the visual review of every shoe is
+`docs/qa/snake-qa.md`, the contact sheets are in `docs/qa/sheets_new/`. To rebuild it and its QA:
+
+```bash
+RAC_DATASET=new python -m contour_algorithm.main --qa --jobs 14
+RAC_DATASET=new python -m contour_algorithm.qa_snake --metrics --sheets --flagged --crosscheck --jobs 14
+```
+
 The plan and the decisions behind this are in `docs/plans/2026-11-05-new-shoes-pipeline.md` and
 `docs/decisions.md`; the fast tests run with `bash tests/run_all.sh`.
 
