@@ -14,6 +14,12 @@ library(imager)
 
 ```{r}
 source("config.R")
+source(paste(ROOT_PATH, "statistical_model/R/distances.R", sep = ""))
+# RAC_DISTANCE_IMPL: vectorized (default; R/distances.R gives the same
+# doubles, bit for bit, about 20 times faster; decisions A-016, A-076) or
+# legacy (the row loops below)
+distance_impl <- rac_distance_impl()
+cat("distance implementation:", distance_impl, "\n")
 
 ```
 
@@ -157,10 +163,14 @@ calculate_min_horiz_distance <- function(new_data, contour_alg_df){
 
 
 ```{r contour_distance_8    BIG ITERATION HORIZ DIST}
+if (distance_impl == "vectorized") {
+  new_data <- compute_distances(dataCC, contour_df, P)
+} else {
 new_data <- calculate_min_distance(dataCC, contour_df)
 file_name <- rac_path(P, "dataCC_distance_temp")
 new_data <-read.csv(file_name,header=TRUE)
 new_data <- calculate_min_horiz_distance(new_data, contour_df)
+}
 
 
 ```
@@ -190,6 +200,9 @@ ycoor <- -matrix(rep((-row_proto / 2 + 1:row_proto) * proto_rel_Y_cord / proto_r
 entire_contour <- data.frame(x = xcoor[image == 1], y = ycoor[image == 1]) # the data 
 distance_per_y <- entire_contour %>% group_by(y) %>% summarise(min_x = abs(min(x)), max_x = max(x))
 
+if (distance_impl == "vectorized") {
+  dist_shape <- distance_shape_vec(new_data$x, new_data$y, distance_per_y)
+} else {
 dist_shape = c()
 for (i in 1:nrow(new_data)) {
   y_val = new_data$y[i]
@@ -216,6 +229,7 @@ for (i in 1:nrow(new_data)) {
   }
   #cat(i, '\t', y_val, '\t', closest_value, '\n')
   dist_shape <- append(dist_shape, closest_value)
+}
 }
 new_data$distance_shape <- dist_shape
 

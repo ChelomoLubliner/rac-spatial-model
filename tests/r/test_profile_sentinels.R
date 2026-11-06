@@ -54,7 +54,8 @@ new_root <- function(profile = NULL) {
 }
 
 # Render one Rmd of the temporary root; returns the exit status.
-render <- function(rt, rmd) {
+# impl: RAC_DISTANCE_IMPL for step 2 ("" = the default).
+render <- function(rt, rmd, impl = "") {
   log <- file.path(rt$root, paste(rmd, ".log", sep = ""))
   sm <- file.path(rt$root, "statistical_model")
   code <- paste("a <- commandArgs(trailingOnly = TRUE);",
@@ -65,6 +66,7 @@ render <- function(rt, rmd) {
                                  file.path(rt$root, "knit")),
                     env = c("RAC_DATASET=new",
                             paste("RAC_PROFILE_FILE=", rt$profile, sep = ""),
+                            paste("RAC_DISTANCE_IMPL=", impl, sep = ""),
                             "RGL_USE_NULL=TRUE"),
                     stdout = log, stderr = log)
   attr(status, "log") <- log
@@ -201,6 +203,24 @@ stopifnot(in_proto(dist$distance_shape))
 pass(sprintf(paste("every distance_shape (%d values) is a half-width of the",
                    "prototype in its own 44 x 66 frame"),
              length(unique(dist$distance_shape))))
+
+# both implementations of step 2 write the same bytes (A-016)
+both <- lapply(c("legacy", "vectorized"), function(impl) {
+  r <- new_root()
+  invisible(file.copy(out(a, "processed_data"), r$root, recursive = TRUE))
+  stopifnot(render(r, "dataCC_distance_2.Rmd", impl) == 0)
+  f <- c("processed_data/new/dataCC_distance_temp_new.csv",
+         "processed_data/new/dataCC_distance_new.csv")
+  sha <- vapply(f, function(x) digest::digest(file = out(r, x),
+                                              algo = "sha256"), "")
+  unlink(r$root, recursive = TRUE)
+  sha
+})
+stopifnot(identical(both[[1]], both[[2]]),
+          identical(unname(both[[2]][2]), digest::digest(
+            file = out(a, "processed_data/new/dataCC_distance_new.csv"),
+            algo = "sha256")))
+pass("step 2 legacy and vectorized: byte-identical CSVs on the fixture")
 
 # copies of step 2 that use the data frame for the prototype must fail:
 # the data width (caught by the frame check of step 2) and the data scale

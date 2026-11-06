@@ -34,8 +34,9 @@
 #                              A-075); creates the folder; returns path
 # rac_model_feature()          RAC_MODEL_FEATURE: NEW_X_NS_XY (default) or
 #                              CML_MODEL
-# rac_distance_impl()          RAC_DISTANCE_IMPL: legacy (default) or
-#                              vectorized
+# rac_distance_impl()          RAC_DISTANCE_IMPL: vectorized (default since
+#                              its byte-identity proof on OLD, A-076) or
+#                              legacy (the row loops of step 2)
 # Reading a profile does not use the random number generator (tested in
 # tests/r/test_profile.R), so it can run before set.seed().
 
@@ -211,7 +212,7 @@ rac_model_feature <- function() {
 }
 
 rac_distance_impl <- function() {
-  f <- rac_env("RAC_DISTANCE_IMPL", "legacy")
+  f <- rac_env("RAC_DISTANCE_IMPL", "vectorized")
   if (!f %in% c("legacy", "vectorized")) {
     stop("RAC_DISTANCE_IMPL must be legacy or vectorized, not '", f, "'",
          call. = FALSE)
