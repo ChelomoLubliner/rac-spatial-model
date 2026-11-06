@@ -1009,3 +1009,49 @@ Chronological; newest entry at the bottom. Each entry: what was done, results (r
    - The dilated stages C and F use the strict stage-O orientation, while the dilated orientation condition reads the dilated stage-O optimum. This is harmless here, since both are mirrored and unflipped.
 
 **Not an engineering defect, for Shlomo:** A-087 keeps the legacy mapping although the pre-registered primary (strict) rule says otherwise. The departure is stated in A-087, the plan, the results doc and the profile comment. Nothing is hidden, and every number behind it reproduces.
+
+## 2026-11-06 11:35, T3-newdata review (reviewer:statistician)
+
+**Verdict: approve** (statistics lens). The data preparation is exact, every calibration number reproduces, and keeping the legacy mapping for NEW is the right decision. But A-087 partly argues it with a test that cannot discriminate, and it should lead with the effect sizes in pixels. All findings are minor record and plan items, for Shlomo and for the rest of T3 and T5-T7. No T3-newdata output needs to change.
+
+**Verified by re-running** (my own code, which does not import `contour_algorithm`; `<scratch>/rv_stat_t3/`):
+- These match: the derived CSV = raw / 2 = the 2023 x and y; the legacy rates (OLD 0.847821 / 0.990291, NEW 0.807775 / 0.974666); the off-contact counts; the all-off shoes; the case pixels (13,249 / 19,990); 2023 `COL/ROW` = `aspix`.
+- Also on a sub-grid (sx 290-310, sy 295-307, offsets -1.5 to 0.5): the stage-F optima and the best offsets at 300 (both criteria, both datasets), the four committed B = 200 intervals to 6 decimals, and the cross-check rates 0.834907 and 0.874313. Of OLD's 0.0096 loss at the NEW optimum, 0.0073 comes from the row offset and 0.0019 from sx 297.
+- **Bootstrap Monte Carlo error.** Over 200 seeds, the B = 200 strict upper bound is OLD 0.0058 +- 0.0003 (min 0.0051) and NEW 0.0061 +- 0.0003 (min 0.0053), never below 0.005. The dilated bound is always below 0.005 (max 0.0021). With B = 20,000: OLD strict [-0.0012, 0.0060], NEW [-0.0011, 0.0062]. So the rule's outcome is not a Monte Carlo accident; the committed NEW 0.0056 is a low draw.
+- **Same coordinate frame.** Per shoe, the contact extent in coordinate units (medians, OLD vs NEW): length 0.967 vs 0.973, width 0.343 vs 0.343, toe 0.485 vs 0.485, heel -0.482 vs -0.488. Both collections were normalized to one frame, which supports a common 300 px per unit independently of the hit-rate criterion.
+- **Fast suite.** `bash tests/run_all.sh old` on a clean clone of `826a814`: ALL PASS in 4 min 9 s (143 Python tests with 3 skipped live checks, 15 R scripts, Tier A 24/24, old_baseline 11/11, old_added_t2 2/2). I did not rerun `regress_old.sh`; the engineer did.
+- **Images opened.** `calibration_curves_new.png`: one peak at 300 over 100-700, y sharp, x flat; the dilated x curve is flat from about 292 to 304. `offcontact_shoes_new.png`: RACs beside lugs (515, 69, 629), faint or partial prints (112, 286, 498, 177), and the dot type 599. Both match their descriptions.
+
+**Findings** (all minor).
+1. **A-087 reason 1 rests on a test with almost no power.** Reason 1 says "the validated version says keep", but the dilated rate barely moves inside the band.
+   - Dilated loss vs the optimum: sx +-6 px per unit, at most 0.0017 (OLD) and 0.0031 (NEW); sy +-2, at most 0.0027 and 0.0047.
+   - So the dilated test cannot separate any sx in [294, 306], or sy within 2 of the optimum. The strict criterion loses 0.007-0.030 at sy +-2.
+   - The decision stands on other evidence; lead with it:
+     - the strict surfaces have the same shape on both datasets;
+     - the NEW optimum differs from the OLD optimum by at most 0.75 px (columns) and 0.25 px (rows) anywhere on the sole;
+     - both optima are within 1.0-1.25 px of legacy, mostly the shared K5 offset;
+     - the same frame (above).
+   - Also, "where the mapping is known" should read "the mapping the OLD analysis uses": OLD's own optimum is sy 301 with a half-pixel offset.
+2. **Delta is optimistic, and the 0.005 margin was too tight by design.** s* is the argmax of 485,809 settings, and the bootstrap holds it fixed.
+   - In 200 random half splits, the in-sample Delta is 0.0025 (OLD) and 0.0032 (NEW).
+   - The out-of-sample Delta of the same selected settings is 0.0014 and 0.0015 (sd 0.0036 and 0.0023; below 0 in 28% and 20% of the splits).
+   - With a bootstrap SD of 0.0018-0.0019 (95% half-width about 0.0036), no setting near the optimum could meet the margin.
+   - The bias pushes toward "fail", so the "keep" decision is not affected. Fix: say so in A-087 and F52. For any later rule of this kind, set the margin from a precision check on OLD, and select on one half of the shoes and test on the other.
+3. **A-029, applied in 3c, is not calibrated by n and mostly flags low-contact prints.** (Bins below are among shoes with at least 10 RACs.)
+   - Share below q by n (10-15 / 16-25 / 26-40 / 41-80 / >80): OLD 1.7 / 2.9 / 9.2 / 6.2 / 5.7%, NEW 4.6 / 16.2 / 17.1 / 16.9 / 13.9%. The maximum over 81 shifts gives a median of 1.000 at n <= 15 in both datasets.
+   - Share below q by contact-area tercile (low / mid / high): OLD 12.9 / 3.0 / 0.0%, NEW 28.3 / 11.1 / 4.0%.
+   - NEW prints have about 13% fewer contact pixels (median 8,924 vs 10,266). So part of the NEW excess (14.5% vs 5.3%) is a dataset-wide difference in print density, not shoe-specific partial prints.
+   - Before 3c freezes the set: cross-tabulate the flag with the census's partial-print verdicts and with n and px; add an n-stratified threshold as a sensitivity; give these numbers to Micha with D-013.
+4. **Part 1 has no print-quality sensitivity.**
+   - RACs more than 1.5 px from contact: NEW 2.53% vs OLD 0.97%. Beyond 3 px: 0.88% vs 0.32%.
+   - 59% of the NEW ones (72% of those beyond 3 px) are in the 75 shoes flagged by the A-029 preview.
+   - They are concentrated at the heel (3.4%), arch (3.2%) and toe (2.9%), against 1.3% in the forefoot.
+   - Step 1 makes each one a case pixel with no controls around it. That raises the fitted intensity locally, more on NEW. T6 compares the maps and runs equality Wald tests with only an overlap sensitivity.
+   - Fix: add a NEW refit without these shoes to T5 and to T6 (c)-(f).
+5. **The RAC type mix differs between the datasets, and no fact records it.**
+   - Shares OLD vs NEW: type 1 24.2 vs 42.6%, type 2 58.8 vs 50.1%, type 4 6.8 vs 1.7%, type 6 6.8 vs 2.1%.
+   - The median per-shoe share of type 1 is 0.227 vs 0.476, so the difference covers the whole collection, not a few shoes.
+   - Types 3-7 sit less in the heel (OLD 12.5% vs about 18% for types 1 and 2), so the mix can shift the maps a little.
+   - Fix: add it as a fact, as a dataset-shift item for T6, T7 and the T8 limitations. Ask Yoram or Sarena whether the codes and the marking protocol were the same in both collections.
+
+**For Shlomo:** I support A-087 (keep the legacy mapping) and the D-014 proposal (no correction; report K5 as a limitation). The shift of 0.5-1.25 px is common to both datasets and small against spline knots 26-82 px apart.
