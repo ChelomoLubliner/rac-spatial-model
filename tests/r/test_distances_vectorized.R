@@ -14,7 +14,12 @@
 #    contour in y (no contour point within 0.01: the min_dist fallback; no
 #    prototype row within 0.01: the nearest-y fallback of distance_shape):
 #    identical() min_dist, horiz_dist, distance_shape and new_x.
-# 3. Optional (RAC_SLOW_TESTS=1, about 1 minute): the whole OLD step 2 with
+# 3. NEW (plan T5): the same legacy chunks against the vectorized functions
+#    on 2,000 random rows of processed_data/new/dataCC_new.csv (seed 1)
+#    with their NEW contour records (255 x 367 frame) and the prototype
+#    frame (307 x 395): identical() min_dist, horiz_dist, distance_shape and
+#    new_x.
+# 4. Optional (RAC_SLOW_TESTS=1, about 1 minute): the whole OLD step 2 with
 #    RAC_DISTANCE_IMPL=vectorized, rendered in a temporary copy, writes both
 #    CSVs with the Tier A sha256. tests/regress_old.sh --steps 2 checks the
 #    same on every gate run.
@@ -140,12 +145,12 @@ pass(sprintf(paste("min_dist and horiz_dist: the legacy loops of the Rmd and",
 # distance_shape and new_x: the legacy chunk, run once per implementation
 shape_chunk <- chunk_with("distance_per_y <- entire_contour")
 consts <- chunk_with("col_proto <- P$prototype$col_shoe")
-run_shape <- function(impl) {
+run_shape <- function(impl, prof = P, pass2 = pass2_legacy) {
   e <- new.env()
   e$rac_write_csv <- function(x, P, key) assign("written", x, envir = e)
-  e$P <- P
+  e$P <- prof
   e$ROOT_PATH <- ROOT_PATH
-  e$new_data <- csv_round_trip(pass2_legacy)
+  e$new_data <- csv_round_trip(pass2)
   e$distance_impl <- impl
   e$load.image <- imager::load.image
   e$rac_path <- rac_path
@@ -166,7 +171,59 @@ pass(sprintf(paste("distance_shape and new_x: the legacy loop and",
                    "distance_shape_vec() identical() (%d distinct y)"),
              length(unique(leg$y))))
 
-# --- 3. optional: the whole OLD step 2, vectorized, = Tier A ----------------
+# --- 3. NEW: legacy loops vs vectorized on 2,000 random NEW rows ----------
+# (plan T5 step 1, review focus 1; needs the NEW step-1 output and the NEW
+# contour of T4). The same chunks of the Rmd, the NEW profile: data frame
+# 255 x 367, prototype frame 307 x 395.
+contour_of_profile <- function(prof) {
+  Wp <- prof$col_shoe
+  Hp <- prof$row_shoe
+  n <- length(rac_analysis_shoes(prof))
+  stopifnot(file.size(rac_path(prof, "contour")) == n * (Wp * Hp + 2))
+  bytes <- readBin(rac_path(prof, "contour"), "raw", n * (Wp * Hp + 2))
+  xc <- t(matrix(rep((-Wp / 2 + 1:Wp) * prof$coords$rel_Y_cord /
+                       prof$coords$rel_col_shoe, Hp), Wp, Hp))
+  yc <- -matrix(rep((-Hp / 2 + 1:Hp) * prof$coords$rel_Y_cord /
+                      prof$coords$rel_col_shoe, Wp), Hp, Wp)
+  function(i) {
+    m <- matrix(bytes[(i - 1) * (Wp * Hp + 2) + seq_len(Wp * Hp)] ==
+                  as.raw(49), Hp, Wp, byrow = TRUE)
+    data.frame(shoe = i, x = xc[m], y = yc[m])
+  }
+}
+new_contour_of <- contour_of_profile(N)
+dataCC_n <- read.csv(rac_path(N, "dataCC"), header = TRUE)
+stopifnot(nrow(dataCC_n) > 2000)
+set.seed(1)
+sub_n <- dataCC_n[sort(sample(nrow(dataCC_n), 2000)), ]
+contour_n <- do.call(rbind, lapply(sort(unique(sub_n$shoe)), new_contour_of))
+legacy$P <- N
+p1_leg <- suppressMessages(legacy$calculate_min_distance(sub_n, contour_n))
+p1_vec <- sub_n
+p1_vec$row_number <- seq_len(nrow(p1_vec))
+p1_vec$min_dist <- min_dist_vec(p1_vec, contour_n)
+stopifnot(identical(p1_leg$min_dist, p1_vec$min_dist))
+in2_n <- csv_round_trip(p1_leg)
+p2_leg <- suppressMessages(legacy$calculate_min_horiz_distance(in2_n,
+                                                               contour_n))
+h_n <- horiz_dist_vec(in2_n, contour_n)
+n_inf_n <- sum(is.infinite(h_n))
+h_n[is.infinite(h_n)] <- in2_n$min_dist[is.infinite(h_n)]
+stopifnot(identical(p2_leg$horiz_dist, h_n))
+leg_n <- run_shape("legacy", N, p2_leg)
+vec_n <- run_shape("vectorized", N, p2_leg)
+stopifnot(identical(leg_n$distance_shape, vec_n$distance_shape),
+          identical(leg_n$new_x, vec_n$new_x), identical(leg_n, vec_n),
+          !anyNA(vec_n$distance_shape), all(is.finite(vec_n$new_x)))
+pass(sprintf(paste("NEW: min_dist, horiz_dist, distance_shape and new_x of",
+                   "the legacy loops and the vectorized functions",
+                   "identical() on %d random NEW rows of %d shoes (seed 1;",
+                   "%d without a contour point within 0.01 in y, %d",
+                   "distinct y)"),
+             nrow(sub_n), length(unique(sub_n$shoe)), n_inf_n,
+             length(unique(leg_n$y))))
+
+# --- 4. optional: the whole OLD step 2, vectorized, = Tier A ----------------
 if (identical(Sys.getenv("RAC_SLOW_TESTS"), "1")) {
   tmp <- tempfile("step2_vec_")
   dir.create(file.path(tmp, "statistical_model", "R"), recursive = TRUE)
