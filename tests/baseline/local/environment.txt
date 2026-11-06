@@ -1,4 +1,4 @@
-# Environment of the T1 Tier B reruns, recorded 2026-11-06T01:44:00+02:00
+# Environment of the T1 Tier B reruns, recorded 2026-11-06T03:43:30+02:00
 
 ## System
 Linux Taxes67-lp 6.18.54.1-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Tue Oct  6 19:13:07 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
@@ -6,7 +6,7 @@ PRETTY_NAME="Ubuntu 24.04.2 LTS"
 16
 
 ## Git
-this repo: 2196d8319f37d0e18f2a7253f2eb476b04818b9f (feature/new-shoes-pipeline)
+this repo: b3f7520cf3f9b0a8f3b9934de937a01e7c2ded28 (feature/new-shoes-pipeline)
 thesis repo HEAD: 109f30a0217aab16e35a31aaed628a555f57031d
 
 ## R (WSL)
@@ -98,6 +98,13 @@ tzdata==2025.2
 
 ## Python (Windows venv-wind, diagnostics only: /mnt/c/Users/mehes/Documents/repo/master_thesis_forensic_shoeprint/venv-wind/Scripts/python.exe)
 3.13.14 (tags/v3.13.14:fd17997, Jun 10 2026, 13:03:48) [MSC v.1944 64 bit (AMD64)]
+base_prefix C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0
+pyvenv.cfg (modified 2025-11-12 12:16:48.041539700 +0200):
+home = C:\Users\mehes\AppData\Local\Microsoft\WindowsApps\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0
+include-system-site-packages = false
+version = 3.13.9
+executable = C:\Users\mehes\AppData\Local\Microsoft\WindowsApps\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\python.exe
+command = C:\Users\mehes\AppData\Local\Microsoft\WindowsApps\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\python.exe -m venv C:\Users\mehes\Documents\repo\master_thesis_forensic_shoeprint\venv-wind
 black==25.11.0
 click==8.3.0
 colorama==0.4.6
