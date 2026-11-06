@@ -18,9 +18,15 @@ Recorded: the npz rebuilds the Tier B contour from the committed bytes with
 the sha256 in tests/baseline/local/python_contour.sha256, and the Windows
 check (contour_windows_check.txt) found 0 differing records of 386.
 Full (optional): RAC_REGRESS_PY_RUN=<folder of run_legacy_python.sh>
-compares all 386 records of that run with Tier B (Linux) or Tier A. Only
-a run that Tier B was not written from is evidence: Tier B came from
-<scratch>/t1/legacy_py_MXmkvc, so that folder can only pass (A-066).
+compares all 386 records of that run with Tier B (Linux) or Tier A, and
+(Linux) all 1,556 intermediate .npy/.png files with Tier B. The folder
+must first prove that it wrote them (decision A-067,
+tests/lib/run_manifest.py): exit_status 0, step0 with exit 0 in
+timings.tsv, the contour on its outputs_regenerated.sha256 list, and every
+intermediate newer than its outputs_expected.txt. Only a run that Tier B
+was not written from is evidence: Tier B came from
+<scratch>/t1/legacy_py_MXmkvc, so that folder can only pass (A-066); the
+T1 run folders predate the manifest and are refused.
 
 Run from the repo root with the thesis venv python:
   MPLBACKEND=Agg python -B -m unittest tests.python.test_snake_old_regression
@@ -38,6 +44,7 @@ import numpy as np
 from PIL import Image
 
 from tests.lib import contour_platform_diff as cpd
+from tests.lib.run_manifest import check_run_manifest
 
 REPO = Path(__file__).resolve().parents[2]
 LEGACY = REPO / 'contour_algorithm'
@@ -162,7 +169,9 @@ class SnakeOld(unittest.TestCase):
                          'set RAC_REGRESS_PY_RUN to a legacy run folder')
     def test_full_run_folder(self):
         run = Path(os.environ['RAC_REGRESS_PY_RUN'])
-        got = read_records(run / 'data/contour_Active_Contour.txt')
+        contour = 'data/contour_Active_Contour.txt'
+        check_run_manifest(run, [contour], steps=('step0',))
+        got = read_records(run / contour)
         want = self.contour.copy()
         if not ON_WINDOWS:
             for k, rec in linux_records().items():
@@ -170,6 +179,30 @@ class SnakeOld(unittest.TestCase):
         self.assertEqual(got.shape, want.shape)
         per_record = (got != want).reshape(got.shape[0], -1).sum(1)
         self.assertEqual(np.flatnonzero(per_record).tolist(), [])
+
+    @unittest.skipUnless(os.environ.get('RAC_REGRESS_PY_RUN'),
+                         'set RAC_REGRESS_PY_RUN to a legacy run folder')
+    @unittest.skipIf(ON_WINDOWS, 'Tier B intermediates are Linux bytes')
+    def test_full_run_intermediates(self):
+        run = Path(os.environ['RAC_REGRESS_PY_RUN'])
+        check_run_manifest(run, ['images/saved/freq_min_18.npy'],
+                           steps=('step0',))
+        start = (run / 'outputs_expected.txt').stat().st_mtime_ns
+        want = {}
+        for line in (LOCAL / 'python_intermediates.sha256').read_text(
+                ).splitlines():
+            want[line[66:]] = line[:64]
+        have = sorted(p.relative_to(run).as_posix()
+                      for p in (run / 'images').rglob('*')
+                      if p.is_file() and p.suffix in ('.npy', '.png'))
+        self.assertEqual(len(want), 1556)
+        self.assertEqual(have, sorted(want))
+        old = [p for p in have if (run / p).stat().st_mtime_ns <= start]
+        self.assertEqual(old, [], 'files older than the start of the run')
+        bad = [p for p in have
+               if hashlib.sha256((run / p).read_bytes()).hexdigest()
+               != want[p]]
+        self.assertEqual(bad, [])
 
 
 if __name__ == '__main__':
