@@ -705,3 +705,87 @@ Chronological; newest entry at the bottom. Each entry: what was done, results (r
 - The binary CSV writer (A-080) fixes a real Windows bug that was found by testing there.
 
 **Required before the next step:** finding 1, in both languages. Findings 2-5 can go into the same fix pass or T3.
+
+## 2026-11-06 07:38, T2-profiles review (reviewer:reproducibility)
+
+**Verdict: changes required** (reproducibility lens), for finding 1 only. Every committed OLD output that I re-ran from HEAD reproduces the `79247d8` baseline exactly. That is Tier A where the platform allows it, Tier B elsewhere, and it includes three Tier A runs under Windows at HEAD. But the new committed OLD file `processed_data/wald_test.csv` changes when step 5 runs on the Windows R, which has car installed, and an in-place knit there overwrites the committed file.
+
+**Re-run by me, with my own drivers** (`<scratch>/review_t2_repro/`).
+- How I ran it:
+  - Each run used `git archive` of HEAD with that step's outputs deleted first. R ran the README way (`cd statistical_model && Rscript -e 'rmarkdown::render(...)'`) with `RAC_DATASET` unset. Step 0 used the thesis venv itself, not the copy.
+  - Only the two Windows gates ran through their repo scripts. One of them (step 0 under venv-wind) started after the engineer's docs-only commit `793b8b7`, so it ran the same code as `26f323a`.
+  - Every comparison is my own: `cmp` or `sha256sum` against `git show 79247d8:<path>`, plus my own R field extraction. I did not use `dump_models.R` or `compare_models.R`.
+- **Tier A list.** The 24 sha256 values recomputed from the `79247d8` blobs equal `committed_79247d8.sha256`, and the work tree equals the blobs. Since `79247d8`, the only additions under `data/`, `processed_data/`, `saved_models/` and `model_images/` are `shoe_codes.csv` and `wald_test.csv`; nothing was modified. `tests/baseline/` is untouched in T2.
+- **T2c.** My AST comparison of the thesis `109f30a` blobs with `6c3488f` gives 8 of 8 modules the same. The negative control (`beta=0.10 -> 0.11`) is detected.
+- **Step 0 on WSL** (exit 0, 1,454 s under load).
+  - Contour = Tier B with CRLF (`e18d50df`). The same 30 records (19,027 px) as in T1 differ from `79247d8`.
+  - 1,556 of 1,556 intermediates = Tier B. `locations_new.csv` = the T1 legacy run.
+- **Step 0 under venv-wind** (`run_windows_python_step0.sh`, Python 3.13.14, Store 3.13.3824.0, 899 s).
+  - The contour is byte-identical to `79247d8:data/contour_Active_Contour.txt` (my `cmp`), and it was written by the run.
+  - `active-contour_all.npy` = the thesis run of 2025-11-13.
+- **Steps 1-6 on WSL** (vectorized default; every knit exit 0; all 17 outputs regenerated).
+  - The five CSVs = the `79247d8` bytes, and `shoe_codes.csv` = the committed file.
+  - GLMM: `identical()` to my own refit with the **unmodified** `79247d8` step 3 (455 s) and to the Tier B dump. Fields: fixef, both vcovs, theta, VarCorr, logLik, deviance, u, beta. My legacy refit itself equals the Tier B dump.
+  - CML: `identical()` to Tier A (coef, vcov, loglik, n, nevent, iter); W_CML = 420.6712420035.
+  - 8 of 8 normalized PDFs = Tier B, and step 5 gives W = 427.780447216513.
+  - Times (s, under load): 190 / 43 / 505 / 401 / 34 / 30 / 57 / 53.
+- **Step 2 with `RAC_DISTANCE_IMPL=legacy`** at HEAD (1,582 s): both CSVs = the `79247d8` bytes.
+- **Windows R 4.4.3 at HEAD.**
+  - Step 1: the three CSVs = `79247d8`, and `shoe_codes.csv` = the committed file.
+  - Step 2 (vectorized), its **first run under the Windows R**: both CSVs = `79247d8`. This closes the implementer's open point "step 2 has not been run under Windows R".
+  - Step 3 (`run_windows_r_step3.sh`, `RAC_WINR_COMMIT=HEAD`, 672 s): `RESULT 27 of 27 fields the same`. My own extraction gives fixef, both vcovs, theta, VarCorr, logLik, deviance, u and beta `identical()` to Tier A, W = 428.6933350010699.
+- **Tier A by composition.** Under Windows, from the raw inputs, each step writes the committed bytes of its output: step 0 the contour, steps 1-2 the five CSVs, step 3 the GLMM fields. Only the PDFs cannot be byte-compared across platforms (F20).
+- **Wald test.**
+  - Step 5 on the committed models: `wald_test.csv` is byte-identical to the committed file.
+  - Windows R with car 3.1-3, on the `79247d8` GLMM blob: the verbatim `79247d8` `linearHypothesis` chunk gives Chisq 428.69333500107. My own b'V^-1 b gives the same value, `wald.R` gives 428.693335001072 (relative difference 5e-15), df 24.
+- **A-081 diagnosis reproduced.** My WSL contour fed into step 2 gives the implementer's chained hashes `352d43d4` / `2ffaf75d`. 2,722 of 51,849 rows differ, in 29 shoe codes (all among the 30 records), and only in min_dist, horiz_dist and new_x.
+- **RNG.**
+  - `set.seed(P$r$seed)` (313) sits where `set.seed(313)` was, and in step 1 it still comes before the only `sample()`.
+  - In steps 3-6, `source("config.R")` moved before `set.seed`. Those steps draw no random numbers, and their models and PDFs are identical.
+  - `dataCC.csv` is byte-identical on WSL and on the Windows R, so the 38,600 sampled controls are the same.
+- **Collisions.**
+  - Python: 8,855 NEW output paths, from the path methods of both profiles. R: 18 NEW outputs. Every one has a `new` folder and a `_new` suffix, none equals an OLD output or a tracked file, and the OLD R paths are the legacy strings.
+  - Empirically, I ran `RAC_DATASET=new tools/run_pipeline.sh --steps 0-6` in a git-tracked scratch copy. This is the first complete NEW run; its values are provisional, and nothing of it is committed.
+    - All 9 steps exited 0 (s: 859 / 229 / 28 / 499 / 285 / 14 / 13 / 23 / 18).
+    - Every file that existed before is byte-identical afterwards (`sha256sum -c`), and no tracked file was modified.
+    - Every new file has a `new` folder and a `_new` suffix: 18 outputs, 4 x 631 per-shoe images, 9 `images_new/saved` files and the logs.
+    - Its step-1 CSVs equal the implementer's NEW smoke test byte for byte (83,090 rows, 19,990 cases).
+- `bash tests/run_all.sh old`: ALL PASS (91 Python tests, 3 skipped; 13 R scripts; flake8 46 files; shellcheck 12), 5 min 42 s under load.
+- **Images I opened.**
+  - My WSL overlays:
+    - Shoe 11: a partial print; the snake bows into the left arch, and a thin streak above the toe stays outside it.
+    - Shoe 176: the snake encloses both pads with a small wave at the toe, and no sticker is inside.
+  - My `NEW_X_NS_XY_SHOE.pdf` next to the committed one: the same map. It is hot on the left forefoot, the centre line, the right midfoot and the left heel, and blue at the toe tip and the heel edge.
+  - From the NEW scratch run (provisional values, for T4 to judge):
+    - `freq_min_29_new.png`: one sole-shaped region with a small bump on the left of the arch.
+    - Shoe 101: the snake encloses a dimpled sole with four round heel lugs, runs outside the print along the left arch, and no sticker is visible.
+    - `NEW_X_NS_XY_SHOE_new.pdf`: drawn in the OLD prototype frame, with a scale up to 0.0031. It is hottest along the right forefoot edge, which T5 should check (K8 edge or the provisional calibration).
+
+**Findings.**
+1. **Major (required): `processed_data/wald_test.csv`, a committed OLD CSV, is not reproducible on the Tier A platform, and an in-place run there overwrites it.**
+   - Reproduced: a scratch copy of HEAD, then step 5 knitted in place by the Windows R (car 3.1-3).
+     - The committed line `...,"manual","hessian",427.767419273715,1.46251348275581e-75,NA,NA` became `...,"manual+car","hessian",427.767419273715,1.46251348275581e-75,428.69333500107,9.42581267047992e-76`.
+     - The four CI PDFs stayed untouched (the A-075 guard works), and `knitr::knit` returned normally.
+     - With RStudio's Knit button the run would stop at the first PDF guard, but only after the CSV chunk had run (`statistical_tests_5.Rmd:139` writes the CSV, `:207` opens the first PDF).
+   - So user rule 2 fails for this file on the platform that made the committed GLMM and figures (Windows R 4.4.3, which has car). A-075's premise ("CSVs are not guarded: step 1 and 2 reproduce them byte for byte on every platform tried") does not cover step 5's CSV.
+   - Also, `regress_old.sh:233-235` and `:310-312` compare `shoe_codes.csv` and `wald_test.csv` with the **work-tree** files, which is the pattern A-070 rejected for the GLMM. No baseline checksum covers either file in `run_all.sh`.
+   - Results doc section 10 does not list the exception. Engineer finding 2 found the dependence; this adds the in-place overwrite and the gate's comparison with the work tree.
+   - Fix:
+     - Keep the committed file independent of optional packages: drop `method`, `W_car` and `p_car`, and print the car cross-check in the knit or in `logs/`. Or guard the file like the models and figures, before any output is written.
+     - Add sha256 entries for the two new OLD files to a baseline list that `run_all.sh` checks, and make `regress_old.sh` compare with that list or the HEAD blob instead of the work tree.
+     - State the exception or the fix in the results doc.
+2. **Minor: the README contradicts A-075 for OLD.**
+   - `README.md:59` ("Open each `.Rmd` in RStudio ... knit in order") and `:110` ("Pre-fitted `.rds` files ship in `saved_models/`, so Steps 4--6 work out of the box") no longer hold.
+   - Reproduced in a scratch copy of HEAD: step 4 in place exits 1 with `refusing to overwrite the committed OLD output .../model_images/NEW_X_NS_XY_SHOE.pdf`. Steps 3, 5 and 6 and `python -m contour_algorithm.main` refuse in the same way.
+   - This changes the user's OLD workflow on an agent call.
+   - Fix: rewrite both paragraphs (OLD reruns through `tests/regress_old.sh`, or after deleting the outputs), and mark A-075 as a workflow change for the user to confirm.
+3. **Minor: the Windows drivers use `knitr::knit`, whose default `error = TRUE` turns a chunk error into an `## Error` line and returns normally.**
+   - My in-place step-5 knit printed four `## Error: refusing ...` lines, and `try()` saw no failure.
+   - The T2 Windows evidence is valid only because every output was compared byte for byte, or field by field after the regenerated-output check.
+   - Fix: `knitr::opts_chunk$set(error = FALSE)` in `run_windows_r_step3.sh` and in every later Windows driver, or fail when the `.md` contains `## Error`.
+4. **Minor: results doc section 6 offers `grep -c "row N" .../logs/step2.log` = 0 as evidence that the vectorized path ran.** rmarkdown sends `message()` into the knit HTML, so the legacy loops also give 0 there. My legacy run had 0 in the log and 104 matches in the HTML; the vectorized run had 2, which are code echoes. The implementer's legacy-loop gate `regress_old_rj6KaH` also has 0. The knit's `## distance implementation: vectorized` line and the timing are valid evidence; use them instead.
+5. **Minor, concurring with engineer finding 4 (no runtime namespace guard).** Today's profile is collision-free, statically and in a full NEW run. But nothing at run time stops an edited NEW path from overwriting an OLD CSV: `rac_write_csv` is unguarded for both datasets.
+
+**What is good.** Every T2 number that I re-ran is real, to the digit, including the failed chained gates. The step-2 vectorization is byte-identical on two platforms and on the WSL-contour chain. The profile keeps the OLD values as exact doubles and the OLD paths as the legacy strings. The refusals protect the committed contour, models and figures.
+
+**Required before T3:** finding 1. Findings 2-5 can go into the same fix pass.
