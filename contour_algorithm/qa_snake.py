@@ -763,6 +763,39 @@ def sticker_table(profile):
     return out
 
 
+# --- cross-check with the 2023 processing (plan T4 step 7) -----------------
+
+def crosscheck_2023(profile, run):
+    """Per shoe, the RACs of the 2023 file (`inputs.cross_check`: COL, ROW
+    1-based, INSIDE_SNAKE, DIST_SNAKE in pixels) against the profile's
+    contour: n_rac, inside_new (RAC pixel in the record's row-span fill),
+    inside_2023, inside_disagree (new - 2023), and the absolute difference
+    between DIST_SNAKE and the distance from the RAC pixel to the nearest
+    contour pixel (median, p90, max; pixels)."""
+    old = pd.read_csv(profile.cross_check)
+    rows = []
+    for shoe, g in old.groupby('shoe'):
+        k = list(run['shoes']).index(int(shoe))
+        rec = run['records'][k]
+        fill = row_span_fill(rec)
+        pts = np.argwhere(rec)
+        r0 = g['ROW'].to_numpy() - 1
+        c0 = g['COL'].to_numpy() - 1
+        d = np.hypot(pts[:, 0][None, :] - r0[:, None],
+                     pts[:, 1][None, :] - c0[:, None]).min(axis=1)
+        dd = np.abs(d - g['DIST_SNAKE'].to_numpy())
+        inside = fill[r0, c0]
+        rows.append({'shoe': int(shoe), 'n_rac': len(g),
+                     'inside_new': int(inside.sum()),
+                     'inside_2023': int(g['INSIDE_SNAKE'].sum()),
+                     'med_abs_dd': float(np.median(dd)),
+                     'p90_abs_dd': float(np.quantile(dd, 0.9)),
+                     'max_abs_dd': float(dd.max())})
+    out = pd.DataFrame(rows)
+    out['inside_disagree'] = out['inside_new'] - out['inside_2023']
+    return out
+
+
 # --- prototype cleaning-mask threshold (plan T4 step 3) --------------------
 
 def threshold_study(profile, thresholds, r_thresholds=(), shoes_of_note=(),
@@ -911,6 +944,9 @@ def main(argv=None):
                         help='comma list: the prototype-mask threshold '
                              'study (mask_threshold table and the '
                              'prototype_mask figure of the sheets folder)')
+    parser.add_argument('--crosscheck', action='store_true',
+                        help='compare with the 2023 snake distances '
+                             '(inputs.cross_check)')
     parser.add_argument('--compare', default=None,
                         help='comma list: the thresholds of the figure '
                              '(default: all of --thresholds)')
@@ -948,6 +984,15 @@ def main(argv=None):
             sticker_table(profile).to_csv(out, index=False,
                                           lineterminator='\n')
             print(f'wrote {out}')
+    if args.crosscheck:
+        if profile.cross_check is None:
+            print('contour_algorithm.qa_snake: the profile has no '
+                  'cross_check file', file=sys.stderr)
+            return 2
+        out = snake_qa_path(profile, 'crosscheck_2023', 'csv')
+        crosscheck_2023(profile, run).round(3).to_csv(
+            out, index=False, lineterminator='\n')
+        print(f'wrote {out}')
     if args.sheets:
         write_sheets(profile, run, table)
     if args.figures:

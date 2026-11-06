@@ -438,6 +438,19 @@ class Files(unittest.TestCase):
             with self.subTest(shoe=row['shoe']):
                 self.assertEqual(row['qa_flags'], q.flag_shoe(row))
 
+    def test_crosscheck_reproduces(self):
+        """The committed 2023 cross-check table is what crosscheck_2023
+        gives on the committed contour (needs no step-0 images)."""
+        p = self.p
+        run = {'shoes': p.analysis_shoes(),
+               'records': read_shoes(p.contour_out, p.W, p.H,
+                                     len(p.analysis_shoes()))}
+        got = q.crosscheck_2023(p, run).round(3)
+        want = pd.read_csv(q.snake_qa_path(p, 'crosscheck_2023', 'csv'))
+        pd.testing.assert_frame_equal(got.reset_index(drop=True), want,
+                                      check_dtype=False)
+        self.assertEqual(int(got['n_rac'].sum()), 20013)
+
     def test_all_flags_resolved(self):
         """Every flagged shoe has a resolution in RESOLUTIONS and a note
         (plan T4 test_qa_snake.Flags.test_all_flags_resolved)."""

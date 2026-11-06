@@ -4,10 +4,10 @@ shoe,resolution,note
 107,ok_after_review,"2 of 22 RACs outside: one on an isolated 4-px speck 16 px beside the lower-right heel, one 4 px outside and 8 px from contact; the contour wraps the printed heel, the snake does not reach isolated specks (as on OLD); the radius-24 fallback leaves both outside too"
 121,ok_after_review,"1 of 18 RACs lies 8 px outside beside the heel and 9 px from contact (off the print); faint, partly printed heel; tightness 0.915 within the band"
 140,ok_after_review,"3 of 26 RACs at the barely printed lower-right heel pad, 1-8 px outside the contour and 6-12 px from contact (off the print, T3); the radius-24 fallback keeps the same flag, so the profile contour stays"
-165,ok_after_review,coverage 0.9896 (just below 0.99): the missed pixels are specks around the pointed toe of a faint print; the contour follows the printed outline
+165,ok_after_review,"coverage 0.9896 (just below 0.99): the missed pixels are specks around the pointed toe of a faint print; the contour follows the printed outline; the radius-24 fallback reaches coverage 0.998 but breaks the turning band (a jag at the top left of the toe), so the profile contour stays"
 170,ok_after_review,coverage 0.9875: the snake runs 1-2 px inside the outer rim of the lower-left heel pad (rim pixels outside the polygon); row-span fill coverage 0.9944; the radius-24 fallback does not improve it (0.9868)
 263,ok_after_review,1 of 19 RACs lies 2 px below the heel and 7 px from contact (off the print); the contour follows the outline
 375,ok_after_review,"tightness 0.857: a narrow-waisted (S-shaped) square-dot sole; the contour follows the waist correctly, so the contour is smaller than the convex hull of the print"
-405,ok_after_review,"tightness 0.892: strongly waisted sole; the contour follows the waist correctly; the radius-24 fallback would meet the band only by bridging the waist (looser), so it is not used"
+405,ok_after_review,"tightness 0.892: strongly waisted sole; the contour follows the waist; the radius-24 fallback meets the band (0.959) only by running a few pixels wider at the waist, not by enclosing missed print (coverage 0.9988 vs 1.0), so the profile contour stays"
 503,ok_after_review,1 of 19 RACs lies 2 px outside beside the heel and 11 px from contact (off the print)
 506,ok_after_review,2 of 13 RACs lie 12-14 px above the toe and 5-10 px from contact (off the print; T3 noted the RAC above the toe)
