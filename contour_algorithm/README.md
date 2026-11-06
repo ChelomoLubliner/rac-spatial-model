@@ -1,38 +1,67 @@
-# contour_algorithm: the thesis snake code (legacy, style-fixed)
+# contour_algorithm: step 0, the snake contour of every shoe
 
-The `.py` files in this folder were committed in T1 (`fe94300`, 2026-11-05) as **byte-identical
-copies** of `contour_algorithm/` in the thesis repository
-(`/mnt/c/Users/mehes/Documents/repo/master_thesis_forensic_shoeprint`) at commit `109f30a`
-(the git blobs, LF line endings; the thesis working tree holds the same text with CRLF), so that
-the plan's T2 port (style fixes, dataset profiles) is a reviewable diff against the code that
-produced the committed old contour. T2c applied the flake8 style fixes only (see below).
+The thesis snake code (thesis repository
+`/mnt/c/Users/mehes/Documents/repo/master_thesis_forensic_shoeprint`, `contour_algorithm/` at
+`109f30a`), ported into this repository in three reviewable steps:
 
-`requirements-lock.txt` is the `pip freeze` of the thesis venv (Python 3.12.3) that runs this code.
-`requirements.txt` pins the direct dependencies to those versions (T2).
+| Commit | What |
+|---|---|
+| `fe94300` (T1) | Byte-identical copy of the thesis blobs (LF), plus `requirements-lock.txt` (the venv's `pip freeze`) |
+| `9adc036`, `6c3488f` (T2c) | The three modules `main.py` never imported dropped (A-073); flake8 fixes only: each kept module has the same Python AST as its verbatim blob, docstrings and one placeholder-free f-string aside |
+| T2d | Every dataset value from the dataset profile (`config/datasets.json`, `profiles.py`); package imports; `globals.py` removed |
 
-Three thesis modules that `main.py` never imports were dropped in T2 (decision A-073):
-`alphas_shape.py` (needs `alphashape` and `shapely`, which are not installed),
-`contact_with_locations.py` (a QA drawing with a hard-coded Windows path) and `convex_hull.py`
-(the convex-hull contour of the 2023 processing). Their verbatim text stays in this repo's history
-(commit `fe94300`) and in the thesis repo at `109f30a`.
+## Run
 
-## Do not run it in place
-The legacy code uses paths relative to its working directory: it reads `../data/contacts_data.txt`
-and `../Data/locations_data.csv`, writes about 3.6 GB under `../images/`, and **overwrites
-`../data/contour_Active_Contour.txt`** (with LF line endings, which breaks the committed CRLF file).
-Run it only through `tests/legacy/run_legacy_python.sh`, which copies the code and the inputs into
-a fresh scratch folder (`RAC_SCRATCH`). The only other user is
-`tests/python/test_snake_old_regression.py`, which imports two modules and points their `FOLDER` at a
-temporary folder. This holds until the T2d commit replaces the fixed paths with profile paths
-(decision A-064). If `data/contour_Active_Contour.txt` is ever overwritten, restore it with
-`git checkout -- data/contour_Active_Contour.txt`; the Tier A checksum of `tests/run_all.sh` fails
-until it is restored.
+From the repository root, with the thesis venv (`venv/bin/python`; nothing is installed):
 
-Known issues kept as they are (plan, known issues): the left-shoe flip of image 8
-(`create_files_shoes.py:26-30`) is dead code (`FOLDER` never equals `'Images/Old_Shoes/'`), so shoe 9
-is not flipped (K1); `active_contour_snake.py:175` writes the fixed path above and `:177` skips
-index 126 (shoe 127) for any dataset; `globals.py` selects the dataset with `OLD_DATASET` and uses
-`../images/` for both datasets. The verbatim code had 106 flake8 findings. T2c fixed them in a
-style-only commit (A-064): each module has the same Python AST as its verbatim blob, apart from
-docstrings and one f-string without placeholders (`docs/tests/T2-profiles-results.md`), and the lint
-check of `tests/run_all.sh` covers this folder.
+```bash
+RAC_DATASET=new python -m contour_algorithm.main [--steps create,contour,snake,distance] [--html]
+```
+
+`RAC_DATASET` is `old` (default; empty means old) or `new`. Every dimension, count, threshold,
+snake parameter and path comes from that dataset's profile: OLD writes the legacy names under
+`images/` and `data/contour_Active_Contour.txt`; NEW writes under `images_new/` with the suffix
+`_new` and `data/new_shoes/contour_Active_Contour_new.txt` (plan section 5). Both `images*/` folders
+are gitignored. `--html` also writes the per-shoe plotly views (off by default, A-017).
+
+The CLI refuses, with exit 2 and before writing anything:
+- `RAC_PROFILE_FILE` set (a test hook; decision A-049);
+- an OLD run whose contour file exists. The committed `data/contour_Active_Contour.txt` is the
+  Tier A baseline, written under Windows; a rerun on WSL differs in 30 of 386 records (A-060). OLD
+  runs belong in a scratch copy: `tests/regress_old.sh` deletes the file there first (A-075).
+
+## Modules
+
+| Module | Step | What |
+|---|---|---|
+| `profiles.py` | | `load_profile()`, `env()`, `Profile` (dimensions, skip lists, snake parameters, `image_path()`, `saved_path()`, record mapping) |
+| `io_shoes.py` | | `read_shoes()` (strict: size, CRLF separators, 0/1 bytes) and `write_shoes()` (binary CRLF on every platform) |
+| `locations.py` | | `read_locations()` (OLD CSV; NEW raw file divided by 2) and `record_skip_idx0()` (shoes without RACs computed from the locations and checked against the profile, plus `excluded_shoes`) |
+| `create_files_shoes.py` | 0a | Shoe images, `list_matrices`, the superposition, the mask `>= superpose_threshold`, the prototype snake |
+| `contour.py`, `remove_noise.py` | 0b | Each shoe cleaned by the prototype mask; its extreme-value contour |
+| `active_contour_snake.py` | 0c | The two-pass snake of each shoe; the contour file (one record per analysis shoe) |
+| `distance_extremities.py` | 0d | Pixel (COL, ROW) of every RAC (`aspix_x`, `aspix_y`, as in R) |
+| `main.py` | | The CLI above |
+
+## Regression (OLD)
+
+The ported step 0 with the OLD profile reproduces, on WSL, the T1 rerun of the verbatim code
+(Tier B) exactly: the contour file (CRLF, sha256 `e18d50df...`) and all 1,556 intermediate
+`.npy`/`.png` files; under the Windows venv-wind it reproduces the committed contour (Tier A,
+`ca8a07f2...`). Evidence and commands: `docs/tests/T2-profiles-results.md`. Fast checks:
+`tests/python/test_snake_old_regression.py` (8 shoes), `test_io_shoes.py`, `test_profiles.py`,
+`test_snake_geometry.py`, `test_locations.py`, `test_sentinel_profile.py` (the profile values reach
+the outputs on a tiny fixture, A-035).
+
+## Known issues kept as they are (plan, known issues)
+- K1: the thesis flip of image 8 was dead code (`FOLDER` never equalled `'Images/Old_Shoes/'`), so
+  the committed contour of shoe 9 is unflipped while R flips its contact. The OLD profile keeps
+  `python.contact_flip_shoes = []` (A-015).
+- `get_snake_image()` draws on a `(W, H)` array and transposes back: a double swap, correct for
+  non-square frames (plan F15), locked by `tests/python/test_snake_geometry.py`.
+- The prototype mask of the legacy loop is `total >= t`; the port computes it directly (same array)
+  and raises when `t` exceeds the maximum count, where the loop silently saved nothing.
+- Dropped as dead code: the unused `superposed_pixels_reversed()` and `heatmap_superposed()`
+  (commented out in the thesis `main()`), the module dictionary of `remove_noise.py`, the
+  commented-out distance functions of `distance_extremities.py`. `list_contour.npy` is saved once
+  after the loop (the thesis code saved it after every shoe; the last save is the same file).

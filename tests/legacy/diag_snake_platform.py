@@ -1,6 +1,8 @@
-"""Diagnostic (T1): re-run the legacy snake for chosen OLD shoes and compare
-with the committed contour records; runs under any Python that has the
-thesis packages (the WSL venv or the Windows venv-wind through interop).
+"""Diagnostic (T1): re-run the snake for chosen OLD shoes and compare with
+the committed contour records; runs under any Python that has the thesis
+packages (the WSL venv or the Windows venv-wind through interop). Since T2
+it runs contour_algorithm/ (the thesis code ported with dataset profiles)
+with the OLD profile, its images folder moved to WORK_DIR.
 
 Usage: python -B diag_snake_platform.py REPO_ROOT WORK_DIR OUT_NPZ SHOE...
   SHOE = 1-based shoe ids (not 127), or the single word "all" (the 386
@@ -12,6 +14,7 @@ and max distance (px) from each re-run contour pixel to the nearest
 committed contour pixel.
 """
 
+import dataclasses
 import os
 import platform
 import sys
@@ -41,19 +44,21 @@ def main(argv):
     else:
         shoes = [int(s) for s in argv[3:]]
     os.environ.setdefault('MPLBACKEND', 'Agg')
-    sys.path.insert(0, str(repo / 'contour_algorithm'))
-    import active_contour_snake as acs
-    import remove_noise as rn
+    if str(repo) not in sys.path:
+        sys.path.insert(0, str(repo))
+    from contour_algorithm import active_contour_snake as acs
+    from contour_algorithm import remove_noise as rn
+    from contour_algorithm.profiles import load_profile
     import numpy
     import scipy
     import skimage
-    folder = str(work) + os.sep
+    profile = dataclasses.replace(
+        load_profile('old', file=repo / 'config' / 'datasets.json',
+                     root=repo), images_dir=work)
     for sub in ('saved', 'cleaned_shoes'):
-        os.makedirs(folder + sub, exist_ok=True)
-    acs.FOLDER = folder
-    rn.FOLDER = folder
+        os.makedirs(profile.images_dir / sub, exist_ok=True)
     mask = np.array(Image.open(repo / 'data' / 'freq_min_18.png')) > 0
-    np.save(folder + 'saved/freq_min_18.npy', mask)
+    np.save(profile.saved_path(profile.stem('prototype_mask'), 'npy'), mask)
     raw = read_records(repo / 'data' / 'contacts_data.txt', sep=b'\r\n')
     committed = read_records(repo / 'data' / 'contour_Active_Contour.txt',
                              sep=b'\r\n')
@@ -74,8 +79,8 @@ def main(argv):
         idx0 = shoe - 1
         k = record_of_idx0(idx0)
         snakes.clear()
-        rn.save_cleaned_shoes(raw, idx0)
-        arr = acs.active_contour_shoe(None, plot_img=False,
+        rn.save_cleaned_shoes(profile, raw, idx0)
+        arr = acs.active_contour_shoe(profile, None, plot_img=False,
                                       save_img_bool=False, im_num=idx0)
         diff = int((arr != committed[k]).sum())
         mean_d, max_d = nearest_dist(arr, committed[k]) if diff else (0, 0)

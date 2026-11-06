@@ -1,3 +1,11 @@
 # Raw data files: keep byte-identical (fixed-offset readers depend on CRLF separators)
 data/new_shoes/*.txt -text
 data/new_shoes/*.csv -text
+# OLD inputs and outputs with committed line endings (CRLF in data/*.txt,
+# data/all_cont.csv, processed_data/dataCC.csv and shoe_pixel_counts.csv;
+# plan F19, A-005): never converted by git
+data/*.txt -text
+data/all_cont.csv -text
+processed_data/**/*.csv -text
+# Sentinel fixture (fixed-stride records with CRLF, A-035)
+tests/fixtures/sentinel/data/*.txt -text

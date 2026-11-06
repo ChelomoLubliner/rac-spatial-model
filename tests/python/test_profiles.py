@@ -9,7 +9,9 @@ tempfile folder.
 
 import json
 import os
+import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path, PurePosixPath
@@ -20,6 +22,7 @@ from contour_algorithm.profiles import env, load_profile
 
 REPO = Path(__file__).resolve().parents[2]
 PROFILE_FILE = REPO / 'config' / 'datasets.json'
+FIXTURE_PROFILE = REPO / 'tests/fixtures/sentinel/sentinel_profile.json'
 NEW_FOLDERS = {'new', 'new_shoes', 'images_new'}
 # The models and figures of the R steps are <models_dir>/<feature><suffix>
 # .rds and <images_dir>/<stem><suffix>.pdf (statistical_model/R/profile.R).
@@ -240,6 +243,67 @@ class Env(unittest.TestCase):
             os.environ['RAC_PROFILE_FILE'] = ''
             self.assertEqual(load_profile('old').num_shoe, 387)
             self.assertEqual(load_profile('old').file, PROFILE_FILE)
+
+
+class Cli(unittest.TestCase):
+    """python -m contour_algorithm.main refuses, before writing anything, a
+    set RAC_PROFILE_FILE (A-049), an unknown dataset, bad --steps, and an
+    OLD run whose contour file exists (the committed Tier A file is never
+    overwritten in place). Run in a temporary copy of the package and the
+    profile file, so that a broken guard cannot touch the repository."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name)
+        shutil.copytree(REPO / 'contour_algorithm',
+                        self.root / 'contour_algorithm',
+                        ignore=shutil.ignore_patterns('__pycache__'))
+        shutil.copytree(REPO / 'config', self.root / 'config')
+        (self.root / 'data').mkdir()
+        self.contour = self.root / 'data' / 'contour_Active_Contour.txt'
+        self.contour.write_bytes(b'committed')
+
+    def files(self):
+        return sorted((p.relative_to(self.root), p.stat().st_mtime_ns)
+                      for p in self.root.rglob('*') if p.is_file())
+
+    def run_cli(self, extra_env, *args):
+        env = {k: v for k, v in os.environ.items()
+               if not k.startswith('RAC_')}
+        env.update(extra_env, PYTHONDONTWRITEBYTECODE='1')
+        return subprocess.run(
+            [sys.executable, '-B', '-m', 'contour_algorithm.main', *args],
+            cwd=self.root, env=env, capture_output=True, text=True,
+            timeout=300)
+
+    def assert_refused(self, result, before, text):
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn(text, result.stderr)
+        self.assertEqual(self.files(), before)
+        self.assertEqual(self.contour.read_bytes(), b'committed')
+
+    def test_refuses_profile_file(self):
+        before = self.files()
+        for dataset in ('new', 'old'):
+            with self.subTest(dataset=dataset):
+                r = self.run_cli({'RAC_PROFILE_FILE': str(FIXTURE_PROFILE),
+                                  'RAC_DATASET': dataset})
+                self.assert_refused(r, before, 'A-049')
+
+    def test_refuses_old_contour_overwrite(self):
+        before = self.files()
+        for extra in ({}, {'RAC_DATASET': ''}, {'RAC_DATASET': 'old',
+                                                'RAC_PROFILE_FILE': ''}):
+            with self.subTest(env=extra):
+                self.assert_refused(self.run_cli(extra), before, 'Tier A')
+
+    def test_refuses_bad_dataset_and_steps(self):
+        before = self.files()
+        self.assert_refused(self.run_cli({'RAC_DATASET': 'foo'}), before,
+                            'RAC_DATASET')
+        self.assert_refused(self.run_cli({'RAC_DATASET': 'new'}, '--steps',
+                                         'create,html'), before, '--steps')
 
 
 class Validation(unittest.TestCase):

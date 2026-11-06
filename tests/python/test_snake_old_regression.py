@@ -8,19 +8,21 @@ all 386 records under the thesis Windows venv; under the WSL venv (same
 package versions) most records are reproduced and the others differ by
 about one pixel (deterministic on each platform).
 
-Default (fast, about 40 s): runs the legacy snake (`contour_algorithm/`,
-the verbatim thesis code at 109f30a) in a temporary folder (the module-level
-FOLDER of the legacy modules points there; nothing in the repo is written):
+Default (fast, about 40 s): runs the snake of `contour_algorithm/` (the
+thesis code at 109f30a, ported with dataset profiles in T2) with the OLD
+profile, its images folder moved to a temporary folder (nothing in the
+repo is written):
   - shoes reproduced on both platforms -> equal to the committed record;
   - platform-sensitive shoes -> the committed record on Windows, the Tier B
     record (tests/baseline/local/contour_linux_diff.npz) on Linux.
 Recorded: the npz rebuilds the Tier B contour from the committed bytes with
 the sha256 in tests/baseline/local/python_contour.sha256, and the Windows
 check (contour_windows_check.txt) found 0 differing records of 386.
-Full (optional): RAC_REGRESS_PY_RUN=<folder of run_legacy_python.sh>
-compares all 386 records of that run with Tier B (Linux) or Tier A, and
-(Linux) all 1,556 intermediate .npy/.png files with Tier B. The folder
-must first prove that it wrote them (decision A-067,
+Full (optional): RAC_REGRESS_PY_RUN=<folder of run_legacy_python.sh, or of
+tests/regress_old.sh with step 0> compares all 386 records of that run
+with Tier B (Linux) or Tier A, and (Linux) all 1,556 intermediate .npy/.png
+files with Tier B. A regress_old.sh folder holds its outputs below repo/.
+The folder must first prove that it wrote them (decision A-067,
 tests/lib/run_manifest.py): exit_status 0, step0 with exit 0 in
 timings.tsv, the contour on its outputs_regenerated.sha256 list, and every
 intermediate newer than its outputs_expected.txt. Only a run that Tier B
@@ -32,10 +34,10 @@ Run from the repo root with the thesis venv python:
   MPLBACKEND=Agg python -B -m unittest tests.python.test_snake_old_regression
 """
 
+import dataclasses
 import hashlib
 import os
 import platform
-import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -43,12 +45,13 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+from contour_algorithm import active_contour_snake, remove_noise
+from contour_algorithm.profiles import load_profile
 from tests.lib import contour_platform_diff as cpd
 from tests.lib.old_records import H, W, read_records, record_of_idx0
 from tests.lib.run_manifest import check_run_manifest
 
 REPO = Path(__file__).resolve().parents[2]
-LEGACY = REPO / 'contour_algorithm'
 LOCAL = REPO / 'tests' / 'baseline' / 'local'
 # 0-based image indices: shoe 1; shoe 9 (left shoe, not flipped, K1);
 # shoes 35 and 153 (lowest RAC on-contact rates, plan F27); shoe 236
@@ -62,13 +65,13 @@ COMMITTED_CONTOUR_SHA256 = (
 ON_WINDOWS = platform.system() == 'Windows'
 
 
-def load_legacy_modules():
-    os.environ.setdefault('MPLBACKEND', 'Agg')
-    if str(LEGACY) not in sys.path:
-        sys.path.insert(0, str(LEGACY))
-    import active_contour_snake
-    import remove_noise
-    return active_contour_snake, remove_noise
+def run_folder_base(run):
+    """(folder that holds the outputs, their path prefix in the manifest):
+    the run folder itself (run_legacy_python.sh) or its repo/ copy
+    (tests/regress_old.sh)."""
+    if (run / 'repo').is_dir():
+        return run / 'repo', 'repo/'
+    return run, ''
 
 
 def linux_records():
@@ -83,29 +86,29 @@ class SnakeOld(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.acs, cls.rn = load_legacy_modules()
         cls.tmp = tempfile.TemporaryDirectory(prefix='snake_old_')
-        folder = cls.tmp.name + os.sep
-        os.makedirs(folder + 'saved')
-        os.makedirs(folder + 'cleaned_shoes')
+        # the OLD profile with its images folder in the temporary folder
+        cls.profile = dataclasses.replace(
+            load_profile('old', file=REPO / 'config' / 'datasets.json'),
+            images_dir=Path(cls.tmp.name))
+        for sub in ('saved', 'cleaned_shoes'):
+            os.makedirs(cls.profile.images_dir / sub)
         mask = np.array(Image.open(REPO / 'data/freq_min_18.png')) > 0
-        np.save(folder + 'saved/freq_min_18.npy', mask)
-        cls.saved_folders = (cls.acs.FOLDER, cls.rn.FOLDER)
-        cls.acs.FOLDER = folder
-        cls.rn.FOLDER = folder
+        np.save(cls.profile.saved_path(cls.profile.stem('prototype_mask'),
+                                       'npy'), mask)
         cls.mask = mask
         cls.shoes = read_records(REPO / 'data/contacts_data.txt')
         cls.contour = read_records(REPO / 'data/contour_Active_Contour.txt')
 
     @classmethod
     def tearDownClass(cls):
-        cls.acs.FOLDER, cls.rn.FOLDER = cls.saved_folders
         cls.tmp.cleanup()
 
     def rerun(self, idx0):
-        self.rn.save_cleaned_shoes(self.shoes, idx0)
-        return self.acs.active_contour_shoe(
-            None, plot_img=False, save_img_bool=False, im_num=idx0)
+        remove_noise.save_cleaned_shoes(self.profile, self.shoes, idx0)
+        return active_contour_snake.active_contour_shoe(
+            self.profile, None, plot_img=False, save_img_bool=False,
+            im_num=idx0)
 
     def test_inputs(self):
         self.assertEqual(self.shoes.shape, (387, H, W))
@@ -148,9 +151,10 @@ class SnakeOld(unittest.TestCase):
                          'set RAC_REGRESS_PY_RUN to a legacy run folder')
     def test_full_run_folder(self):
         run = Path(os.environ['RAC_REGRESS_PY_RUN'])
+        base, prefix = run_folder_base(run)
         contour = 'data/contour_Active_Contour.txt'
-        check_run_manifest(run, [contour], steps=('step0',))
-        got = read_records(run / contour)
+        check_run_manifest(run, [prefix + contour], steps=('step0',))
+        got = read_records(base / contour)
         want = self.contour.copy()
         if not ON_WINDOWS:
             for k, rec in linux_records().items():
@@ -164,22 +168,23 @@ class SnakeOld(unittest.TestCase):
     @unittest.skipIf(ON_WINDOWS, 'Tier B intermediates are Linux bytes')
     def test_full_run_intermediates(self):
         run = Path(os.environ['RAC_REGRESS_PY_RUN'])
-        check_run_manifest(run, ['images/saved/freq_min_18.npy'],
+        base, prefix = run_folder_base(run)
+        check_run_manifest(run, [prefix + 'images/saved/freq_min_18.npy'],
                            steps=('step0',))
         start = (run / 'outputs_expected.txt').stat().st_mtime_ns
         want = {}
         for line in (LOCAL / 'python_intermediates.sha256').read_text(
                 ).splitlines():
             want[line[66:]] = line[:64]
-        have = sorted(p.relative_to(run).as_posix()
-                      for p in (run / 'images').rglob('*')
+        have = sorted(p.relative_to(base).as_posix()
+                      for p in (base / 'images').rglob('*')
                       if p.is_file() and p.suffix in ('.npy', '.png'))
         self.assertEqual(len(want), 1556)
         self.assertEqual(have, sorted(want))
-        old = [p for p in have if (run / p).stat().st_mtime_ns <= start]
+        old = [p for p in have if (base / p).stat().st_mtime_ns <= start]
         self.assertEqual(old, [], 'files older than the start of the run')
         bad = [p for p in have
-               if hashlib.sha256((run / p).read_bytes()).hexdigest()
+               if hashlib.sha256((base / p).read_bytes()).hexdigest()
                != want[p]]
         self.assertEqual(bad, [])
 

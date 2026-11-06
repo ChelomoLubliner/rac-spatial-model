@@ -1,0 +1,210 @@
+{
+  "_comment": [
+    "Sentinel profile of tests/fixtures/make_sentinel.py (A-035, A-050); test use only (RAC_PROFILE_FILE)."
+  ],
+  "version": 1,
+  "datasets": {
+    "old": {
+      "dataset": "old",
+      "suffix": "",
+      "col_shoe": 40,
+      "row_shoe": 60,
+      "num_shoe": 6,
+      "shoes_without_racs": [
+        4
+      ],
+      "excluded_shoes": [
+        5
+      ],
+      "coords": {
+        "divisor": 2,
+        "rel_col_shoe": 10,
+        "rel_row_shoe": 20,
+        "rel_x_cord": 0.25,
+        "rel_Y_cord": 0.5
+      },
+      "inputs": {
+        "contacts": "data/contacts_sentinel.txt",
+        "locations": "data/locations_sentinel.txt",
+        "locations_format": "space_no_header",
+        "cross_check": null,
+        "sticker_masks": null
+      },
+      "prototype": {
+        "col_shoe": 44,
+        "row_shoe": 66,
+        "coords": {
+          "rel_col_shoe": 12.5,
+          "rel_row_shoe": 25,
+          "rel_x_cord": 0.25,
+          "rel_Y_cord": 0.5
+        },
+        "contour": "data/prototype_contour_sentinel.png",
+        "mask": "data/prototype_mask_sentinel.png"
+      },
+      "r": {
+        "contact_flip_shoes": [
+          3
+        ],
+        "stamp_threshold": 2,
+        "stamp_sweep_bound": 40,
+        "n_controls": 5,
+        "seed": 7,
+        "mean_offset_fallback_pixels": null,
+        "knit_dir": "statistical_model",
+        "log_dir": "logs/old",
+        "paths": {
+          "dataCC": "processed_data/dataCC.csv",
+          "pixel_counts": "processed_data/shoe_pixel_counts.csv",
+          "all_cont": "processed_data/all_cont.csv",
+          "shoe_codes": "processed_data/shoe_codes.csv",
+          "dataCC_distance_temp": "processed_data/dataCC_distance_temp.csv",
+          "dataCC_distance": "processed_data/dataCC_distance.csv",
+          "wald_test": "processed_data/wald_test.csv",
+          "models_dir": "saved_models",
+          "images_dir": "model_images"
+        },
+        "eol": {
+          "dataCC": "\n",
+          "pixel_counts": "\n",
+          "all_cont": "\n",
+          "shoe_codes": "\n",
+          "dataCC_distance_temp": "\n",
+          "dataCC_distance": "\n",
+          "wald_test": "\n"
+        }
+      },
+      "python": {
+        "images_dir": "images",
+        "contact_flip_shoes": [
+          2
+        ],
+        "superpose_threshold": 2,
+        "snake": {
+          "center_rc": [
+            30,
+            20
+          ],
+          "radii_rc": [
+            25,
+            15
+          ],
+          "n_points": 50,
+          "gaussian_sigma": 3,
+          "alpha": 0.015,
+          "beta_first": 10,
+          "beta_second": 0.1,
+          "gamma": 0.001
+        },
+        "write_html": false,
+        "contour_out": "data/contour_sentinel.txt",
+        "stems": {
+          "superposed": "superposed_min_{t}",
+          "prototype_mask": "freq_min_{t}",
+          "locations_pixels": "locations_pixels"
+        }
+      }
+    },
+    "new": {
+      "dataset": "new",
+      "suffix": "_new",
+      "col_shoe": 40,
+      "row_shoe": 60,
+      "num_shoe": 6,
+      "shoes_without_racs": [
+        4
+      ],
+      "excluded_shoes": [
+        5
+      ],
+      "coords": {
+        "divisor": 2,
+        "rel_col_shoe": 10,
+        "rel_row_shoe": 20,
+        "rel_x_cord": 0.25,
+        "rel_Y_cord": 0.5
+      },
+      "inputs": {
+        "contacts": "data/contacts_sentinel.txt",
+        "locations": "data/locations_sentinel.txt",
+        "locations_format": "space_no_header",
+        "cross_check": null,
+        "sticker_masks": null
+      },
+      "prototype": {
+        "col_shoe": 44,
+        "row_shoe": 66,
+        "coords": {
+          "rel_col_shoe": 12.5,
+          "rel_row_shoe": 25,
+          "rel_x_cord": 0.25,
+          "rel_Y_cord": 0.5
+        },
+        "contour": "data/prototype_contour_sentinel.png",
+        "mask": "data/prototype_mask_sentinel.png"
+      },
+      "r": {
+        "contact_flip_shoes": [
+          3
+        ],
+        "stamp_threshold": 2,
+        "stamp_sweep_bound": 40,
+        "n_controls": 5,
+        "seed": 7,
+        "mean_offset_fallback_pixels": null,
+        "knit_dir": "logs/knit/new",
+        "log_dir": "logs/new",
+        "paths": {
+          "dataCC": "processed_data/new/dataCC_new.csv",
+          "pixel_counts": "processed_data/new/shoe_pixel_counts_new.csv",
+          "all_cont": "processed_data/new/all_cont_new.csv",
+          "shoe_codes": "processed_data/new/shoe_codes_new.csv",
+          "dataCC_distance_temp": "processed_data/new/dataCC_distance_temp_new.csv",
+          "dataCC_distance": "processed_data/new/dataCC_distance_new.csv",
+          "wald_test": "processed_data/new/wald_test_new.csv",
+          "models_dir": "saved_models/new",
+          "images_dir": "model_images/new"
+        },
+        "eol": {
+          "dataCC": "\n",
+          "pixel_counts": "\n",
+          "all_cont": "\n",
+          "shoe_codes": "\n",
+          "dataCC_distance_temp": "\n",
+          "dataCC_distance": "\n",
+          "wald_test": "\n"
+        }
+      },
+      "python": {
+        "images_dir": "images_new",
+        "contact_flip_shoes": [
+          2
+        ],
+        "superpose_threshold": 2,
+        "snake": {
+          "center_rc": [
+            30,
+            20
+          ],
+          "radii_rc": [
+            25,
+            15
+          ],
+          "n_points": 50,
+          "gaussian_sigma": 3,
+          "alpha": 0.015,
+          "beta_first": 10,
+          "beta_second": 0.1,
+          "gamma": 0.001
+        },
+        "write_html": false,
+        "contour_out": "data/new_shoes/contour_sentinel_new.txt",
+        "stems": {
+          "superposed": "superposed_min_{t}",
+          "prototype_mask": "freq_min_{t}",
+          "locations_pixels": "locations_pixels"
+        }
+      }
+    }
+  }
+}

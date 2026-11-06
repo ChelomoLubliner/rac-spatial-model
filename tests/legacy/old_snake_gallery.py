@@ -1,10 +1,11 @@
 """OLD reference gallery of the snake (T1 item 6).
 
-Re-runs the legacy snake (contour_algorithm/, verbatim thesis code) for a
-representative set of OLD shoes inside a temporary folder, captures the
-legacy figures of `plot_active_contour` (cleaned shoe, initial ellipse red
-dashed, snake blue; the legacy code calls Image.show(), which is redirected
-to a list here), and builds contact sheets:
+Re-runs the snake (contour_algorithm/: the thesis code, ported with
+dataset profiles in T2; the OLD profile with its images folder moved to a
+temporary folder) for a representative set of OLD shoes, captures the
+figures of `plot_active_contour` (cleaned shoe, initial ellipse red
+dashed, snake blue; the code calls Image.show(), which is redirected to a
+list here), and builds contact sheets:
 
   sheet_old_<kk>.png  8 shoes per sheet, 3 panels per shoe:
     1. legacy figure: cleaned shoe + init ellipse + FIRST snake
@@ -29,6 +30,7 @@ Usage (thesis venv python, repo root):
 
 import argparse
 import csv
+import dataclasses
 import os
 import sys
 import tempfile
@@ -43,7 +45,6 @@ if str(REPO) not in sys.path:   # run as a script: make tests.lib importable
 from tests.lib.old_records import (  # noqa: E402  (after the path)
     SKIPPED_IDX0, H, W, read_records, record_of_idx0)
 
-LEGACY = REPO / 'contour_algorithm'
 SEED = 20261105
 N_RANDOM = 24
 SHOES_PER_SHEET = 8
@@ -161,20 +162,20 @@ def mask_panel(raw, mask, contour):
 
 
 class LegacySnake:
-    """The legacy snake with its figures and snakes captured."""
+    """The snake with its figures and snakes captured (OLD profile, images
+    folder = work)."""
 
     def __init__(self, work):
         os.environ.setdefault('MPLBACKEND', 'Agg')
-        if str(LEGACY) not in sys.path:
-            sys.path.insert(0, str(LEGACY))
-        import active_contour_snake as acs
-        import remove_noise as rn
+        from contour_algorithm import active_contour_snake as acs
+        from contour_algorithm import remove_noise as rn
+        from contour_algorithm.profiles import load_profile
         self.acs, self.rn = acs, rn
-        self.folder = str(work) + '/'
+        self.profile = dataclasses.replace(
+            load_profile('old', file=REPO / 'config' / 'datasets.json',
+                         root=REPO), images_dir=Path(work))
         for sub in ('saved', 'cleaned_shoes'):
-            os.makedirs(self.folder + sub, exist_ok=True)
-        acs.FOLDER = self.folder
-        rn.FOLDER = self.folder
+            os.makedirs(self.profile.images_dir / sub, exist_ok=True)
         self.snakes, self.figures = [], []
         real = acs.active_contour
 
@@ -189,17 +190,18 @@ class LegacySnake:
     def run_shoe(self, list_matrices, idx0):
         self.snakes.clear()
         self.figures.clear()
-        self.rn.save_cleaned_shoes(list_matrices, idx0)
-        arr = self.acs.active_contour_shoe(None, plot_img=True,
+        self.rn.save_cleaned_shoes(self.profile, list_matrices, idx0)
+        arr = self.acs.active_contour_shoe(self.profile, None, plot_img=True,
                                            save_img_bool=False, im_num=idx0)
         return arr, list(self.figures), list(self.snakes)
 
     def run_prototype(self, old_freq_min_18):
+        p = self.profile
         self.snakes.clear()
         Image.fromarray(old_freq_min_18).save(
-            self.folder + 'saved/old_freq_min_18.png')
-        self.acs.active_contour_on_prototype()
-        final = np.load(self.folder + 'saved/freq_min_18.npy')
+            p.saved_path(p.stem('superposed'), 'png'))
+        self.acs.active_contour_on_prototype(p)
+        final = np.load(p.saved_path(p.stem('prototype_mask'), 'npy'))
         return final, list(self.snakes)
 
 
