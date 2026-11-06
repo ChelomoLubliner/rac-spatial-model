@@ -38,9 +38,12 @@ import numpy as np
 from PIL import Image
 
 REPO = Path(__file__).resolve().parents[2]
+if str(REPO) not in sys.path:   # run as a script: make tests.lib importable
+    sys.path.insert(0, str(REPO))
+from tests.lib.old_records import (  # noqa: E402  (after the path)
+    SKIPPED_IDX0, H, W, read_records, record_of_idx0)
+
 LEGACY = REPO / 'contour_algorithm'
-W, H = 307, 395
-SKIPPED_IDX0 = 126
 SEED = 20261105
 N_RANDOM = 24
 SHOES_PER_SHEET = 8
@@ -62,15 +65,6 @@ STICKER = (7, 12, 24, 29, 55, 56, 66, 94, 110, 113, 116, 121, 160, 239,
            264, 267, 299, 371)
 
 
-def read_records(path, width=W, height=H):
-    data = Path(path).read_bytes()
-    size = width * height
-    stride = size + 2
-    arr = np.frombuffer(data, dtype=np.uint8).reshape(-1, stride)
-    assert np.all(arr[:, size] == 13) and np.all(arr[:, size + 1] == 10)
-    return (arr[:, :size] - 48).reshape(-1, height, width).astype(bool)
-
-
 def inner_boundary4(mask):
     p = np.pad(mask, 1, constant_values=False)
     interior = (p[1:-1, 1:-1] & p[:-2, 1:-1] & p[2:, 1:-1]
@@ -87,9 +81,8 @@ def row_span_fill(contour):
 
 
 def record_index(idx0):
-    if idx0 == SKIPPED_IDX0:
-        return None
-    return idx0 if idx0 < SKIPPED_IDX0 else idx0 - 1
+    """Contour record of image index idx0; None for the shoe without one."""
+    return None if idx0 == SKIPPED_IDX0 else record_of_idx0(idx0)
 
 
 def shoe_metrics(raw, mask, contour):
@@ -278,8 +271,9 @@ def main(argv=None):
     ap.add_argument('--work', type=Path)
     args = ap.parse_args(argv)
     args.out.mkdir(parents=True, exist_ok=True)
-    raw_all = read_records(REPO / 'data/contacts_data.txt')
-    contour_all = read_records(REPO / 'data/contour_Active_Contour.txt')
+    raw_all = read_records(REPO / 'data/contacts_data.txt', sep=b'\r\n')
+    contour_all = read_records(REPO / 'data/contour_Active_Contour.txt',
+                               sep=b'\r\n')
     mask = np.array(Image.open(REPO / 'data/freq_min_18.png')) > 0
     proto = np.array(Image.open(REPO / 'data/contour_prototype.png')
                      .convert('L')) > 0

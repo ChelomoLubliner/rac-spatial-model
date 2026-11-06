@@ -28,9 +28,12 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-W, H = 307, 395
-N_RECORDS = 386
-SKIPPED_IDX0 = 126  # shoe 127 has no RACs; the contour file has no record
+REPO = Path(__file__).resolve().parents[2]
+if str(REPO) not in sys.path:   # run as a script: make tests.lib importable
+    sys.path.insert(0, str(REPO))
+from tests.lib.old_records import (  # noqa: E402  (after the path)
+    N_SHOES, parse_records, shoe_of_record)
+
 PER_SHOE_DIRS = (
     ('shoes', 'im{}.png'),
     ('shoe_on_prototype', 'im_{}.png'),
@@ -51,29 +54,6 @@ def sha256_file(path):
     return sha256_bytes(Path(path).read_bytes())
 
 
-def read_records(data, width, height):
-    """Parse a fixed-stride 0/1 file with LF or CRLF separators.
-
-    Returns (records as uint8 array (n, height, width), separator bytes).
-    Raises ValueError if the layout is not a whole number of records with
-    one consistent separator, or if a byte is not '0' or '1'.
-    """
-    size = width * height
-    for sep in (b'\r\n', b'\n'):
-        stride = size + len(sep)
-        if len(data) % stride:
-            continue
-        n = len(data) // stride
-        arr = np.frombuffer(data, dtype=np.uint8).reshape(n, stride)
-        if not np.all(arr[:, size:] == np.frombuffer(sep, dtype=np.uint8)):
-            continue
-        body = arr[:, :size]
-        if not np.all((body == 48) | (body == 49)):
-            raise ValueError('bytes other than 0/1 in the records')
-        return (body - 48).reshape(n, height, width), sep
-    raise ValueError('not a fixed-stride file with LF or CRLF separators')
-
-
 def inner_boundary4(mask):
     """Pixels of mask with at least one 4-neighbour outside it."""
     m = np.asarray(mask, dtype=bool)
@@ -91,8 +71,8 @@ def compare_contour(run, repo, out):
     committed = (repo / 'data/contour_Active_Contour.txt').read_bytes()
     regen_path = run / 'data/contour_Active_Contour.txt'
     regen = regen_path.read_bytes()
-    a, sep_a = read_records(committed, W, H)
-    b, sep_b = read_records(regen, W, H)
+    a, sep_a = parse_records(committed)
+    b, sep_b = parse_records(regen)
     out.append('## contour txt')
     out.append(f'committed: {len(committed)} bytes, {a.shape[0]} records, '
                f'separator {sep_a!r}, sha256 {sha256_bytes(committed)}')
@@ -111,7 +91,7 @@ def compare_contour(run, repo, out):
     out.append(f'records with any differing pixel: {bad.size} of '
                f'{a.shape[0]}; total differing pixels: {int(diff.sum())}')
     for k in bad[:50]:
-        shoe = k + 1 if k < SKIPPED_IDX0 else k + 2
+        shoe = shoe_of_record(k)
         out.append(f'  record {k + 1} (shoe {shoe}): {int(diff[k])} px '
                    f'(committed {int(a[k].sum())}, regenerated '
                    f'{int(b[k].sum())} contour px)')
@@ -173,7 +153,7 @@ def compare_thesis(run, thesis, out):
         ok &= np.array_equal(a, b)
     for sub, pattern in PER_SHOE_DIRS:
         px_diff, byte_same, n = [], 0, 0
-        for i in range(387):
+        for i in range(N_SHOES):
             pa = run / 'images' / sub / pattern.format(i)
             pb = thesis / sub / pattern.format(i)
             a, b = np.array(Image.open(pa)), np.array(Image.open(pb))
@@ -207,8 +187,7 @@ def write_tier_b(run, dest):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('run', type=Path)
-    ap.add_argument('--repo', type=Path,
-                    default=Path(__file__).resolve().parents[2])
+    ap.add_argument('--repo', type=Path, default=REPO)
     ap.add_argument('--thesis-images', type=Path)
     ap.add_argument('--write-tier-b', type=Path)
     args = ap.parse_args(argv)

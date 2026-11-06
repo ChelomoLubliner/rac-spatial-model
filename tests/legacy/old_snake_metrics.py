@@ -23,19 +23,17 @@ Usage (repo root): python -B tests/legacy/old_snake_metrics.py
 
 import csv
 import math
+import sys
 from pathlib import Path
 
 import numpy as np
 from PIL import Image
 
 REPO = Path(__file__).resolve().parents[2]
-W, H = 307, 395
-
-
-def read_records(path):
-    data = Path(path).read_bytes()
-    arr = np.frombuffer(data, dtype=np.uint8).reshape(-1, W * H + 2)
-    return (arr[:, :W * H] == 49).reshape(-1, H, W)
+if str(REPO) not in sys.path:   # run as a script: make tests.lib importable
+    sys.path.insert(0, str(REPO))
+from tests.lib.old_records import (  # noqa: E402  (after the path)
+    H, W, read_records, shoe_of_record)
 
 
 def row_span_fill(contour):
@@ -56,8 +54,9 @@ def aspix(x, y):
 
 
 def main():
-    raw = read_records(REPO / 'data/contacts_data.txt')
-    contour = read_records(REPO / 'data/contour_Active_Contour.txt')
+    raw = read_records(REPO / 'data/contacts_data.txt', sep=b'\r\n')
+    contour = read_records(REPO / 'data/contour_Active_Contour.txt',
+                           sep=b'\r\n')
     mask = np.array(Image.open(REPO / 'data/freq_min_18.png')) > 0
     racs = {}
     with open(REPO / 'data/locations_data.csv', newline='') as f:
@@ -66,7 +65,7 @@ def main():
                 aspix(float(r['x']), float(r['y'])))
     rows = []
     for k in range(contour.shape[0]):
-        shoe = k + 1 if k < 126 else k + 2
+        shoe = shoe_of_record(k)
         c, s = contour[k], raw[shoe - 1]
         fill = row_span_fill(c)
         cleaned = s & mask

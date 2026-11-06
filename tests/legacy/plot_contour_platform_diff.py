@@ -19,28 +19,12 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 REPO = Path(__file__).resolve().parents[2]
-W, H = 307, 395            # OLD dataset frame
-NO_RECORD_SHOE = 127       # shoe 127 has no RACs and no contour record
+if str(REPO) not in sys.path:   # run as a script: make tests.lib importable
+    sys.path.insert(0, str(REPO))
+from tests.lib.old_records import (  # noqa: E402  (after the path)
+    H, W, read_records, record_of_shoe)
+
 ZOOM = 3
-
-
-def read_records(path):
-    """Fixed-stride 0/1 records (LF or CRLF) as bool (n, H, W)."""
-    data = Path(path).read_bytes()
-    for sep in (b'\r\n', b'\n'):
-        stride = W * H + len(sep)
-        if len(data) % stride == 0:
-            arr = np.frombuffer(data, np.uint8).reshape(-1, stride)
-            if np.all(arr[:, W * H:] == np.frombuffer(sep, np.uint8)):
-                return (arr[:, :W * H] == 49).reshape(-1, H, W)
-    raise ValueError(f'{path}: not a fixed-stride 0/1 file')
-
-
-def record_index(shoe):
-    """0-based contour record of a shoe id (1-based)."""
-    if shoe == NO_RECORD_SHOE:
-        raise ValueError('shoe 127 has no contour record')
-    return shoe - 1 if shoe < NO_RECORD_SHOE else shoe - 2
 
 
 def panel(committed, rerun, shoe):
@@ -74,8 +58,8 @@ def main(argv):
     if committed.shape != rerun.shape:
         raise ValueError(f'record counts differ: {committed.shape} vs '
                          f'{rerun.shape}')
-    panels = [panel(committed[record_index(s)], rerun[record_index(s)], s)
-              for s in shoes]
+    panels = [panel(committed[record_of_shoe(s)], rerun[record_of_shoe(s)],
+                    s) for s in shoes]
     out = Image.new('RGB', (sum(p.width for p in panels)
                             + 10 * (len(panels) - 1),
                             max(p.height for p in panels)), (40, 40, 40))
@@ -85,7 +69,7 @@ def main(argv):
         x += p.width + 10
     out.save(out_png)
     for s in shoes:
-        k = record_index(s)
+        k = record_of_shoe(s)
         print(f'shoe {s} (record {k + 1}): '
               f'{int((committed[k] != rerun[k]).sum())} px differ')
     print(f'wrote {out_png} {out.size}')

@@ -44,13 +44,12 @@ import numpy as np
 from PIL import Image
 
 from tests.lib import contour_platform_diff as cpd
+from tests.lib.old_records import H, W, read_records, record_of_idx0
 from tests.lib.run_manifest import check_run_manifest
 
 REPO = Path(__file__).resolve().parents[2]
 LEGACY = REPO / 'contour_algorithm'
 LOCAL = REPO / 'tests' / 'baseline' / 'local'
-W, H = 307, 395
-SKIPPED_IDX0 = 126  # shoe 127: no RACs, no contour record
 # 0-based image indices: shoe 1; shoe 9 (left shoe, not flipped, K1);
 # shoes 35 and 153 (lowest RAC on-contact rates, plan F27); shoe 236
 # (printed twice inside OLD, K10); shoe 387 (last record).
@@ -61,26 +60,6 @@ PLATFORM_SENSITIVE_IDX0 = (175, 353)
 COMMITTED_CONTOUR_SHA256 = (
     'ca8a07f2a46614a14383a8017b688663caba8350c3ea41c51792d8ebd0ec7e56')
 ON_WINDOWS = platform.system() == 'Windows'
-
-
-def read_records(path, width=W, height=H):
-    """Records of a fixed-stride 0/1 file (LF or CRLF), as uint8 (n, H, W)."""
-    data = Path(path).read_bytes()
-    size = width * height
-    for sep in (b'\r\n', b'\n'):
-        stride = size + len(sep)
-        if len(data) % stride == 0:
-            arr = np.frombuffer(data, dtype=np.uint8).reshape(-1, stride)
-            if np.all(arr[:, size:] == np.frombuffer(sep, dtype=np.uint8)):
-                return (arr[:, :size] - 48).reshape(-1, height, width)
-    raise ValueError(f'{path}: not a fixed-stride 0/1 file')
-
-
-def record_index(idx0):
-    """Contour record (0-based) of the shoe with 0-based image index idx0."""
-    if idx0 == SKIPPED_IDX0:
-        raise ValueError('shoe 127 has no contour record')
-    return idx0 if idx0 < SKIPPED_IDX0 else idx0 - 1
 
 
 def load_legacy_modules():
@@ -115,7 +94,7 @@ class SnakeOld(unittest.TestCase):
         cls.acs.FOLDER = folder
         cls.rn.FOLDER = folder
         cls.mask = mask
-        cls.shoes = read_records(REPO / 'data/contacts_data.txt') == 1
+        cls.shoes = read_records(REPO / 'data/contacts_data.txt')
         cls.contour = read_records(REPO / 'data/contour_Active_Contour.txt')
 
     @classmethod
@@ -137,18 +116,18 @@ class SnakeOld(unittest.TestCase):
         for idx0 in SHOES_IDX0:
             with self.subTest(shoe=idx0 + 1):
                 got = self.rerun(idx0)
-                want = self.contour[record_index(idx0)] == 1
+                want = self.contour[record_of_idx0(idx0)]
                 self.assertEqual(got.shape, (H, W))
                 self.assertEqual(int((got != want).sum()), 0)
 
     def test_platform_sensitive_records(self):
         linux = linux_records()
         for idx0 in PLATFORM_SENSITIVE_IDX0:
-            k = record_index(idx0)
+            k = record_of_idx0(idx0)
             with self.subTest(shoe=idx0 + 1):
                 self.assertIn(k, linux)
                 got = self.rerun(idx0)
-                want = (self.contour[k] == 1) if ON_WINDOWS else linux[k]
+                want = self.contour[k] if ON_WINDOWS else linux[k]
                 self.assertEqual(int((got != want).sum()), 0)
 
     def test_full_rerun_recorded(self):

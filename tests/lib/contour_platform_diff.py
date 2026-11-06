@@ -26,22 +26,17 @@ from pathlib import Path
 import numpy as np
 
 REPO = Path(__file__).resolve().parents[2]
-W, H = 307, 395
+if str(REPO) not in sys.path:   # run as a script: make tests.lib importable
+    sys.path.insert(0, str(REPO))
+from tests.lib.old_records import (  # noqa: E402  (after the path)
+    H, W, parse_records, shoe_of_record)
+
 SIZE = W * H
 
 
 def read_records(data):
-    for sep in (b'\r\n', b'\n'):
-        stride = SIZE + len(sep)
-        if len(data) % stride == 0:
-            arr = np.frombuffer(data, dtype=np.uint8).reshape(-1, stride)
-            if np.all(arr[:, SIZE:] == np.frombuffer(sep, dtype=np.uint8)):
-                return arr[:, :SIZE] == 49
-    raise ValueError('not a fixed-stride contour file')
-
-
-def shoe_of_record(k):
-    return k + 1 if k < 126 else k + 2
+    """Records of a contour file's bytes, flattened: bool (n, W * H)."""
+    return parse_records(data)[0].reshape(-1, SIZE)
 
 
 def apply_records(committed_bytes, npz):

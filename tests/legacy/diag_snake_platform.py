@@ -20,14 +20,11 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-W, H = 307, 395
-
-
-def read_records(path):
-    data = Path(path).read_bytes()
-    size = W * H
-    arr = np.frombuffer(data, dtype=np.uint8).reshape(-1, size + 2)
-    return (arr[:, :size] - 48).reshape(-1, H, W).astype(bool)
+HERE_REPO = Path(__file__).resolve().parents[2]
+if str(HERE_REPO) not in sys.path:   # make tests.lib importable
+    sys.path.insert(0, str(HERE_REPO))
+from tests.lib.old_records import (  # noqa: E402  (after the path)
+    N_CONTOUR_RECORDS, read_records, record_of_idx0, shoe_of_record)
 
 
 def nearest_dist(a, b):
@@ -40,7 +37,7 @@ def nearest_dist(a, b):
 def main(argv):
     repo, work, out_npz = Path(argv[0]), Path(argv[1]), Path(argv[2])
     if argv[3:] == ['all']:
-        shoes = [s for s in range(1, 388) if s != 127]
+        shoes = [shoe_of_record(k) for k in range(N_CONTOUR_RECORDS)]
     else:
         shoes = [int(s) for s in argv[3:]]
     os.environ.setdefault('MPLBACKEND', 'Agg')
@@ -57,8 +54,9 @@ def main(argv):
     rn.FOLDER = folder
     mask = np.array(Image.open(repo / 'data' / 'freq_min_18.png')) > 0
     np.save(folder + 'saved/freq_min_18.npy', mask)
-    raw = read_records(repo / 'data' / 'contacts_data.txt')
-    committed = read_records(repo / 'data' / 'contour_Active_Contour.txt')
+    raw = read_records(repo / 'data' / 'contacts_data.txt', sep=b'\r\n')
+    committed = read_records(repo / 'data' / 'contour_Active_Contour.txt',
+                             sep=b'\r\n')
     snakes = []
     real = acs.active_contour
 
@@ -74,7 +72,7 @@ def main(argv):
     result = {'platform': np.array(tag)}
     for shoe in shoes:
         idx0 = shoe - 1
-        k = idx0 if idx0 < 126 else idx0 - 1
+        k = record_of_idx0(idx0)
         snakes.clear()
         rn.save_cleaned_shoes(raw, idx0)
         arr = acs.active_contour_shoe(None, plot_img=False,
