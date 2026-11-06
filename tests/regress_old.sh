@@ -31,7 +31,14 @@
 #              B's W (a WSL refit, 427.7804) when step 3 ran
 # and runs the live checks that the steps cover (test_snake_old_regression
 # for step 0, test_old_regression.R for steps 1-3, test_live_r_pdfs for steps
-# 4-6). Writes timings.tsv, compare.tsv, logs/, exit_status into the run
+# 3-6).
+# Step 0 and steps 2-6 are never compared in one run: step 2 reads the
+# contour, which step 0 rewrites on WSL as Tier B (30 records differ from
+# the committed Windows contour, A-060), while the step-2 to step-6
+# baselines were computed from the committed contour. Such a request (e.g.
+# --steps 0-6) runs as two runs, --steps 0 and --steps <the others>, each
+# in its own run folder with the committed inputs (A-081); exit 0 only if
+# both pass. Writes timings.tsv, compare.tsv, logs/, exit_status into the run
 # folder and prints a summary; exit 0 only if every step and comparison
 # passes. The run folder is deleted after a pass unless --keep, and kept
 # after a failure. Nothing in the repository is written. Refuses
@@ -84,6 +91,25 @@ for part in "${parts[@]}"; do
   for ((s = ${part%-*}; s <= ${part#*-}; s++)); do want[$s]=1; done
 done
 has() { [[ -n "${want[$1]:-}" ]]; }
+
+if has 0 && { has 2 || has 3 || has 4 || has 5 || has 6; }; then
+  rest=""
+  for s in 1 2 3 4 5 6; do
+    if has "$s"; then rest+="${rest:+,}$s"; fi
+  done
+  echo "regress_old.sh: step 0 rewrites the contour that steps 2-6 read;" \
+    "on WSL it is Tier B, and their baselines come from the committed" \
+    "contour, so this runs as two runs: --steps 0 and --steps $rest (A-081)"
+  args=()
+  if [[ $keep -eq 1 ]]; then args+=(--keep); fi
+  split=0
+  bash "$here/regress_old.sh" --steps 0 --py "$py" "${args[@]}" || split=1
+  bash "$here/regress_old.sh" --steps "$rest" --py "$py" "${args[@]}" ||
+    split=1
+  echo "== regress_old.sh --steps $steps (as --steps 0 and --steps $rest):" \
+    "$([[ $split -eq 0 ]] && echo "ALL PASS" || echo "SOME CHECKS FAILED")"
+  exit "$split"
+fi
 
 run=$(rac_scratch_new regress_old)
 echo "$run"
@@ -156,8 +182,10 @@ record() {
 }
 sha() { sha256sum "$1" | cut -d' ' -f1; }
 want_sha() { awk -v p="$2" '$2 == p {print $1}' "$1"; }
+# Is the path (relative to the run folder) on the regenerated list, exactly?
 regenerated() {
-  grep -qF "  $1" "$run/outputs_regenerated.sha256" 2> /dev/null
+  awk -v p="$1" 'substr($0, 67) == p {found = 1} END {exit !found}' \
+    "$run/outputs_regenerated.sha256" 2> /dev/null
 }
 
 if [[ $status -ne 0 ]]; then
