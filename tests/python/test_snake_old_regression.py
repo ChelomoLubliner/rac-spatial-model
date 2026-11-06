@@ -18,7 +18,9 @@ Recorded: the npz rebuilds the Tier B contour from the committed bytes with
 the sha256 in tests/baseline/local/python_contour.sha256, and the Windows
 check (contour_windows_check.txt) found 0 differing records of 386.
 Full (optional): RAC_REGRESS_PY_RUN=<folder of run_legacy_python.sh>
-compares all 386 records of that run with Tier B (Linux) or Tier A.
+compares all 386 records of that run with Tier B (Linux) or Tier A. Only
+a run that Tier B was not written from is evidence: Tier B came from
+<scratch>/t1/legacy_py_MXmkvc, so that folder can only pass (A-066).
 
 Run from the repo root with the thesis venv python:
   MPLBACKEND=Agg python -B -m unittest tests.python.test_snake_old_regression

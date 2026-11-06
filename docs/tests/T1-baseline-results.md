@@ -3,6 +3,7 @@
 **Date:** 2026-11-05/06. **Branch:** `feature/new-shoes-pipeline`. **Task:** T1 of `docs/plans/2026-11-05-new-shoes-pipeline.md`.
 **Scratch:** `<scratch>` = `/tmp/claude-1000/-home-mehes-projects-rac-spatial-model/1d789329-e60a-4147-af28-9c8214affef3/scratchpad`; the T1 runs are in `<scratch>/t1/` (`RAC_SCRATCH=<scratch>/t1`).
 Every output below is pasted from the real run; long outputs are trimmed only where marked `[... omitted ...]` or `...`. Absolute scratch paths in pasted output are shortened to `<scratch>`, `<run>` (a run folder) or `<venv>` (the thesis venv), and trailing spaces are dropped; nothing else is edited.
+**Corrected after the T1 reviews (2026-11-06):** section 3.2 is relabelled (its WSL live checks are consistency checks of the Tier B hash files, not determinism evidence; A-066), the index lists of section 4.3 are labelled correctly, and section 5.3 now shows the full comparison table. Results of the review fixes, including the independent reruns: [`T1-review-fixes-results.md`](T1-review-fixes-results.md).
 
 ## 0. Summary
 
@@ -178,7 +179,8 @@ ALL PASS
 ```
 Wall time 41.4 s. The skips are by design: the live-rerun checks need a run folder (`RAC_REGRESS_PY_RUN`, `RAC_REGRESS_R_RUN`), and car is absent on WSL. The OpenCV warning comes from `cv2.imencode` inside the legacy `get_snake_image()` and is harmless.
 
-### 3.2 The optional branches, run once
+### 3.2 The optional branches, run once (the WSL ones are Tier B hash-file consistency checks)
+**Relabelled after the T1 reviews (A-066).** The two WSL runs below point at the very folders Tier B was written from: `compare_legacy_python.py --write-tier-b` read `legacy_py_MXmkvc`, and Tier B for R is chain A, `legacy_r_oTZO3x`. So they only show that the Tier B hash files and dumps were written correctly from those folders. They are **not** evidence that a rerun reproduces Tier B, and they could not have failed. That evidence comes from runs Tier B was not written from: R chain B (section 5.3), the reproducibility reviewer's full reruns (`<scratch>/review_t1_repro/pychain_ZlQAFJ` and `rchain_l8x7yU`, re-checked with the repo tests) and the fresh full reruns of the review fixes, all in [`T1-review-fixes-results.md`](T1-review-fixes-results.md) section 5.
 ```bash
 RAC_REGRESS_PY_RUN=<scratch>/t1/legacy_py_MXmkvc MPLBACKEND=Agg <venv>/bin/python -B -m unittest tests.python.test_snake_old_regression -v
 ```
@@ -186,7 +188,7 @@ RAC_REGRESS_PY_RUN=<scratch>/t1/legacy_py_MXmkvc MPLBACKEND=Agg <venv>/bin/pytho
 Ran 5 tests in 24.395s
 OK
 ```
-(`test_full_run_folder` compared all 386 records of the WSL run with Tier B: 0 differing records.)
+(`test_full_run_folder` compared all 386 records of the run Tier B was written from with Tier B: 0 differing records, a consistency check.)
 ```bash
 RAC_REGRESS_R_RUN=<scratch>/t1/legacy_r_oTZO3x Rscript tests/r/test_old_regression.R
 ```
@@ -195,6 +197,8 @@ PASS live rerun: the five CSVs equal Tier B byte for byte
 PASS live rerun: models identical() to Tier B in every field
 ALL PASS test_old_regression
 ```
+(Chain A is Tier B, so this is a consistency check too.) The Windows runs below are real checks: they compare Windows runs with the committed files.
+
 Under the Windows interpreters (from the repo root, through interop):
 ```bash
 venv-wind/Scripts/python.exe -B -m unittest tests.python.test_snake_old_regression -v
@@ -306,7 +310,7 @@ active-contour/: 387 images; pixels differ in 31 [7, 10, 20, 25, 61, 68, 79, 95,
 ## Tier B written to tests/baseline/local (1556 intermediate files hashed)
 RESULT contour_identical=False masks_identical=True thesis_intermediates_identical=False
 ```
-The 30 differing `active-contour_all.npy` arrays are exactly the 30 differing records (0-based 7, 10, 20, 25, 61, 68, 79, 95, 116, 141, 151, 156, 162, 173, 175, 187, 191, 202, 206, 220, 234, 265, 285, 322, 339, 348, 353, 369, 381, 383); shoe 127's snake (index 126) is identical. The 31st differing render (index 102, shoe 103, 226 px) has an identical rasterized contour: a sub-pixel change of the float snake alters only the anti-aliasing.
+The 30 differing `active-contour_all.npy` arrays are exactly the shoes of the 30 differing records. As 0-based image (npy array) indices, that is shoe id - 1: 7, 10, 20, 25, 61, 68, 79, 95, 116, 141, 151, 156, 162, 173, 175, 187, 191, 202, 206, 220, 234, 265, 285, 322, 339, 348, 353, 369, 381, 383. As 0-based record indices of the contour file, which has no record for shoe 127, so records from shoe 128 on are one lower: 7, 10, 20, 25, 61, 68, 79, 95, 116, 140, 150, 155, 161, 172, 174, 186, 190, 201, 205, 219, 233, 264, 284, 321, 338, 347, 352, 368, 380, 382. *(Corrected after the T1 reviews: this list was first called "0-based records", which is wrong from shoe 128 on. Both lists are computed from `contour_linux_diff.csv`; see the results of the review fixes, section 6.)* Shoe 127's snake (image index 126) is identical. The 31st differing render (image index 102, shoe 103, 226 px) has an identical rasterized contour: a sub-pixel change of the float snake alters only the anti-aliasing. The `active-contour/` list in the output above also gives image indices.
 
 ```bash
 <scratch>/t1/venv_copy/bin/python -B tests/lib/contour_platform_diff.py <scratch>/t1/legacy_py_MXmkvc/data/contour_Active_Contour.txt tests/baseline/local/contour_linux_diff
@@ -348,6 +352,7 @@ record  shoe  differing_px  run_px  committed_px  mean_dist_px  max_dist_px
 381     382   1189          682     675           1.073         3.162
 383     384   802           674     670           0.680         2.828
 ```
+(`record` = 1-based record number in the contour file; `shoe` = shoe id = 0-based image index + 1; from shoe 128 on, `shoe` = `record` + 1.)
 
 ### 4.4 Platform diagnosis
 The first gallery build (WSL) flagged 8 shoes whose re-run differs from the committed record while 6 test shoes matched, so the snake was re-run per shoe on both platforms (`tests/legacy/diag_snake_platform.py`).
@@ -453,25 +458,34 @@ processed_data/dataCC_distance_part4.csv   raw_equal=yes LF-normalized_equal=yes
 (The part4 file is the archive copy, untouched by every step.) Step 1 on Linux writes LF; converted to CRLF it equals the committed bytes, which confirms A-005 (the OLD profile must write these three files with `eol = "\r\n"`). Tier B: `tests/baseline/local/r_outputs.sha256`.
 
 ### 5.3 Models
-**Committed vs WSL refit (chain B, from the committed step-2 CSV):**
+**Committed vs WSL refit, the full table** (corrected after the T1 reviews: the first version of this section left out the `varcorr` and `optimizer` rows without an omission marker; the values shown were real). The output below is Tier A dump vs Tier B dump (Tier B = chain A; chain B, refitted from the committed step-2 CSV, is `identical()` to chain A in every field, so the numbers are the same):
+```bash
+Rscript tests/lib/compare_models.R tests/baseline/models_committed.rds tests/baseline/local/models_local.rds
+```
 ```text
 fixef         n=25   identical=FALSE all.equal(tol=0)=FALSE max|diff|=0.0007666   rel=0.0002971
 vcov          n=625  identical=FALSE all.equal(tol=0)=FALSE max|diff|=2.121       rel=0.2479
 vcov_rx       n=625  identical=FALSE all.equal(tol=0)=FALSE max|diff|=8.526e-06   rel=7.986e-07
 theta         n=1    identical=FALSE all.equal(tol=0)=FALSE max|diff|=8.58e-06    rel=8.758e-06
 sigma2        n=1    identical=FALSE all.equal(tol=0)=FALSE max|diff|=1.681e-05   rel=1.752e-05
+varcorr       n=1    identical=FALSE all.equal(tol=0)=FALSE max|diff|=1.681e-05   rel=1.752e-05
 loglik        n=1    identical=FALSE all.equal(tol=0)=FALSE max|diff|=1.153e-06   rel=4.464e-11
 deviance      n=1    identical=FALSE all.equal(tol=0)=FALSE max|diff|=0.001106    rel=2.205e-08
 nobs          n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
 ngrps         n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
 conv          n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=   NA
+optimizer     n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=   NA       rel=   NA
 cml_coef      n=24   identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
 cml_vcov      n=576  identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
 cml_loglik    n=2    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
-[... cml_n, cml_nevent, cml_iter, cml_method identical ...]
+cml_n         n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+cml_nevent    n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+cml_iter      n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+cml_method    n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=   NA       rel=   NA
 wald_glmm     n=1    identical=FALSE all.equal(tol=0)=FALSE max|diff|=0.9129      rel=0.002129
 wald_glmm_rx  n=1    identical=FALSE all.equal(tol=0)=FALSE max|diff|=0.01303     rel=3.046e-05
 wald_cml      n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+exit 1
 ```
 (`rel` = max |diff| / max |value|.) **Determinism on WSL:** chain A (all steps, from its own step-2 CSVs) vs chain B: every field `identical=TRUE` (fixef, vcov, vcov_rx, theta, sigma2, loglik, deviance, all CML fields, all three W). Tier B = chain A.
 
@@ -490,8 +504,38 @@ lme4 1.1-38 `NEWS.Rd`: "derivative-based convergence checks are now skipped for 
 fixef         n=25   identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
 vcov          n=625  identical=FALSE all.equal(tol=0)=FALSE max|diff|=5.189       rel=0.486
 vcov_rx       n=625  identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+[... 19 more rows; the full table follows below ...]
 glmm  wald            1 431.18973544143188  W_vcov_default
 glmm  wald            1 427.7804472165131  W_vcov_rx
+```
+*(Added after the T1 reviews, which asked for complete tables.)* The full comparison, regenerated from the saved dumps; the two `glmm  wald` lines above come from `<scratch>/t1/diag_glmm/dump_local_derivs_true_summary.txt`:
+```bash
+Rscript tests/lib/compare_models.R tests/baseline/local/models_local.rds <scratch>/t1/diag_glmm/dump_local_derivs_true.rds
+```
+```text
+fixef         n=25   identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+vcov          n=625  identical=FALSE all.equal(tol=0)=FALSE max|diff|=5.189       rel=0.486
+vcov_rx       n=625  identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+theta         n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+sigma2        n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+varcorr       n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+loglik        n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+deviance      n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+nobs          n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+ngrps         n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+conv          n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=   NA
+optimizer     n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=   NA       rel=   NA
+cml_coef      n=24   identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+cml_vcov      n=576  identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+cml_loglik    n=2    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+cml_n         n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+cml_nevent    n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+cml_iter      n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+cml_method    n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=   NA       rel=   NA
+wald_glmm     n=1    identical=FALSE all.equal(tol=0)=FALSE max|diff|=3.409       rel=0.00797
+wald_glmm_rx  n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+wald_cml      n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+exit 1
 ```
 So derivatives are computed after the fit and do not change it, and the Hessian vcov is numerically fragile: W = 428.69 (Windows Hessian), 431.19 (WSL Hessian), 427.77/427.78 (RX, both platforms).
 
@@ -507,10 +551,40 @@ theta         n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0     
 sigma2        n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
 loglik        n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
 deviance      n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
-[... nobs, ngrps, conv, optimizer, wald_glmm, wald_glmm_rx identical ...]
+[... 15 more rows, all identical=TRUE (varcorr, nobs, ngrps, conv, optimizer, the seven cml_* rows, wald_glmm, wald_glmm_rx, wald_cml; the first version of this marker named only six of them); the full table is regenerated below ...]
 Hessian identical: TRUE  theta identical: TRUE  beta identical: TRUE  u identical: TRUE
 infoRDS writer: 4.4.3
 ```
+*(Added after the T1 reviews.)* The full comparison, regenerated from the saved dump of that refit:
+```bash
+Rscript tests/lib/compare_models.R tests/baseline/models_committed.rds <scratch>/t1/diag_glmm/dump_windows_default.rds
+```
+```text
+fixef         n=25   identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+vcov          n=625  identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+vcov_rx       n=625  identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+theta         n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+sigma2        n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+varcorr       n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+loglik        n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+deviance      n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+nobs          n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+ngrps         n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+conv          n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=   NA
+optimizer     n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=   NA       rel=   NA
+cml_coef      n=24   identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+cml_vcov      n=576  identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+cml_loglik    n=2    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+cml_n         n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+cml_nevent    n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+cml_iter      n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+cml_method    n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=   NA       rel=   NA
+wald_glmm     n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+wald_glmm_rx  n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+wald_cml      n=1    identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+exit 0
+```
+(The CML rows compare the committed CML with itself, because the diagnostic refitted only the GLMM.) The review fixes turned this one-off diagnostic into a committed gate, `tests/legacy/run_windows_r_step3.sh` (A-065), which knits the unmodified Rmd and gives the same result.
 **Conclusion:** the committed GLMM is exactly reproducible from the committed step-2 CSV and the step-3 code with R 4.4.3, lme4 1.1-37 and Matrix 1.7-2 on Windows. The WSL difference is the platform and package versions (an optimizer end point 7.7e-4 away in fixef, at a logLik 1.2e-6 away) plus lme4 1.1-38's derivative rule (A-055). The CML is reproduced exactly on WSL.
 
 ### 5.4 Wald test (all 24 spatial coefficients = 0)

@@ -1,7 +1,10 @@
 # Old-dataset baseline (T1)
 
 Two tiers (plan section 4.5, decision A-004). Files here are written once in T1 and never edited
-afterwards, except to add a missing file (with a LOG entry).
+afterwards, except to add a missing file (with a LOG entry). One recorded exception: in the T1 review
+fixes (2026-11-06) `local/environment.txt` was regenerated to add the Windows R `sessionInfo()`; its
+diff against the T1 version shows only the timestamp, the repo commit and the new section (LOG entry,
+`docs/tests/T1-review-fixes-results.md` section 4).
 
 ## Tier A: the files committed at `79247d8`
 
@@ -25,7 +28,7 @@ Checked by `tests/run_all.sh` (`sha256sum -c`), `tests/python/test_baseline_raw_
 | `local/r_outputs.sha256` | sha256 of the CSVs written by the legacy R run (raw, LF) |
 | `local/pdf_normalized.sha256` | `tests/lib/pdf_normalize.py` hashes (dates removed) of the 8 PDFs of the legacy R run |
 | `local/models_local.rds`, `local/old_model_summary_local.txt`, `.csv` | `dump_models()` of the models refitted by the legacy R run |
-| `local/environment.txt` | `uname -a`, R `sessionInfo()`, `pip freeze` of the venv, git commits; the Windows interpreters used for diagnostics (venv-wind, R 4.4.3) |
+| `local/environment.txt` | `uname -a`, R `sessionInfo()`, `pip freeze` of the venv, git commits; the Windows interpreters (venv-wind; R 4.4.3 with its `sessionInfo()`, the R that reproduces the committed GLMM, A-065) |
 | `local/contour_linux_diff.npz`, `.csv` | The 30 contour records (of 386) in which the Linux rerun differs from the committed (Windows) contour: record indices, shoe ids, the Linux records (bit-packed), the sha256 of the Linux file with CRLF; the CSV gives differing pixels and the mean/max distance to the committed contour per record (`tests/lib/contour_platform_diff.py`). Tier A with these records replaced = Tier B |
 | `local/contour_windows_check.txt` | The same legacy snake under the thesis Windows venv: 0 of 386 records differ from the committed contour |
 
@@ -34,5 +37,11 @@ Tier B comes from these runs (2026-11-05/06, `docs/tests/T1-baseline-results.md`
 decision A-056); R chain A `<scratch>/t1/legacy_r_oTZO3x` (all six steps of `79247d8`; step 5
 without car, decision A-057). An independent R chain B (steps 3-6 from the committed CSVs) gave
 `identical()` models and identical normalized PDF hashes.
+Runs that Tier B was not written from and that reproduce it exactly (the evidence that Tier B is
+reproducible, decision A-066; `docs/tests/T1-review-fixes-results.md` section 5): the reproducibility
+reviewer's `<scratch>/review_t1_repro/pychain_ZlQAFJ` (Python) and `rchain_l8x7yU` (R, all six steps),
+and the review-fix runs `<scratch>/t1fix/legacy_py_doxevy` (Python) and `legacy_r_FTg4vJ` (R, all six
+steps), both at `2196d83`. A live check (`RAC_REGRESS_PY_RUN`, `RAC_REGRESS_R_RUN`) pointed at
+`legacy_py_MXmkvc` or `legacy_r_oTZO3x` is only a consistency check of these files.
 
 How they were produced and compared: `docs/tests/T1-baseline-results.md`.

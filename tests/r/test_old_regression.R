@@ -5,7 +5,9 @@
 # Run from anywhere:  Rscript tests/r/test_old_regression.R
 # Live rerun check:   RAC_REGRESS_R_RUN=<run folder of
 #   tests/legacy/run_legacy_r.sh or tests/regress_old.sh> Rscript ...
-#   (its repo/ copy must hold the regenerated CSVs and models).
+#   (its repo/ copy must hold the regenerated CSVs and models). Only a
+#   run that Tier B was not written from is evidence: Tier B is chain A,
+#   <scratch>/t1/legacy_r_oTZO3x, which can only pass (A-066).
 #
 # What T1 established (docs/tests/T1-baseline-results.md):
 #  - step-1 CSVs: same content as Tier A, LF instead of CRLF (R on Linux);
