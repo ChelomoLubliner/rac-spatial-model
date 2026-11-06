@@ -1,11 +1,11 @@
-# contour_algorithm: verbatim copy of the thesis snake code (legacy)
+# contour_algorithm: the thesis snake code (legacy, style-fixed)
 
-The `.py` files and `requirements.txt` in this folder are **byte-identical copies** of
-`contour_algorithm/` in the thesis repository
+The `.py` files in this folder were committed in T1 (`fe94300`, 2026-11-05) as **byte-identical
+copies** of `contour_algorithm/` in the thesis repository
 (`/mnt/c/Users/mehes/Documents/repo/master_thesis_forensic_shoeprint`) at commit `109f30a`
-(the git blobs, LF line endings; the thesis working tree holds the same text with CRLF).
-They were copied in T1 (2026-11-05) so that the plan's T2 port (style fixes, dataset profiles)
-is a reviewable diff against the code that produced the committed old contour.
+(the git blobs, LF line endings; the thesis working tree holds the same text with CRLF), so that
+the plan's T2 port (style fixes, dataset profiles) is a reviewable diff against the code that
+produced the committed old contour. T2c applied the flake8 style fixes only (see below).
 
 `requirements-lock.txt` is the `pip freeze` of the thesis venv (Python 3.12.3) that runs this code.
 `requirements.txt` pins the direct dependencies to those versions (T2).
@@ -32,6 +32,7 @@ Known issues kept as they are (plan, known issues): the left-shoe flip of image 
 (`create_files_shoes.py:26-30`) is dead code (`FOLDER` never equals `'Images/Old_Shoes/'`), so shoe 9
 is not flipped (K1); `active_contour_snake.py:175` writes the fixed path above and `:177` skips
 index 126 (shoe 127) for any dataset; `globals.py` selects the dataset with `OLD_DATASET` and uses
-`../images/` for both datasets. flake8 reports 106 findings in these files. T2c, the first T2
-commit, fixes them in a style-only commit before any change of logic (A-064). Until then the lint
-check of `tests/run_all.sh` skips this folder.
+`../images/` for both datasets. The verbatim code had 106 flake8 findings. T2c fixed them in a
+style-only commit (A-064): each module has the same Python AST as its verbatim blob, apart from
+docstrings and one f-string without placeholders (`docs/tests/T2-profiles-results.md`), and the lint
+check of `tests/run_all.sh` covers this folder.

@@ -17,7 +17,9 @@ def scatter_plot_contour(coordinates, im_num):
     trace = go.Scatter(x=x, y=y, mode='markers')
     layout = go.Layout(title=f'Scatter plot of contour image {im_num}')
     fig = go.Figure(data=[trace], layout=layout)
-    pyo.plot(fig, filename=f'{FOLDER}extreme_values/plot_cont_{im_num}.html', auto_open=False)
+    pyo.plot(fig,
+             filename=f'{FOLDER}extreme_values/plot_cont_{im_num}.html',
+             auto_open=False)
 
 
 def save_new_contour_shoe(new_points, im_num):

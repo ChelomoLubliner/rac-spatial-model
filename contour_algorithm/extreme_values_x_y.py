@@ -10,7 +10,7 @@ def dict_points(all_points, x_true):
                 points_dict[x_i] = [y_i]
             else:
                 points_dict[x_i].append(y_i)
-        else :
+        else:
             if y_i not in points_dict:
                 points_dict[y_i] = [x_i]
             else:

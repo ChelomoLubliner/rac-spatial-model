@@ -1,7 +1,5 @@
 OLD_DATASET = True
 
-
-
 if OLD_DATASET:
     DATASET = 'contacts_data.txt'
     FOLDER = '../images/'
@@ -12,8 +10,3 @@ else:
     FOLDER = '../images/'
     LOCATIONS = 'results_data_naomi_fast.txt'
     W, H = 255, 367
-
-
-
-
-

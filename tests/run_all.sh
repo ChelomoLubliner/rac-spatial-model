@@ -57,15 +57,11 @@ code_files() {
 # shellcheck disable=SC2317  # invoked indirectly through run_check
 lint_python() {
   local -a files=()
-  local f
-  while IFS= read -r f; do
-    # contour_algorithm/ is the verbatim thesis code (106 findings, A-058);
-    # the T2c style-only commit fixes it and must delete this exclusion
-    # (A-064).
-    if [[ "$f" != contour_algorithm/* ]]; then files+=("$f"); fi
-  done < <(code_files '*.py')
-  echo "flake8: ${#files[@]} files (contour_algorithm/ excluded until T2c)"
-  # with no file argument flake8 would lint "." (contour_algorithm too)
+  # every tracked or new Python file, contour_algorithm/ included since the
+  # T2c style-only commit (A-064)
+  mapfile -t files < <(code_files '*.py')
+  echo "flake8: ${#files[@]} files"
+  # with no file argument flake8 would lint "."
   if [[ ${#files[@]} -eq 0 ]]; then return 1; fi
   flake8 -- "${files[@]}"
 }
@@ -87,8 +83,7 @@ run_check "python unittest discover tests/python" \
 for t in tests/r/test_*.R; do
   run_check "Rscript $t" Rscript "$t"
 done
-run_check "flake8 (all Python except contour_algorithm/ until T2c)" \
-  lint_python
+run_check "flake8 (all Python files)" lint_python
 run_check "shellcheck (all shell scripts)" lint_shell
 # shellcheck disable=SC2317  # invoked indirectly through run_check
 tree_unchanged() {

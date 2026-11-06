@@ -8,8 +8,3 @@ if __name__ == '__main__':
     contour.main()
     active_contour_snake.main()
     distance_extremities.main()
-    
-
-
-
-

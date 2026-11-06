@@ -35,7 +35,8 @@ def contacts_data():
 def superposition_all_shoes(list_lines):
     print('superposition_all_shoes')
     total = list_lines.sum(axis=0)
-    Image.fromarray(total.astype(bool)).save(FOLDER + 'saved/all_shoes_superposed.png')
+    Image.fromarray(total.astype(bool)).save(
+        FOLDER + 'saved/all_shoes_superposed.png')
 
 
 def superposed_pixels(list_lines):
@@ -69,16 +70,14 @@ def superposed_pixels_reversed(list_lines):
         line = np.vectorize(new_dict.get)(total)
         if (max_pix % 10 == 0) or (max_pix < 25):
             img = Image.fromarray(line)
-            img.save(f'{FOLDER}Superposed_Pixels_Reversed/freq_max_{max_pix}.png')
+            img.save(
+                f'{FOLDER}Superposed_Pixels_Reversed/freq_max_{max_pix}.png')
 
 
 def heatmap_superposed(list_lines):
     print('Heatmap_superposed')
     plt.imshow(list_lines.sum(axis=0), cmap='jet', interpolation='sinc')
     plt.savefig(FOLDER + 'saved/heatmap_superposed.png')
-
-
-
 
 
 def main():
@@ -96,4 +95,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
