@@ -579,3 +579,47 @@ Chronological; newest entry at the bottom. Each entry: what was done, results (r
 - With my runs, five WSL R chains (one of them steps 3-6 only) and four WSL Python runs give the same outputs.
 
 **Required before T2:** finding 1 (runner, live check, plan text and negative test), together with engineer finding 1. Findings 2 and 3 can go into the first T2 commits.
+
+## 2026-11-06 04:00, T1-baseline second review fixes (implementer)
+
+**What.** Fixed every finding of the second T1 reviews (engineering `9ddc9f0`, reproducibility `ba3639a`): both majors, all minor notes and all four nits. Code commits: `223b5e6` (scratch marker), `4d7dfec` (runners delete and list their outputs; Windows step-3 reference), `a781041` (`compare_models.R` CLI), `969e7d9` (live checks gated on the run manifest), `386951e` (test nits), `0a6a727` (stub runner tests), `b3f7520` and `90392ae` (environment), `0c4829e` (one OLD record reader). The docs commit follows this entry. Decisions A-067 to A-072, with update notes on A-060, A-062, A-065 and A-066; plan Revision 5. Exact commands and outputs: `docs/tests/T1-review2-fixes-results.md`.
+
+**Fixes and results.**
+- **R1 (major), stale outputs (A-067).** Reproduced first: the previous `test_old_regression.R` prints ALL PASS, exit 0, on the reviewer's `<scratch>/rv2_t1/fake_stale_zv7m57`, where no step ran.
+  - New `tests/lib/run_outputs.sh`. Before the first step, each runner deletes the outputs of the steps it runs and lists them in `outputs_expected.txt`. After the last step, it hashes the outputs that exist and are newer than the list (`outputs_regenerated.sha256`). A missing output fails the run.
+  - The R, Python and Windows step-3 runners use it, and all three write `timings.tsv`.
+  - Every live check calls `check_run_manifest()` (`tests/lib/run_manifest.R` and `.py`) first: `test_old_regression.R`, the new `test_live_r_pdfs.py` (8 PDFs) and `test_snake_old_regression.py` (contour plus, new, all 1,556 intermediates).
+  - Plan 4.5 and T2 step 3 amended: `regress_old.sh` deletes each step's outputs, step 0's contour included.
+  - The new test fails on the reviewer's folder ("run manifest: no exit_status").
+  - `tests/r/test_run_manifest.R` rebuilds that folder from the committed files: its five CSVs and its CML equal Tier B, so content checks alone cannot tell. The live check fails on it, also with a forged `exit_status` and `timings.tsv`.
+  - `tests/python/test_runner_outputs.py` runs the real runners with a stub in place of R: a step that writes nothing, or a stale `cp -p` copy, fails. The old Windows runner accepted that stale copy (exit 0, 27/27).
+  - The T1 run folders predate the manifest and are now refused.
+- **E1 = R4 (major), `compare_models.R` CLI (A-069).** All five reported dumps exited 0 with the old CLI (NaN, shorter fixef, `bobyqa`, `breslow`, all GLMM fields NaN) and exit 1 now. CLI cases are in the test, and they fail against the old file.
+- **E2 = R2, step-3 reference (A-070).** The runner compares with the blob `79247d8:saved_models/NEW_X_NS_XY.rds`, sha256-checked against the Tier A list (exit 2 on a mismatch), and prints both sha256 values. The driver sets `RAC_DATASET=old` and `RAC_MODEL_FEATURE=NEW_X_NS_XY` and unsets `RAC_PROFILE_FILE`, because WSL variables do not reach Windows R.
+- **R3, venv-wind not frozen (A-071).** `pyvenv.cfg` says 3.13.9 (written 2025-11-12). The interpreter is 3.13.14, `sys.base_prefix` = the Store package `PythonSoftwareFoundation.Python.3.13_3.13.3824.0`, and it updates itself.
+  - `write_environment.sh` records both values, and it now passes the `PIP_*` settings through `WSLENV`. `environment.txt` was regenerated: only the timestamp, the commit and the new lines changed.
+  - F21 and F40 are reconciled. T2 and T4 log `sys.version` and `sys.base_prefix` for every venv-wind Tier A check.
+  - Freezing the base (Store updates off, or a python.org build) is a user decision outside the repo. It is recorded, not done.
+- **E3, A-062 residual risk (A-068).** `rac_scratch_new` writes `.rac_scratch_run` (the folder's own path), and `rac_scratch_remove` requires it. `rac_scratch_root` is read-only, with a guard for a second `source`. The scratch library has 16 tests; 9 fail on the old library: hand-made `legacy_python`, `results_backup` and three more deleted, a copy deleted, the root assignable, the second source, the marker.
+- **E4 nits (A-072).**
+  - (1) `tests/lib/old_records.py` (frame, checked LF/CRLF reader, shoe/record mapping) replaces the copies in seven helpers. Their outputs are identical before and after: the overlay PNG and `contour_linux_diff.csv` are byte-identical to the committed files, the npz and diag arrays are equal, and the WSL gallery is byte-identical. Under venv-wind the gallery reproduces all 11 committed `docs/qa/sheets_old/` files byte for byte, and the diag gives 0 px for shoes 176, 354, 11 and 21. The plan's `test_no_hardcoding` now scans `tests/` except an allowlist of OLD-only files. A blind scan would confuse the colour value 255 with the NEW width.
+  - (2) The `!identical()` assertion is a printed NOTE now. (3) The missing space is fixed.
+  - (4) Shoe 11's heel is not shared: in the bottom 20% of rows, 18 shared pixels against 128 Windows-only and 129 WSL-only, with the WSL outline about 1 px right and down. Corrected in `T1-review-fixes-results.md` 5.3.
+- **Looked at:** the zoomed heel of shoe 11 (green and magenta side by side, only a few white pixels at the lower left); `sheet_old_02.png` of the venv-wind build (stickers on 29, 55, 56 and 66 red, that is, removed; contours hug the prints; nothing inside a contour); and the fresh `difference_random_cml.pdf` and `CI_cut_110.pdf` of the R chain, which match the T1 descriptions of their twins.
+
+**OLD regression (fresh runs from the runners at `4d7dfec`, strict checks).** No committed data, model, figure, Rmd, `config.R` or legacy `.py` changed, and 24/24 Tier A and 11/11 OLD checksums verify.
+- Python `<scratch>/t1rv2/legacy_py_rJehu1`: the contour (`d43fda7e...` / CRLF `e18d50df...`) and all 1,556 intermediates equal Tier B. Against Tier A: 30 records, 19,027 px, as in T1.
+- R `legacy_r_ck4pCJ`: all 15 outputs regenerated. The five CSVs equal Tier B, the models are `identical()` to Tier B, 8/8 normalized PDFs equal Tier B, and step 5 prints W = 427.7804.
+- Windows R `winr_step3_kMdls7`: 27/27 fields equal the Tier A blob (sha256 `ae670fd3...`), and its dump equals the committed dump in 22/22 fields (fixed CLI, exit 0).
+
+**Tests.** `bash tests/run_all.sh`: ALL PASS, 13 checks, 87.5 s. 52 Python tests ran; the 3 skips are the live checks, which need a run folder. 7 R scripts; flake8 on 26 files, shellcheck on 9.
+
+**Timings.** Python 1,046 s; R steps 146 / 1,387 / 260 / 203 / 13 / 13 / 25 / 18 s; Windows R knit 631 s. All three ran in parallel (load average up to 29 on 16 cores).
+
+**Side effects outside the repo.** Only `<scratch>/t1rv2/`. Windows R and venv-wind wrote only there. In the thesis repo, the root, both venvs and `.git/index` kept their mtimes (checked around the venv-wind queries). The leftover `<scratch>/t1fix/mirror_leUZA9` of the previous pass (59 empty entries, no symlinks) was removed.
+
+**Next.** T2, starting with T2c (A-064). T2's `regress_old.sh` must source `run_outputs.sh` and gate every comparison on `check_run_manifest()` (A-067). Add the profile files to the archive list of `run_windows_r_step3.sh`, plus any `RAC_*` variable to its driver. Log the venv-wind interpreter (A-071). Write the `test_no_hardcoding` allowlist (A-072).
+
+**Open.** A-055 (vcov method for T5/T6) and A-060 (platform of the official NEW contour) are still proposals. Freezing venv-wind's base (A-071) needs the user.
+
+**Blockers.** None.

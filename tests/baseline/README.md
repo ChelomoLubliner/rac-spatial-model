@@ -4,7 +4,10 @@ Two tiers (plan section 4.5, decision A-004). Files here are written once in T1 
 afterwards, except to add a missing file (with a LOG entry). One recorded exception: in the T1 review
 fixes (2026-11-06) `local/environment.txt` was regenerated to add the Windows R `sessionInfo()`; its
 diff against the T1 version shows only the timestamp, the repo commit and the new section (LOG entry,
-`docs/tests/T1-review-fixes-results.md` section 4).
+`docs/tests/T1-review-fixes-results.md` section 4). It was regenerated once more in the second T1
+review fixes to record venv-wind's base interpreter (`sys.base_prefix`, `pyvenv.cfg`; decision A-071);
+again only the timestamp, the commit and the new lines changed
+(`docs/tests/T1-review2-fixes-results.md` section 4).
 
 ## Tier A: the files committed at `79247d8`
 
@@ -28,7 +31,7 @@ Checked by `tests/run_all.sh` (`sha256sum -c`), `tests/python/test_baseline_raw_
 | `local/r_outputs.sha256` | sha256 of the CSVs written by the legacy R run (raw, LF) |
 | `local/pdf_normalized.sha256` | `tests/lib/pdf_normalize.py` hashes (dates removed) of the 8 PDFs of the legacy R run |
 | `local/models_local.rds`, `local/old_model_summary_local.txt`, `.csv` | `dump_models()` of the models refitted by the legacy R run |
-| `local/environment.txt` | `uname -a`, R `sessionInfo()`, `pip freeze` of the venv, git commits; the Windows interpreters (venv-wind; R 4.4.3 with its `sessionInfo()`, the R that reproduces the committed GLMM, A-065) |
+| `local/environment.txt` | `uname -a`, R `sessionInfo()`, `pip freeze` of the venv, git commits; the Windows interpreters (venv-wind with its `sys.base_prefix` and `pyvenv.cfg`: the self-updating Microsoft Store Python, 3.13.9 at creation, 3.13.14 now, A-071; R 4.4.3 with its `sessionInfo()`, the R that reproduces the committed GLMM, A-065) |
 | `local/contour_linux_diff.npz`, `.csv` | The 30 contour records (of 386) in which the Linux rerun differs from the committed (Windows) contour: record indices, shoe ids, the Linux records (bit-packed), the sha256 of the Linux file with CRLF; the CSV gives differing pixels and the mean/max distance to the committed contour per record (`tests/lib/contour_platform_diff.py`). Tier A with these records replaced = Tier B |
 | `local/contour_windows_check.txt` | The same legacy snake under the thesis Windows venv: 0 of 386 records differ from the committed contour |
 
@@ -43,5 +46,11 @@ reviewer's `<scratch>/review_t1_repro/pychain_ZlQAFJ` (Python) and `rchain_l8x7y
 and the review-fix runs `<scratch>/t1fix/legacy_py_doxevy` (Python) and `legacy_r_FTg4vJ` (R, all six
 steps), both at `2196d83`. A live check (`RAC_REGRESS_PY_RUN`, `RAC_REGRESS_R_RUN`) pointed at
 `legacy_py_MXmkvc` or `legacy_r_oTZO3x` is only a consistency check of these files.
+Since the second T1 review fixes (decision A-067) a live check accepts only a run folder whose runner
+deleted the outputs before the run and listed the regenerated ones (`outputs_expected.txt`,
+`outputs_regenerated.sha256`, `timings.tsv`, `exit_status`; `tests/lib/run_outputs.sh`); the folders
+above predate that and are refused. Runs that pass the strict checks: `<scratch>/t1rv2/legacy_py_rJehu1`
+(Python) and `legacy_r_ck4pCJ` (R, all six steps), both from the runners at `4d7dfec`
+(`docs/tests/T1-review2-fixes-results.md`).
 
 How they were produced and compared: `docs/tests/T1-baseline-results.md`.
