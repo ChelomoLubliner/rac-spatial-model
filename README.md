@@ -56,7 +56,8 @@ install.packages(c(
 
 ### Run the pipeline
 
-Open each `.Rmd` in RStudio (working directory: `statistical_model/`) and knit in order:
+The steps are the six `.Rmd` files of `statistical_model/` (working directory: `statistical_model/`),
+run in order:
 
 | Step | File | Output |
 |:----:|------|--------|
@@ -67,12 +68,30 @@ Open each `.Rmd` in RStudio (working directory: `statistical_model/`) and knit i
 | 5 | `statistical_tests_5.Rmd` | Confidence intervals (Random vs CML) |
 | 6 | `model_comparison_6.Rmd` | Side-by-side comparison figure |
 
-To fit **both** models, run Step 3 twice -- once with each value of the environment variable
-`RAC_MODEL_FEATURE` (read by `statistical_model/config.R`; `NEW_X_NS_XY` when unset):
+**Rerunning the OLD steps (the committed results) -- not in this working tree.** The committed OLD
+contour, models and figures were made on Windows (R 4.4.3 and the thesis Windows venv); a rerun on
+another platform reproduces the CSVs byte for byte, but not those files bit for bit. So the code
+refuses to overwrite them in place: knitting Step 3, 4, 5 or 6 here with `RAC_DATASET` unset or `old`
+(RStudio's Knit button included), or running `python -m contour_algorithm.main`, stops at once with
+`refusing to overwrite the committed OLD output ...`, before it computes or writes anything (decision
+A-075; the user has yet to confirm this change of the old workflow). Steps 1 and 2 are not refused:
+they rewrite the same bytes. To rerun OLD steps, use a copy:
+
+- `RAC_SCRATCH=<scratch folder> bash tests/regress_old.sh --steps 1-6 --keep` copies the tree to a
+  scratch folder, deletes there the outputs of the steps it runs, runs them, compares every output
+  with the baselines and keeps the run folder with all outputs (see *Datasets* below);
+- or copy the repository yourself and delete, in the copy, the outputs of the steps you rerun.
+
+**NEW dataset**: set `RAC_DATASET=new` (see below); every NEW output has its own path, so the steps
+run in this tree. To fit **both** models, run Step 3 twice -- once with each value of the environment
+variable `RAC_MODEL_FEATURE` (read by `statistical_model/config.R`; `NEW_X_NS_XY` when unset):
 
 ```bash
-RAC_MODEL_FEATURE=CML_MODEL Rscript -e 'rmarkdown::render("re_model_shoe_std_3.Rmd")'
+cd statistical_model
+RAC_DATASET=new RAC_MODEL_FEATURE=CML_MODEL Rscript -e 'rmarkdown::render("re_model_shoe_std_3.Rmd")'
 ```
+
+(`tools/run_pipeline.sh` does this for you: it runs Steps 3 and 4 once per model.)
 
 ### Datasets: OLD (387 shoes) and NEW (631 shoes)
 
@@ -107,7 +126,12 @@ The plan and the decisions behind this are in `docs/plans/2026-11-05-new-shoes-p
 
 ### Skip the fitting
 
-Pre-fitted `.rds` files ship in `saved_models/`, so Steps 4--6 work out of the box (Steps 1--3 take ~15 min).
+The pre-fitted OLD models ship in `saved_models/` and the OLD figures in `model_images/`. Steps 4--6
+read those models, but for OLD they run only in a copy (they would overwrite the committed figures):
+`RAC_SCRATCH=<scratch folder> bash tests/regress_old.sh --steps 4-6 --keep` draws them from the
+committed models in a few minutes. For NEW, Steps 4--6 run in this tree once Step 3 has fitted the NEW
+models. Times on this machine (WSL): Step 1 about 2 min, Step 2 about 20 s, Step 3 about 4 min per
+model.
 
 ---
 

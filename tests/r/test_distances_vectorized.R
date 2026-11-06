@@ -73,7 +73,8 @@ pass(sprintf(paste("float window (F14): OLD %d of %d three-row pairs with the",
              new_w[["above"]], new_w[["below"]], new_w[["pairs"]],
              P$row_shoe, N$row_shoe))
 
-# --- 2. legacy chunks vs vectorized, 1,000 OLD rows -------------------------
+# --- 2. legacy chunks vs vectorized, 406 OLD rows ---------------------------
+# (400 sampled rows of 30 shoes plus 6 rows beyond every contour in y)
 rmd <- readLines(file.path(root, "statistical_model", "dataCC_distance_2.Rmd"))
 chunk_with <- function(pattern) {
   starts <- grep("^```\\{r", rmd)

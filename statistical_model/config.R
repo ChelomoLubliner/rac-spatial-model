@@ -21,7 +21,8 @@ ROOT_PATH <- paste(ROOT_PATH, "/", sep = "")
 source(paste(ROOT_PATH, "statistical_model/R/profile.R", sep = ""))
 source(paste(ROOT_PATH, "statistical_model/R/io.R", sep = ""))
 P <- rac_profile(root = ROOT_PATH)
-CONTOUR_ALGORITHM <- "Active_Contour"
+# (CONTOUR_ALGORITHM is gone: step 2 reads the contour path from the profile,
+# rac_path(P, "contour"), the legacy data/contour_Active_Contour.txt for OLD)
 IMAGE_NUMBER <- "171"
 # 171/ 135
 MODEL_FEATURE <- rac_model_feature()

@@ -40,10 +40,14 @@ rac-spatial-model/
 **Key Variables**:
 ```r
 ROOT_PATH            # Auto-detected project root
-CONTOUR_ALGORITHM    # "Active_Contour"
+P                    # the dataset profile (config/datasets.json, RAC_DATASET=old|new):
+                     #   every dimension, count, threshold and path, e.g. rac_path(P, "contour")
 IMAGE_NUMBER         # "171" or "135" (for specific shoe analysis)
-MODEL_FEATURE        # "NEW_X_NS_XY" or "CML_MODEL"
+MODEL_FEATURE        # "NEW_X_NS_XY" or "CML_MODEL" (from RAC_MODEL_FEATURE)
 ```
+
+(`CONTOUR_ALGORITHM` was removed in the T2 review fixes: the contour path now comes from the
+profile, `data/contour_Active_Contour.txt` for OLD.)
 
 **Path Detection**:
 - If RStudio: Uses `rstudioapi` to detect file location
