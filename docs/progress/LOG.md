@@ -521,3 +521,61 @@ Chronological; newest entry at the bottom. Each entry: what was done, results (r
 - Every pasted output I re-ran is real.
 
 **Required before the next step:** finding 1 (code and test). Findings 2-4 can go into the first T2 commits.
+
+## 2026-11-06 03:08, T1-baseline review of the fix pass 823a80c..2d39846 (reviewer:reproducibility)
+
+**Verdict: changes required** (reproducibility lens), for one item: finding 1. Every number of the fix pass that I re-ran reproduces, and a new Windows run makes the contour baseline stronger. But the OLD-regression check can pass on stale committed files, and plan 4.5 gives T2's `regress_old.sh` the same pattern.
+
+**Re-run by me, with my own drivers** (`<scratch>/rv2_t1/`). Only the new Windows R gate ran through its repo script, because that script is under review.
+- **Tier A.** The 24 sha256 values recomputed from the `79247d8` blobs equal `committed_79247d8.sha256` (file list and values), and the work tree equals the blobs. Since `79247d8`, the only change under `data/`, `processed_data/`, `saved_models/`, `model_images/` and `statistical_model/` is the new `R/wald.R`. The `.py` files and `requirements.txt` of `contour_algorithm/` are `cmp`-identical to the thesis blobs at `109f30a`. The thesis HEAD is unchanged, and its `.git/index`, `__pycache__` and both venvs were not touched by my runs.
+- **RNG.** `set.seed(313)` (`dataCC_1.Rmd:12`) still comes before the only `sample()` (`:236`). There is no other random call and no parallel backend in steps 1-6, and no Rmd changed. My step-1 `dataCC.csv` is byte-identical to Tier B and, with CRLF, to Tier A, so the sampled controls are the same.
+- **R steps 1-6 on WSL** (`rchain_khNh0d`: `git archive HEAD`, all 15 outputs deleted before the run, my own car-free step 5 with an inline Wald; every knit exit 0).
+  - Step-1 CSVs equal Tier B raw, and Tier A after LF -> CRLF. Step-2 CSVs are byte-identical to Tier A.
+  - GLMM: fixef, both vcovs, theta, sigma^2, logLik and deviance are `identical()` to the Tier B dump. No Hessian is stored. Against Tier A: max |dfixef| 7.666e-4, sigma^2 0.95979590 vs 0.95977909.
+  - CML: 13 fields `identical()` to Tier A; W = 420.6712420035.
+  - PDFs: 8/8 normalized hashes equal Tier B, and they also equal the implementer's and the first reviewer's runs.
+  - Step 5 prints W = 427.7804472165 (committed GLMM: 428.6933350011; RX 427.7674192737).
+  - Times (s, under load): 123 / 1,482 / 245 / 200 / 13 / 13 / 24 / 18.
+- **Legacy Python on WSL** (`pychain_QFvW12`: thesis blobs; inputs from the `79247d8` blobs; the venv copy, whose `pip freeze` equals `requirements-lock.txt` and which has no file newer than the copy). Exit 0, 1,060 s.
+  - Contour sha256 `d43fda7e` (LF) / `e18d50df` (CRLF) = Tier B. The same 30 records (19,027 px) differ from Tier A.
+  - 1,556/1,556 intermediates equal Tier B, none missing or extra. The regenerated mask equals the committed PNG pixels.
+- **New: full legacy step 0 under venv-wind** (`winchain_5CNsNh`, my driver: raw contacts -> superposition -> prototype snake -> cleaning -> 386 snakes; only the plotly HTML call stubbed; 1,427 s).
+  - `data/contour_Active_Contour.txt` is **byte-identical to Tier A** (`ca8a07f2`). Its regenerated `freq_min_18.png` is byte-identical to `data/freq_min_18.png`.
+  - Against my WSL run: `list_matrices`, `old_freq_min_18`, `freq_min_18` and `list_contour` (npy) are byte-identical; `active-contour_all` differs in exactly the 19,027 px. The shoe, cleaned and overlay PNGs are pixel-identical (their bytes differ, A-054).
+  - T1's Windows check started from the committed mask. This is the first end-to-end Tier A reproduction of step 0, so A-060 now holds without that assumption.
+- **Windows R step 3** (`tests/legacy/run_windows_r_step3.sh` as committed): exit 0, knit 663.6 s, `RESULT 27 of 27 fields the same`.
+  - My own check of that fit: fixef, both vcovs, theta, the stored Hessian, gradient, u, logLik and VarCorr are `identical()` to the committed GLMM; W = 428.6933350011.
+  - Its `.rds` bytes (`0e1d19f0`) differ from the committed file and from the implementer's Windows fit (`9bc6eccf`). Only fields can be compared, as documented.
+- `bash tests/run_all.sh`: ALL PASS (12 checks, about 3 min under load). No commit since `79247d8` has an attribution line, and the changed text files have 0 CR bytes.
+- **Images I opened.**
+  - The overlay `docs/qa/T1/old/contour_platform_diff_old.png`: it matches the LOG description.
+  - The snake of shoe 176 from my WSL run: it hugs the print, and no sticker is left.
+  - Shoe 11, Windows next to WSL: Windows bows further into the left arch and has a small notch at the toe.
+  - My `NEW_X_NS_XY_SHOE.pdf` and `difference_random_cml.pdf` next to the committed ones: the maps are the same. The only difference is a faint shading change at the bottom of the heel in the difference map, as T1 described.
+
+**Findings.**
+1. **Major: the OLD-regression check passes on stale committed files.**
+   - `tests/legacy/run_legacy_r.sh` extracts every committed output into its copy. The live check of `tests/r/test_old_regression.R` only hashes the files at the committed paths. It checks neither the knit exit codes nor that the run wrote the files.
+   - For the step-2 CSVs and the CML, Tier B equals Tier A, so a step that never ran passes. The step-1 CSVs pass when the committed files are only CR-stripped.
+   - Reproduced: `<scratch>/rv2_t1/fake_stale_zv7m57/repo` holds the committed step-1 CSVs with CR removed, the committed step-2 CSVs and CML untouched, and an older WSL GLMM. `RAC_REGRESS_R_RUN=<that folder> Rscript tests/r/test_old_regression.R` prints "the five CSVs equal Tier B byte for byte" and "models identical() to Tier B", then ALL PASS, exit 0. Yet steps 1 and 2 and the CML fit never ran.
+   - Plan 4.5 gives T2's `regress_old.sh` the same pattern: rsync of the working tree, run, compare at the committed paths. With the committed EOLs in the OLD profile, the five R CSVs and the CML would pass even if a refactored step wrote nothing or wrote elsewhere. So would the venv-wind Tier A contour check, because the copy holds `data/contour_Active_Contour.txt`. On WSL only the GLMM, the PDFs and the Tier B contour would catch it.
+   - The T1 evidence itself is sound: chain A, the fix-pass chain and my chain regenerated every file (mtimes after the start, every knit exit 0).
+   - Fix:
+     - In `run_legacy_r.sh` and in `regress_old.sh`, delete the outputs of every step being run from the copy before running (for step 0, the contour), write that list into the run folder, and fail if an output is missing afterwards.
+     - In the live check, require `exit_status` 0 and exit 0 for every step of `timings.tsv`, and accept only files on that list.
+     - Amend plan 4.5 and T2 step 3 accordingly.
+     - Add the stale folder above as a negative test.
+2. **Minor (same as engineer finding 2): `run_windows_r_step3.sh` takes its reference GLMM from the work tree without a hash check.** Extract `79247d8:saved_models/NEW_X_NS_XY.rds` into the run folder (or `sha256sum -c` it first) and print its sha256 in `compare.txt`.
+3. **Minor: the Windows platform of Tier A is not frozen.**
+   - venv-wind's base is the Microsoft Store Python 3.13 (`pyvenv.cfg`: `...WindowsApps\PythonSoftwareFoundation.Python.3.13_...`, version 3.13.9 at creation on 2025-11-12), which updates itself. It now runs 3.13.14 (built 2026-06-10).
+   - So the committed contour (2025-11-13) came from an earlier patch level than the one that reproduces it today. The plan says 3.13.9 in F21 but 3.13.14 in F40 and A-060, without saying why.
+   - Fix: record this in `environment.txt` and A-060, reconcile F21 and F40, and log the interpreter version with every venv-wind Tier A check (T2, T4).
+4. **Confirmed: engineer finding 1.** `compare_models.R` exits 0 for a dump with `fixef[1] = NaN` and `optimizer = "bobyqa"`, although both rows say `identical=FALSE`. So both comparison paths that T2's gate will reuse have a false-pass mode.
+
+**What is good.**
+- Every T1 and fix-pass number I re-ran is real, to the digit.
+- The Windows R gate makes Tier A of step 3 repeatable, and its field-by-field comparison is careful.
+- The scratch-guard, Wald and splice fixes are right, and they are tested against the old code.
+- With my runs, five WSL R chains (one of them steps 3-6 only) and four WSL Python runs give the same outputs.
+
+**Required before T2:** finding 1 (runner, live check, plan text and negative test), together with engineer finding 1. Findings 2 and 3 can go into the first T2 commits.
