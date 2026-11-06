@@ -13,6 +13,8 @@ py=${RAC_VENV_PY:-$thesis/venv/bin/python}
 win_py=${RAC_WIN_PY:-$thesis/venv-wind/Scripts/python.exe}
 win_r=${RAC_WIN_RSCRIPT:-/mnt/c/Users/mehes/AppData/Local/Programs/R/R-4.4.3/bin/Rscript.exe}
 export PIP_DISABLE_PIP_VERSION_CHECK=1 PIP_NO_CACHE_DIR=1
+# WSL variables reach a Windows process only through WSLENV.
+export WSLENV="${WSLENV:+$WSLENV:}PIP_DISABLE_PIP_VERSION_CHECK:PIP_NO_CACHE_DIR"
 
 echo "# Environment of the T1 Tier B reruns, recorded $(date --iso-8601=seconds)"
 echo
@@ -42,8 +44,15 @@ timeout 600 "$py" -B -m pip freeze
 if [[ -x "$win_py" ]]; then
   echo
   echo "## Python (Windows venv-wind, diagnostics only: $win_py)"
-  (cd /mnt/c && timeout 600 "$win_py" -B -c 'import sys; print(sys.version)' \
+  (cd /mnt/c && timeout 600 "$win_py" -B -I -c \
+    'import sys; print(sys.version); print("base_prefix", sys.base_prefix)' \
     | tr -d '\r')
+  # The base interpreter is the Microsoft Store Python 3.13, which updates
+  # itself: pyvenv.cfg keeps the version at creation, base_prefix names the
+  # Store package now in use (decision A-071).
+  win_cfg="$(dirname "$(dirname "$win_py")")/pyvenv.cfg"
+  echo "pyvenv.cfg (modified $(stat -c %y "$win_cfg")):"
+  tr -d '\r' < "$win_cfg"
   (cd /mnt/c && timeout 600 "$win_py" -B -m pip freeze | tr -d '\r')
 fi
 if [[ -x "$win_r" ]]; then
