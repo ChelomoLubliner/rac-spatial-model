@@ -50,7 +50,8 @@ if [[ -x "$win_r" ]]; then
   echo
   echo "## R (Windows, diagnostics only: $win_r)"
   # one line: a multi-line -e argument does not survive the Windows
-  # command line
-  (cd /mnt/c && timeout 600 "$win_r" -e 'for (p in c("lme4", "Matrix", "survival", "car")) cat(p, as.character(packageVersion(p)), "\n"); cat(R.version.string, "\n")' \
+  # command line. sessionInfo() after loading the step-3 packages: this R
+  # reproduces the committed GLMM bit for bit (A-055, A-065).
+  (cd /mnt/c && timeout 600 "$win_r" -e 'for (p in c("lme4", "Matrix", "survival", "car")) cat(p, as.character(packageVersion(p)), "\n"); cat(R.version.string, "\n"); suppressMessages({library(splines); library(lme4); library(survival)}); print(sessionInfo())' \
     2>&1 | tr -d '\r')
 fi

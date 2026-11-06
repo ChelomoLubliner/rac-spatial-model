@@ -1,4 +1,4 @@
-# Environment of the T1 Tier B reruns, recorded 2026-11-06T00:19:03+02:00
+# Environment of the T1 Tier B reruns, recorded 2026-11-06T01:44:00+02:00
 
 ## System
 Linux Taxes67-lp 6.18.54.1-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Tue Oct  6 19:13:07 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
@@ -6,7 +6,7 @@ PRETTY_NAME="Ubuntu 24.04.2 LTS"
 16
 
 ## Git
-this repo: e4fedce3f5221591beb2317898a19964019f1c4c (feature/new-shoes-pipeline)
+this repo: 2196d8319f37d0e18f2a7253f2eb476b04818b9f (feature/new-shoes-pipeline)
 thesis repo HEAD: 109f30a0217aab16e35a31aaed628a555f57031d
 
 ## R (WSL)
@@ -137,3 +137,32 @@ Matrix 1.7.2
 survival 3.8.3 
 car 3.1.3 
 R version 4.4.3 (2025-02-28 ucrt) 
+R version 4.4.3 (2025-02-28 ucrt)
+Platform: x86_64-w64-mingw32/x64
+Running under: Windows 11 x64 (build 26300)
+
+Matrix products: default
+
+
+locale:
+[1] LC_COLLATE=English_United States.utf8 
+[2] LC_CTYPE=English_United States.utf8   
+[3] LC_MONETARY=English_United States.utf8
+[4] LC_NUMERIC=C                          
+[5] LC_TIME=English_United States.utf8    
+
+time zone: Asia/Jerusalem
+tzcode source: internal
+
+attached base packages:
+[1] splines   stats     graphics  grDevices utils     datasets  methods  
+[8] base     
+
+other attached packages:
+[1] survival_3.8-3 lme4_1.1-37    Matrix_1.7-2  
+
+loaded via a namespace (and not attached):
+ [1] minqa_1.2.8      MASS_7.3-64      compiler_4.4.3   reformulas_0.4.1
+ [5] tools_4.4.3      Rcpp_1.1.0       nlme_3.1-167     grid_4.4.3      
+ [9] rbibutils_2.3    nloptr_2.2.1     boot_1.3-31      Rdpack_2.6.4    
+[13] lattice_0.22-6  
