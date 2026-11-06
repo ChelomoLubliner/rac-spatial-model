@@ -304,7 +304,8 @@ ALL PASS
 Wald test, all 24 spatial coefficients = 0 (manual): W = 428.6933, df = 24, p = 9.43e-76
 car::linearHypothesis: not run (car not installed)
 ```
-That file is the committed `processed_data/wald_test.csv`. With car: `test_wald.R` under the Windows R
+That file was the committed `processed_data/wald_test.csv` of T2 (replaced in the T2 review fixes by the
+same line without the two car columns, decision A-082). With car: `test_wald.R` under the Windows R
 (car 3.1-3) ends with `PASS car::linearHypothesis W = 428.693335 equals the manual W` / `ALL PASS
 test_wald`, and the refactored step 5 knitted there (`<scratch>/t2/win_step5`, a copy of `c9d782b`, whose
 step 5 is that of `82c1661`) writes
@@ -346,8 +347,13 @@ step   seconds       exit
 step2  51.444158977  0
 ALL PASS
 ```
-The knit of that run printed `## distance implementation: vectorized`, and its log has none of the legacy
-progress messages (`grep -c "row N" .../logs/step2.log` gives 0). `tests/r/test_distances_vectorized.R`:
+The knit of that run printed `## distance implementation: vectorized`, and the run took 51.4 s instead of
+about 19 minutes. *(Corrected in the T2 review fixes, reproducibility finding 4: this paragraph first offered
+`grep -c "row N" .../logs/step2.log` = 0 as evidence, but rmarkdown sends `message()` to the knit HTML, not
+to the log, so the legacy loops give 0 there too. The discriminating evidence is the HTML: the vectorized
+run's `dataCC_distance_2.html` has 0 progress messages `row N.<number>` (its 2 `row N` matches are code
+echoes), the legacy-loop run `regress_old_rj6KaH` has 102 (51 per loop), plus the timing; commands and output
+in `docs/tests/T2-review-fixes-results.md` section 6.)* `tests/r/test_distances_vectorized.R`:
 ```text
 PASS float window (F14): OLD 160 of 392 three-row pairs with the data row above, 161 below; NEW 152 and 151 of 364; the round trip changes 263 of 395 and 245 of 367 y values; horiz_dist_vec admits the same pairs
 PASS min_dist and horiz_dist: the legacy loops of the Rmd and the vectorized functions identical() on 406 OLD rows (6 without a contour point within 0.01 in y)
@@ -632,6 +638,14 @@ slow each other down severalfold; the results did not change (every run above co
   three has its Tier A evidence on Windows (sections 7.2, 7.3) or, for the PDFs, only within this machine.
 - `processed_data/shoe_codes.csv` and `processed_data/wald_test.csv` are new OLD files (plan section 5);
   no committed OLD file changed (24 of 24 Tier A checksums verify in every suite run).
+- *(Added in the T2 review fixes.)* **Not listed here at first, and wrong:** `wald_test.csv` as committed in T2
+  was not reproducible across platforms. Its `method`, `W_car` and `p_car` columns depended on whether car
+  is installed, so step 5 under the Windows R (car 3.1-3) wrote `"manual+car"` and the car values instead of
+  `"manual"` and `NA`, and an in-place knit there rewrote the committed file before the first figure guard
+  stopped it (reproducibility review, finding 1). Also, `regress_old.sh` compared `shoe_codes.csv` and
+  `wald_test.csv` with the work-tree files, and no baseline list covered them. Fixed by decision A-082: the
+  CSV has no car column, the guards run before anything is written, and both files are in
+  `tests/baseline/old_added_t2.sha256`; evidence in `docs/tests/T2-review-fixes-results.md` section 1.
 - The NEW profile values marked provisional (pixel scale, stamp threshold 13, superposition threshold 29,
   snake init) are T3/T4 decisions; nothing NEW was computed in T2 except on the sentinel fixture.
 - The plan's NEW legacy-vs-vectorized check of step 2 needs the NEW contour (T4/T5).

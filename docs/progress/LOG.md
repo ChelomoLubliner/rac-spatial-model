@@ -789,3 +789,37 @@ Chronological; newest entry at the bottom. Each entry: what was done, results (r
 **What is good.** Every T2 number that I re-ran is real, to the digit, including the failed chained gates. The step-2 vectorization is byte-identical on two platforms and on the WSL-contour chain. The profile keeps the OLD values as exact doubles and the OLD paths as the legacy strings. The refusals protect the committed contour, models and figures.
 
 **Required before T3:** finding 1. Findings 2-5 can go into the same fix pass.
+
+## 2026-11-06 08:55, T2-profiles review fixes (implementer)
+
+**What.** Fixed both major findings of the T2 reviews (engineer `793b8b7`, reproducibility `8657651`) and every minor note and nit. Code commits: `2951c5f` (step-5 CSV without car columns; steps 3-6 check their outputs first; the T2-added baseline list), `6056a72` (rule 1 checked when a profile is read; collision tests against OLD files only), `0b1adb1` (Windows R knits fail on chunk errors; Windows runner for steps 1, 2, 5), `f9b7760` (sentinel fixture with distinct values), `24edaf6` (README, nits). The docs commit follows this entry. Decisions A-082 to A-085 and an amendment of A-075; plan Revision 7 and fact F50. Exact commands and outputs: `docs/tests/T2-review-fixes-results.md`.
+
+**Fixes and results.**
+- **Major 1 (reproducibility), `wald_test.csv` (A-082).** `wald_all_spatial()` keeps `method = "manual"` with and without car (new `car_status`), and step 5 writes `model, W, df, p, method, vcov, W_rx, p_rx`. The file was regenerated in scratch: the old values to the digit, without the two `NA` columns. Steps 3-6 now call `rac_new_output()` for all their protected outputs at their start, so an in-place OLD knit refuses before it computes or writes anything; before, step 5 wrote the CSV and only then reached its first figure guard, and step 3 checked after the fit. New `tests/r/test_output_guards.R` (six knits in a copy holding the committed outputs; each refuses in about 5 s and changes no file); against the T2 step 5 it fails with `+ processed_data/wald_test.csv`. New write-once list `tests/baseline/old_added_t2.sha256` (`shoe_codes.csv` `3d6c09fe...`, `wald_test.csv` `aa249ed4...`), checked by `run_all.sh`; `regress_old.sh` compares with it instead of the work tree. **Result:** the CSV is byte-identical on WSL (no car) and under the Windows R with car 3.1-3.
+- **Major 2 (engineer), collision tests (A-083).** Reproduced first (copied index with the NEW contour: both tests fail). NEW outputs are now compared with OLD outputs, the files of `79247d8`, the tracked files outside the NEW namespace and the inputs of both profiles; new cases show that committed NEW outputs pass and that five kinds of colliding paths are caught. The reproduction passes now, also with three NEW outputs in the index.
+- **Rule 1 at run time (A-083).** `load_profile()` and `rac_profile()` refuse a NEW profile whose outputs leave the NEW namespace, name an input or another dataset's output, or lie in an OLD work folder. All five colliding profiles of T2 are refused at load, with the same messages in both languages.
+- **README (A-075).** The run instructions now say that OLD steps 3-6 refuse to run in place and how to rerun them (`regress_old.sh --keep`, or a copy); A-075 is marked as a user-visible workflow change for Shlomo to confirm.
+- **Windows knits (A-084).** `tests/lib/win_r.sh` (`rac_win_knit`: `error = FALSE`, and a `## Error` line fails). Real Windows R: a `stop()` chunk now fails the knit and the next chunk does not run; the old driver form exits 0 and runs the next chunk. Both Windows R runners use it; `tests/legacy/run_windows_r_steps.sh` is new (steps 1, 2, 5).
+- **Step-2 evidence.** The T2 results doc (section 6) is corrected: the vectorized knits have 0 progress messages in their HTML, the legacy-loop knit 102; every log has 0.
+- **Sentinel fixture (A-085).** Distinct snake values and coordinate ranges. **Looked at** the fixture snakes: my first choice (sigma 2, alpha 0.02, beta 5 and 0.2, gamma 0.002) collapsed shoe 3's snake onto a line across the heel and cut shoe 2's contour into the sole, so I scored 8 candidates and took sigma 2.5, alpha 0.012, beta 12 and 0.12, gamma 0.0015, whose six contours all enclose their soles (1-3 px margin). The tests record every snake and blur call and check that each value, reset alone to the real one, changes every snake; 8 hard-coding mutations (the engineer's included) are caught.
+- **Nits.** Step 3's guard before the fit; the 406-row comment; plan Revision 6 header (`ed68998`, A-081); `print.rac_wald` says `not run` without a reason when car was not requested; `CONTOUR_ALGORITHM` dropped.
+- **Looked at:** the sentinel overlays (above) and the Windows-made `CI_cut_110.pdf` (CML and Random bands almost on top of each other, peak about 0.00195 left of the centre, dip about 0.00115, widest band at the right edge: the committed figure).
+
+**OLD regression (all at `24edaf6`).** No Tier A file changed (24/24 and 11/11 checksums verify; `old_added_t2` 2/2).
+- WSL `regress_old.sh --steps 0-6` (as 0 and 1-6): ALL PASS. Contour = Tier B (CRLF `e18d50df...`), 1,556 intermediates = Tier B, five CSVs = Tier A, `shoe_codes.csv` = list, models `identical()` to Tier B in 22/22 fields, 8/8 normalized PDFs = Tier B, W = 427.7804472165 (Tier B), live checks pass.
+- WSL `regress_old.sh --steps 5` (committed models): `wald_test.csv` = list (`aa249ed4...`).
+- Windows R `run_windows_r_steps.sh --steps 1,2,5`: ALL PASS. Steps 1-2 = Tier A, `wald_test.csv` = list, car's W = the manual W to 4.8e-15, and the four CI figures equal the committed PDFs without dates (new: the figures are Tier A under the Windows R; on WSL the producer string differs).
+- Windows R `run_windows_r_step3.sh` at `24edaf6`: RESULT 27 of 27 fields the same.
+- venv-wind `run_windows_python_step0.sh` at `24edaf6`: contour = Tier A (`ca8a07f2...`), four npy = Tier B, `active-contour_all.npy` = the thesis run; Python 3.13.14, the same Store base as in T2.
+
+**Tests.** `bash tests/run_all.sh old` at `24edaf6`: ALL PASS (100 Python tests, 3 skipped live checks; 14 R scripts; flake8 46 files; shellcheck 14; work tree unchanged). An earlier run on the work tree failed only its unchanged-tree check, because I edited three docs while it ran.
+
+**Timings (s, three gates overlapping).** Fast suite 214-308; WSL step 0 599, step 1 114, step 2 22, GLMM 253, CML 233, step 4 15 and 16, step 5 29, step 6 23; Windows R step 1 154, step 2 101, step 5 39, step 3 549; venv-wind step 0 508.
+
+**Side effects outside the repo.** Only `<scratch>/t2fix/` (run folders, probes, images, drafts). Windows R and venv-wind wrote only there; the thesis repo was only read. Inside the repo's `.git`: the first copied-index reproduction wrote one unreferenced blob with `git hash-object -w` (removed by `git gc`).
+
+**Next.** T3. T4/T5 may now commit NEW outputs without touching the collision tests; a task that adds OLD files writes its own baseline list (like `old_added_t2.sha256`). Optional: add steps 4 and 6 to `run_windows_r_steps.sh` for Tier A evidence of every figure.
+
+**Open.** A-075 needs Shlomo's confirmation (the in-place refusal changes the old RStudio workflow). A-055 and A-060 stay proposals; freezing venv-wind's base (A-071) needs the user.
+
+**Blockers.** None.
