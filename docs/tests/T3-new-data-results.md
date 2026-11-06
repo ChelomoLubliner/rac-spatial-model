@@ -440,6 +440,8 @@ ALL PASS test_profile
 
 Notes. `test_calibration` recomputes from the data the hits at every named setting, at the best row of every stage and at 12 random grid rows (the vectorized grid against a direct evaluation), and reproduces the 200 bootstrap draws of both criteria bit for bit; its synthetic tests (RACs placed on real NEW contact pixels with a known mapping, a thinned-out grid for speed) recover a non-legacy mapping exactly (then the band condition fails), a non-mirrored placement, and a Delta upper bound below 0.005 for a legacy placement with 0.3 px jitter. Two first versions of tests were wrong and were fixed before the commit: the synthetic placement used u in (0.2, 0.8), which leaves several settings tied at rate 1; and the shift test of `test_shoe_quality` used a block wider than the shift (the tie went to the smaller shift, -2 instead of -3); both now use placements where only the true setting fits.
 
+Interfaces against the plan's T3 list. `legacy_pixel(x, y, coords, width, height)` takes the profile's `Coords` instead of the plan's literal defaults (`rel_col=150, rel_row=300, ...`), which the no-hardcoding scan forbids in pipeline code. The plan's `calibration_grid(contacts, locs, scales_x, scales_y, offsets, mirror_x, flip_y)` is `calibrate_pixels.run_stage(images, shoe0, x, y, centre, s0, orientations, xscales, yscales, offsets)` (one row per orientation and scale pair at its best offsets) on top of `hit_matrix` (every setting), and `calibrate(profile, data=None, log=print, grids=None)` runs the three stages of A-086. `shoe_quality(contacts, locs, mapping)` is `shoe_quality(contacts, shoe, col0, row0, num_shoe)` with `profile_table(profile)` applying the profile's mapping. `on_contact_rate(contacts, shoe, col0, row0)` is as planned. The plan's module `locations.py` (readers) was extended rather than created (T2 had created it).
+
 ## 8. Gates (OLD regression)
 
 Fast suite on a scratch clone of the committed code (`git clone --local` at `b5d3c4c`; run there so that the docs could be written meanwhile without tripping its unchanged-tree check):
@@ -497,6 +499,45 @@ sys	0m44.225s
 exit 0
 ```
 
+The same suite on the main tree after the docs commit `2bcf3a8` (it lints the T3 probe too):
+
+```
+$ time bash tests/run_all.sh old
+[... per-test output omitted ...]
+Ran 143 tests in 64.312s
+OK (skipped=3)
+flake8: 55 files
+shellcheck: 14 files
+[...]
+== summary
+PASS         0s  sha256 committed_79247d8 (Tier A, 24 files)
+PASS         0s  sha256 old_baseline (11 OLD artifacts)
+PASS         0s  sha256 old_added_t2 (the 2 OLD files T2 added)
+PASS        92s  python unittest discover tests/python
+PASS         5s  Rscript tests/r/test_baseline_committed.R
+PASS        21s  Rscript tests/r/test_compare_glmm_fits.R
+PASS         3s  Rscript tests/r/test_compare_models.R
+PASS         8s  Rscript tests/r/test_distances_vectorized.R
+PASS         1s  Rscript tests/r/test_no_hardcoding.R
+PASS         3s  Rscript tests/r/test_old_regression.R
+PASS        32s  Rscript tests/r/test_output_guards.R
+PASS         1s  Rscript tests/r/test_pixel_mapping.R
+PASS         2s  Rscript tests/r/test_profile.R
+PASS        48s  Rscript tests/r/test_profile_sentinels.R
+PASS         8s  Rscript tests/r/test_run_manifest.R
+PASS         2s  Rscript tests/r/test_step5_variant.R
+PASS         4s  Rscript tests/r/test_wald.R
+PASS         0s  flake8 (all Python files)
+PASS         4s  shellcheck (all shell scripts)
+PASS         0s  work tree unchanged by the tests (no file created or modified)
+ALL PASS
+
+real	3m54.218s
+user	3m38.661s
+sys	0m33.247s
+exit 0
+```
+
 No committed OLD file changed (Tier A 24/24, old_baseline 11/11, old_added_t2 2/2 in the suite); step 1 rerun from scratch writes the four OLD CSVs byte for byte. The OLD files added by T3 are QA files under `docs/qa/T3/old/` (not pipeline outputs); their regeneration is checked by `test_calibration` and `test_shoe_quality`.
 
 ## 9. Timings (s, this machine, idle except my jobs)
@@ -507,7 +548,7 @@ No committed OLD file changed (Tier A 24/24, old_baseline 11/11, old_added_t2 2/
 | NEW calibration | 123 (stage F strict 33.8, dilated 32.8) |
 | shoe tables OLD / NEW (loop version; vectorized: 0.8 s each plus about 12 s of loading) | 13 / 15 |
 | QA images OLD / NEW (with the 20 raw sheets) | 22 / 43 |
-| fast suite (clone) | 249 (Python 104) |
+| fast suite (clone; main tree after the docs commit) | 249 (Python 104); 234 (Python 92) |
 | `regress_old.sh --steps 1` | 122 (step 1 121) |
 
 ## 10. Not done in this part of T3 (open, plan T3)

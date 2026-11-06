@@ -934,13 +934,13 @@ Chronological; newest entry at the bottom. Each entry: what was done, results (r
 2. **Nit:** after a WSL refit, `regress_old.sh` checks the step-5 CSV only on W (tolerance 1e-12) and df. The file is deterministic: `...,427.780447216513,24,1.45350215057922e-75,"manual","RX",...` in my run. A sha256 of it in a Tier B addendum list would also check p, `method` and `vcov`.
 3. **For Shlomo (A-075):** the in-place refusal is what keeps the Windows-made Tier A files safe from WSL reruns. In none of my runs did it change any output. It is a workflow change only, and I support confirming it.
 
-## 2026-11-06 10:40, T3-newdata (implementer), in progress
+## 2026-11-06 10:21, T3-newdata (implementer), in progress
 
 **What.** Started T3-newdata (plan T3, first part: the NEW locations CSV, the pixel calibration, the shoes without RACs and with RACs off the contact surface). Baseline at `48f6f89`: `bash tests/run_all.sh old` ALL PASS (3 min 36 s). Pre-registered the calibration grids, criteria and the reading of rule (i) in A-086 before any grid ran on the real data (exploration so far: file formats, parsing and the 2023 `COL/ROW`, no calibration grid).
 
 **Found while exploring (real output in the results doc):** R's `read.csv` / `read.table` parse 11 OLD x values and 4 OLD y values 1 ulp away from the correctly rounded double (Python's `float()` and pandas agree with each other); the R `aspix` pixels nevertheless equal the Python division form for all 13,287 OLD and 20,013 NEW RACs. The 2023 `COL/ROW` equal R `aspix` for all 20,013 NEW RACs.
 
-## 2026-11-06 11:40, T3-newdata (implementer), done
+## 2026-11-06 11:12, T3-newdata (implementer), done
 
 **What.** The first part of plan T3 (task "T3-newdata"): the NEW locations in the OLD column format, the pixel calibration of the NEW images validated on OLD first, the shoes without RACs and with RACs off contact, the skip list. Commits `a9981e8` (pre-registration A-086, before any grid ran on the real data), `b5d3c4c` (code, tests, outputs), then the docs commit. Decisions A-086 to A-090 and D-014 (for Shlomo and Micha); plan Revision 8 with facts F51-F55. Exact commands and real outputs: `docs/tests/T3-new-data-results.md` (`docs/tests/T3-results.md` points to it).
 
@@ -954,7 +954,7 @@ Chronological; newest entry at the bottom. Each entry: what was done, results (r
 
 **Tests.** 43 new Python tests (143 in all, 3 skipped live checks) and 1 new R script (15 in all). Fast suite on a scratch clone of `b5d3c4c`: ALL PASS in 4 min 9 s (Tier A 24/24, old_baseline 11/11, old_added_t2 2/2, flake8 54 files, shellcheck 14, work tree unchanged).
 
-**OLD regression.** `regress_old.sh --steps 1`: ALL PASS (the three Tier A CSVs and `shoe_codes.csv` byte-identical), 122 s. No committed OLD file changed.
+**OLD regression.** `regress_old.sh --steps 1`: ALL PASS (the three Tier A CSVs and `shoe_codes.csv` byte-identical), 122 s. No committed OLD file changed. After the docs commit `2bcf3a8`, `bash tests/run_all.sh old` on the main tree: ALL PASS in 3 min 54 s (143 Python tests, 3 skipped; 15 R scripts; flake8 55 files with the T3 probe; shellcheck 14; work tree unchanged).
 
 **Timings (s).** OLD calibration 83, NEW 123; shoe tables 13 and 15 (0.8 s of computing each after vectorizing); QA images 22 and 43; fast suite 249; step-1 gate 122.
 
@@ -962,6 +962,6 @@ Chronological; newest entry at the bottom. Each entry: what was done, results (r
 
 **Next.** The rest of T3: `stickers.py` and the full-size census (step 3; start from `visual_flags_new.csv`), the overlap screen (3b), the quality rule with the census's partial-print part and the Part 2 shoe set frozen (3c, 3d), the R stamp threshold (step 4). Then T4 (snake), which must check the frame artefacts of F54.
 
-**Open.** A-087 (keep the legacy mapping against the strict criterion) and D-014 (correct the half-pixel offset in both datasets?) need Shlomo and Micha. A-075 still needs Shlomo's confirmation.
+**Open.** A-087 (keep the legacy mapping against the strict criterion) and D-014 (correct the half-pixel offset in both datasets?) need Shlomo and Micha. A-075 still needs Shlomo's confirmation. Of the T2 engineering review's optional findings, 1 is done (A-090) and part of 3 (R now also checks the `cross_check` and `sticker_masks` paths); nit 2 (the sentinel snake test asks every reset value to change all six snakes) and the rest of 3 (Python accepts `a//b` path parts and a dot-file output name, R refuses both) are left for a later task.
 
 **Blockers.** None.
