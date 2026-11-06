@@ -13,8 +13,12 @@ and of the blur receives them, and each one set alone to the real value
 changes the snakes; T2 review), the coordinates at 20 px per unit with
 rel_x_cord 0.3 and rel_Y_cord 0.6 (a leftover 0.25 or 0.5 moves the RAC
 pixels), the skip list (shoe 4 without RACs, shoe 5 excluded: 4 contour
-records of stride 40 * 60 + 2) and the namespaced output names. Nothing is
-written outside the temporary root.
+records of stride 40 * 60 + 2) and the namespaced output names; and the T4
+step-0 values of the NEW entry (T4 review): the first-snake closing radius
+2, the per-shoe override of shoe 3 (closing radius 5, its own ellipse) and
+the erase rectangle on shoe 6, each of which changes the snakes and the
+contour records (each removed alone in a second run or a recomputed snake).
+Nothing is written outside the temporary root.
 """
 
 import dataclasses
@@ -33,6 +37,7 @@ from contour_algorithm import main as step0
 from contour_algorithm.active_contour_snake import init_snake
 from contour_algorithm.io_shoes import read_shoes
 from contour_algorithm.profiles import load_profile
+from contour_algorithm.stickers import apply_sticker_masks, read_sticker_masks
 from tests.fixtures import make_sentinel
 
 SNAKE_PARAMS = ('gaussian_sigma', 'alpha', 'beta_first', 'beta_second',
@@ -100,9 +105,10 @@ class Sentinel(unittest.TestCase):
         p = self.profile
         raw = read_shoes(p.contacts, 40, 60, 6)
         matrices = np.load(p.saved_path('list_matrices', 'npy'))
-        # python.contact_flip_shoes = [2]: only shoe 2 is mirrored
-        want = raw.copy()
-        want[1] = np.fliplr(raw[1])
+        # inputs.sticker_masks: the fixture's rectangle on shoe 6 is erased
+        # first (A-095), then python.contact_flip_shoes = [2] mirrors shoe 2
+        want, _ = apply_sticker_masks(raw, read_sticker_masks(p))
+        want[1] = np.fliplr(want[1])
         self.assertTrue(np.array_equal(matrices, want))
         self.assertFalse(np.array_equal(matrices[1], raw[1]))
         # python.superpose_threshold = 2, in the mask and in its file name
@@ -138,12 +144,18 @@ class Sentinel(unittest.TestCase):
         self.assertEqual(len(self.snake_calls), 2 * (1 + 6))
         self.assertEqual(len(self.blur_calls), 2 * (1 + 6))
         for k, c in enumerate(self.snake_calls):
+            # calls 0-1: the prototype; then 2 per shoe, shoe 1 first; the
+            # override of shoe 3 gives it its own ellipse (A-097)
+            shoe = None if k < 2 else (k - 2) // 2 + 1
             with self.subTest(call=k):
                 beta = sp.beta_first if k % 2 == 0 else sp.beta_second
                 self.assertEqual((c.kwargs['alpha'], c.kwargs['beta'],
                                   c.kwargs['gamma']),
                                  (sp.alpha, beta, sp.gamma))
-                self.assertTrue(np.array_equal(c.args[1], init_snake(p)))
+                self.assertTrue(np.array_equal(c.args[1],
+                                               init_snake(p, shoe=shoe)))
+        self.assertFalse(np.array_equal(init_snake(p, shoe=3),
+                                        init_snake(p)))
         for k, c in enumerate(self.blur_calls):
             with self.subTest(blur=k):
                 self.assertEqual(c.args[1], sp.gaussian_sigma)
@@ -168,6 +180,66 @@ class Sentinel(unittest.TestCase):
                 same = [i + 1 for i in range(6)
                         if np.array_equal(snake(q, i), snakes[i])]
                 self.assertEqual(same, [])
+
+    def test_t4_values_reach_outputs(self):
+        """The T4 step-0 values of the NEW entry differ from the real ones
+        and each one changes the outputs (T4 review; A-035): the
+        first-snake closing radius (2; set to 0 alone, the snake of every
+        shoe without an override changes), the override of shoe 3 (removed
+        alone, only shoe 3's snake changes) and the erase rectangle on
+        shoe 6 (its matrix is the record minus the rectangle; a second step
+        0 without the list gives other matrices, snake and record for shoe
+        6 only)."""
+        p, real = self.profile, load_profile('new')
+        self.assertEqual(p.snake.first_closing_radius,
+                         make_sentinel.CLOSING_RADIUS)
+        self.assertNotIn(p.snake.first_closing_radius,
+                         (0, real.snake.first_closing_radius))
+        over = acs.snake_overrides(p)
+        self.assertEqual(set(over), {make_sentinel.OVERRIDE['shoe']})
+        self.assertEqual(over[3]['first_closing_radius'],
+                         make_sentinel.OVERRIDE['first_closing_radius'])
+        contours = np.load(p.saved_path('list_contour', 'npy'))
+        snakes = np.load(p.saved_path('active-contour_all', 'npy'))
+
+        def snake(profile, i):
+            return acs.active_contour_shoe(profile, contours, plot_img=False,
+                                           save_img_bool=False, im_num=i)
+        no_closing = dataclasses.replace(p, snake=dataclasses.replace(
+            p.snake, first_closing_radius=0))
+        changed = [i + 1 for i in range(6)
+                   if not np.array_equal(snake(no_closing, i), snakes[i])]
+        self.assertEqual(changed, [1, 2, 4, 5, 6])
+        no_override = dataclasses.replace(p, snake_overrides=None)
+        changed = [i + 1 for i in range(6)
+                   if not np.array_equal(snake(no_override, i), snakes[i])]
+        self.assertEqual(changed, [3])
+        # the erase list: a second step 0 without it, in its own root
+        raw = read_shoes(p.contacts, 40, 60, 6)
+        matrices = np.load(p.saved_path('list_matrices', 'npy'))
+        e = make_sentinel.ERASE
+        block = (e['shoe'] - 1, slice(e['row0'] - 1, e['row1']),
+                 slice(e['col0'] - 1, e['col1']))
+        self.assertGreater(int(raw[block].sum()), 0)
+        self.assertFalse(matrices[block].any())
+        with tempfile.TemporaryDirectory(prefix='sentinel_py_') as tmp:
+            root = Path(tmp)
+            shutil.copytree(FIXTURE / 'data', root / 'data')
+            q = dataclasses.replace(load_profile(
+                'new', file=FIXTURE / make_sentinel.PROFILE, root=root),
+                sticker_masks=None)
+            step0.run(q, log=lambda *a: None)
+            m2 = np.load(q.saved_path('list_matrices', 'npy'))
+            s2 = np.load(q.saved_path('active-contour_all', 'npy'))
+            r1 = read_shoes(p.contour_out, 40, 60, 4)
+            r2 = read_shoes(q.contour_out, 40, 60, 4)
+        self.assertEqual([i + 1 for i in range(6)
+                          if not np.array_equal(m2[i], matrices[i])], [6])
+        self.assertEqual([i + 1 for i in range(6)
+                          if not np.array_equal(s2[i], snakes[i])], [6])
+        # record 4 is shoe 6 (shoes 4 and 5 have no record)
+        self.assertEqual([k + 1 for k in range(4)
+                          if not np.array_equal(r2[k], r1[k])], [4])
 
     def test_coordinates_follow_the_profile(self):
         """COL/ROW of every RAC = the pixel the fixture placed it on (20 px

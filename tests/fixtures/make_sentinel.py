@@ -31,7 +31,15 @@ the real datasets coincide, from each other:
     0.12 (second), gamma 0.0015 (real: 3, 0.015, 10, 0.10, 0.001; chosen so
     that every snake still encloses its sole, and each value set alone to
     the real one changes every snake); R stamp threshold 2, sweep bound
-    40, 5 controls, seed 7.
+    40, 5 controls, seed 7;
+  - the T4 step-0 values of the NEW entry (T4 review; real NEW: closing
+    radius 10, overrides of radius 24 or 16, 48 erase rectangles; OLD: none
+    of them): first-snake closing radius 2 (snake.first_closing_radius), a
+    per-shoe snake override for shoe 3 (inputs.snake_overrides: closing
+    radius 5 and its own ellipse) and an erase list with one rectangle on
+    shoe 6 (inputs.sticker_masks: the bottom rows of its heel, no RAC in
+    it), each of which changes the step-0 outputs
+    (tests/python/test_sentinel_profile.py).
 Shoes 1, 2 and 3 carry a 4 x 4 "stamp" in the top-left corner (shoe 3's
 moves to the top right when R flips it), which the R sweep removes.
 
@@ -71,6 +79,12 @@ RACS = {1: [(22, 17), (30, 20), (35, 24), (39, 18)],
         5: [(24, 20), (32, 17), (38, 23)],
         6: [(21, 16), (29, 25), (34, 19), (36, 22)]}
 ANALYSIS_SHOES = (1, 2, 3, 6)
+# T4 step-0 values of the NEW entry (T4 review): the first-snake closing
+# radius, one per-shoe override and one erase rectangle (1-based, inclusive)
+CLOSING_RADIUS = 2
+OVERRIDE = {'shoe': 3, 'first_closing_radius': 5, 'center_r': 31,
+            'center_c': 21, 'radius_r': 24, 'radius_c': 14}
+ERASE = {'shoe': 6, 'row0': 50, 'row1': 56, 'col0': 10, 'col1': 31}
 
 
 def ellipse(h, w, cr, cc, rr, rc):
@@ -131,7 +145,11 @@ def profile_entry(dataset, suffix):
         'inputs': {'contacts': 'data/contacts_sentinel.txt',
                    'locations': 'data/locations_sentinel.txt',
                    'locations_format': 'space_no_header',
-                   'cross_check': None, 'sticker_masks': None},
+                   'cross_check': None,
+                   'sticker_masks': ('data/stickers_sentinel.csv' if new
+                                     else None),
+                   'snake_overrides': ('data/snake_overrides_sentinel.csv'
+                                       if new else None)},
         'prototype': {'col_shoe': PW, 'row_shoe': PH,
                       'coords': dict(PROTO_COORDS),
                       'contour': 'data/prototype_contour_sentinel.png',
@@ -159,7 +177,8 @@ def profile_entry(dataset, suffix):
                   'dataCC_distance_temp', 'dataCC_distance', 'wald_test')}},
         'python': {'images_dir': 'images_new' if new else 'images',
                    'contact_flip_shoes': [2], 'superpose_threshold': 2,
-                   'snake': dict(SNAKE),
+                   'snake': dict(SNAKE, **({'first_closing_radius':
+                                            CLOSING_RADIUS} if new else {})),
                    'write_html': False,
                    'contour_out': ('data/new_shoes/contour_sentinel_new.txt'
                                    if new else 'data/contour_sentinel.txt'),
@@ -195,6 +214,19 @@ def main(out):
               for i in ANALYSIS_SHOES]
     (data / 'contour_sentinel_r.txt').write_bytes(records(bounds))
     (data / 'contour_sentinel_short.txt').write_bytes(records(bounds[:-1]))
+    # the T4 inputs of the NEW entry: one erase rectangle, one override
+    (data / 'stickers_sentinel.csv').write_text(
+        'shoe,row0,row1,col0,col1,reason\n'
+        + ','.join(str(ERASE[k])
+                   for k in ('shoe', 'row0', 'row1', 'col0', 'col1'))
+        + ',sentinel rectangle over the bottom of the heel\n')
+    (data / 'snake_overrides_sentinel.csv').write_text(
+        'shoe,first_closing_radius,center_r,center_c,radius_r,radius_c,'
+        'reason\n'
+        + ','.join(str(OVERRIDE[k]) for k in (
+            'shoe', 'first_closing_radius', 'center_r', 'center_c',
+            'radius_r', 'radius_c'))
+        + ',sentinel override\n')
     proto = ellipse(PH, PW, 32.5, 21.5, 26, 13)
     Image.fromarray(inner_boundary4(proto)).save(
         data / 'prototype_contour_sentinel.png')

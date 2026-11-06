@@ -36,6 +36,14 @@
 # and runs the live checks that the steps cover (test_snake_old_regression
 # for step 0, test_old_regression.R for steps 1-3, test_live_r_pdfs for steps
 # 3-6).
+# OpenBLAS precondition of step 0 (T4 review; decisions A-092, A-103): the
+# snake depends on numpy's OpenBLAS thread count, and both OLD baselines
+# were written with 16 threads, the library default on this 16-CPU machine
+# (tests/baseline/local/openblas_tier_b.txt). The pipeline runs without
+# OPENBLAS_NUM_THREADS, GOTO_NUM_THREADS and OMP_NUM_THREADS (an inherited
+# value would change 32 records); before step 0 the script reads the count
+# that numpy's OpenBLAS will run and stops (exit 2) when it is not the
+# recorded one, and the step-0 log's count is checked again afterwards.
 # Step 0 and steps 2-6 are never compared in one run: step 2 reads the
 # contour, which step 0 rewrites on WSL as Tier B (30 records differ from
 # the committed Windows contour, A-060), while the step-2 to step-6
@@ -115,6 +123,28 @@ if has 0 && { has 2 || has 3 || has 4 || has 5 || has 6; }; then
   exit "$split"
 fi
 
+# The OpenBLAS precondition of step 0 (see the header), checked before the
+# run folder is made: a wrong thread count cannot reproduce Tier B.
+blas_env=(env -u OPENBLAS_NUM_THREADS -u GOTO_NUM_THREADS -u OMP_NUM_THREADS)
+blas_record=$repo/tests/baseline/local/openblas_tier_b.txt
+want_threads=$(awk '$1 == "threads" {print $2}' "$blas_record")
+want_kernel=$(awk '$1 == "kernel" {print $2}' "$blas_record")
+if has 0; then
+  got_threads=$(
+    cd "$repo" || exit 1
+    "${blas_env[@]}" PYTHONDONTWRITEBYTECODE=1 "$py" -B -c \
+      'from contour_algorithm.active_contour_snake import numpy_blas_threads
+print(numpy_blas_threads())' 2> /dev/null
+  ) || got_threads=""
+  if [[ "$got_threads" != "$want_threads" ]]; then
+    echo "regress_old.sh: numpy's OpenBLAS would run ${got_threads:-?}" \
+      "threads; both OLD step-0 baselines were written with" \
+      "$want_threads ($blas_record), and the snake depends on the count" \
+      "(A-092): the OLD contour cannot be compared on this machine" >&2
+    exit 2
+  fi
+fi
+
 run=$(rac_scratch_new regress_old)
 echo "$run"
 mkdir -p "$run/repo" "$run/logs" "$run/models"
@@ -167,7 +197,7 @@ rac_outputs_begin "$run" "${outputs[@]}"
 printf 'step\tseconds\texit\n' > "$run/timings.tsv"
 status=0
 (
-  cd "$run/repo" && env -u RAC_PROFILE_FILE RAC_DATASET=old \
+  cd "$run/repo" && "${blas_env[@]}" -u RAC_PROFILE_FILE RAC_DATASET=old \
     bash tools/run_pipeline.sh --steps "$steps" --py "$py" \
     --timings "$run/timings.tsv"
 ) > "$run/logs/pipeline.log" 2>&1 || status=$?
@@ -214,6 +244,17 @@ check_sha() {
 }
 
 if has 0; then
+  logged=$(grep -o 'numpy OpenBLAS threads: [0-9]*' "$run/logs/step0.log" \
+    2> /dev/null | head -n 1 | awk '{print $NF}' || true)
+  logged_kernel=$(grep -o 'numpy OpenBLAS kernel: .*' "$run/logs/step0.log" \
+    2> /dev/null | head -n 1 | awk '{print $NF}' || true)
+  if [[ "$logged" == "$want_threads" ]]; then
+    record PASS "step 0 OpenBLAS threads = baseline" \
+      "$logged threads (kernel ${logged_kernel:-?}, baseline $want_kernel)"
+  else
+    record FAIL "step 0 OpenBLAS threads = baseline" \
+      "logged ${logged:-nothing}, baseline $want_threads (logs/step0.log)"
+  fi
   check_sha "step 0 contour = Tier B (CRLF)" data/contour_Active_Contour.txt \
     "$(awk '/\[LF->CRLF\]/ {print $1}' \
       "$repo/tests/baseline/local/python_contour.sha256")"

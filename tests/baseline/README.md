@@ -7,7 +7,10 @@ diff against the T1 version shows only the timestamp, the repo commit and the ne
 `docs/tests/T1-review-fixes-results.md` section 4). It was regenerated once more in the second T1
 review fixes to record venv-wind's base interpreter (`sys.base_prefix`, `pyvenv.cfg`; decision A-071);
 again only the timestamp, the commit and the new lines changed
-(`docs/tests/T1-review2-fixes-results.md` section 4).
+(`docs/tests/T1-review2-fixes-results.md` section 4). In the T4 review fixes (2026-11-06) a section
+was appended to it, `bash tests/lib/write_environment.sh --openblas`: numpy's OpenBLAS thread count
+with the library default and its CPU kernel (`threads 16 kernel Haswell`); nothing else changed
+(LOG entry, `docs/tests/T4-review-fixes-results.md` section 9).
 
 ## Tier A: the files committed at `79247d8`
 
@@ -43,6 +46,7 @@ with it (never with the work-tree files, A-070).
 | `local/environment.txt` | `uname -a`, R `sessionInfo()`, `pip freeze` of the venv, git commits; the Windows interpreters (venv-wind with its `sys.base_prefix` and `pyvenv.cfg`: the self-updating Microsoft Store Python, 3.13.9 at creation, 3.13.14 now, A-071; R 4.4.3 with its `sessionInfo()`, the R that reproduces the committed GLMM, A-065) |
 | `local/contour_linux_diff.npz`, `.csv` | The 30 contour records (of 386) in which the Linux rerun differs from the committed (Windows) contour: record indices, shoe ids, the Linux records (bit-packed), the sha256 of the Linux file with CRLF; the CSV gives differing pixels and the mean/max distance to the committed contour per record (`tests/lib/contour_platform_diff.py`). Tier A with these records replaced = Tier B |
 | `local/contour_windows_check.txt` | The same legacy snake under the thesis Windows venv: 0 of 386 records differ from the committed contour |
+| `local/openblas_tier_b.txt` | Added in the T4 review fixes (A-103): numpy's OpenBLAS during the OLD step-0 baselines, `threads 16` (the library default on this 16-CPU machine) and `kernel Haswell`. The snake depends on the thread count (32 of 386 records differ with one thread, F56); `tests/regress_old.sh` reads it and refuses a run with another count. **Precondition of the OLD step-0 gate:** 16 OpenBLAS threads |
 
 Tier B comes from these runs (2026-11-05/06, `docs/tests/T1-baseline-results.md`): Python
 `<scratch>/t1/legacy_py_MXmkvc` (thesis code `109f30a`, the venv copied to the Linux filesystem,

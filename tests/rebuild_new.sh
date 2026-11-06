@@ -1,0 +1,151 @@
+#!/usr/bin/env bash
+# The NEW rebuild gate (T4 review fixes; decisions A-035, A-103).
+#
+# Usage: RAC_SCRATCH=<scratch dir> bash tests/rebuild_new.sh [--keep]
+#            [--py PYTHON] [--jobs N]
+#   PYTHON  the Python for step 0 (default RAC_VENV_PY, else the thesis venv)
+#   N       forked processes for the snakes and the QA metrics (default 14;
+#           1 on a platform without fork)
+# Copies the work tree into a fresh run folder RAC_SCRATCH/rebuild_new_XXXXXX
+# (repo/: rsync without .git, images*/, logs/, .claude), deletes there the
+# committed NEW step-0 contour and the QA tables that --metrics writes, runs
+# NEW step 0 (python -m contour_algorithm.main --qa) and the QA metrics
+# (python -m contour_algorithm.qa_snake --metrics) in the copy, and compares
+# the regenerated files with the work tree's committed ones byte for byte:
+#   data/new_shoes/contour_Active_Contour_new.txt   the NEW contour
+#   docs/qa/T4/new/snake_metrics_new.csv            the QA metrics, flags,
+#                                                   review merged
+#   docs/qa/T4/new/sticker_erased_new.csv           the erase counts
+#   docs/qa/sheets_new/snake_qa_new.csv             the task copy
+# A code or profile edit that changes the NEW snakes (the erase list, the
+# closing, the overrides, the mask, the thread count) without a rebuild of
+# the committed outputs fails this gate, while the unit tests stay green.
+# The run logs the OpenBLAS thread count and kernel (A-092). Writes
+# timings.tsv, compare.tsv, logs/ and exit_status into the run folder and
+# prints a summary; exit 0 only if every step and comparison passes. The
+# run folder is deleted after a pass unless --keep, and kept after a
+# failure. Nothing in the repository is written. Refuses RAC_PROFILE_FILE
+# (A-049). About 2.5 minutes on this machine with 14 jobs.
+
+set -euo pipefail
+
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+# shellcheck source=lib/scratch.sh
+source "$here/lib/scratch.sh"
+repo=$rac_repo_root
+
+if [[ -n "${RAC_PROFILE_FILE:-}" ]]; then
+  echo "rebuild_new.sh: RAC_PROFILE_FILE is set; it is a test hook and a" \
+    "real run refuses it (decision A-049)" >&2
+  exit 2
+fi
+keep=0
+jobs=14
+py=${RAC_VENV_PY:-/mnt/c/Users/mehes/Documents/repo/master_thesis_forensic_shoeprint/venv/bin/python}
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --py | --jobs)
+      if [[ $# -lt 2 ]]; then
+        echo "rebuild_new.sh: $1 needs a value" >&2
+        exit 2
+      fi
+      if [[ $1 == --py ]]; then py=$2; else jobs=$2; fi
+      shift 2
+      ;;
+    --keep)
+      keep=1
+      shift
+      ;;
+    *)
+      echo "rebuild_new.sh: unknown argument '$1'" >&2
+      exit 2
+      ;;
+  esac
+done
+if [[ ! "$jobs" =~ ^[1-9][0-9]*$ ]]; then
+  echo "rebuild_new.sh: --jobs takes a positive integer, not '$jobs'" >&2
+  exit 2
+fi
+
+compared=(data/new_shoes/contour_Active_Contour_new.txt
+  docs/qa/T4/new/snake_metrics_new.csv
+  docs/qa/T4/new/sticker_erased_new.csv
+  docs/qa/sheets_new/snake_qa_new.csv)
+
+run=$(rac_scratch_new rebuild_new)
+echo "$run"
+mkdir -p "$run/repo" "$run/logs"
+rsync -a --exclude /.git --exclude '/images*/' --exclude /logs/ \
+  --exclude /.claude "$repo/" "$run/repo/"
+echo rebuild_new > "$run/runner.txt"
+{
+  echo "head=$(git -C "$repo" rev-parse HEAD)"
+  echo "python=$py"
+  echo "jobs=$jobs"
+  echo "work tree changes (git status --short):"
+  git -C "$repo" status --short
+} > "$run/source.txt"
+for f in "${compared[@]}"; do
+  rm -f "$run/repo/$f"
+done
+touch "$run/start_marker"
+
+printf 'step\tseconds\texit\n' > "$run/timings.tsv"
+status=0
+step() {
+  local name=$1 start code=0
+  shift
+  start=$(date +%s.%N)
+  (cd "$run/repo" && env -u RAC_PROFILE_FILE RAC_DATASET=new \
+    MPLBACKEND=Agg TQDM_DISABLE=1 PYTHONDONTWRITEBYTECODE=1 "$@") \
+    > "$run/logs/$name.log" 2>&1 || code=$?
+  printf '%s\t%s\t%s\n' "$name" \
+    "$(echo "$(date +%s.%N) - $start" | bc)" "$code" >> "$run/timings.tsv"
+  if [[ $code -ne 0 && $status -eq 0 ]]; then status=$code; fi
+}
+step step0 "$py" -B -m contour_algorithm.main --qa --jobs "$jobs"
+if [[ $status -eq 0 ]]; then
+  step qa_metrics "$py" -B -m contour_algorithm.qa_snake --metrics \
+    --jobs "$jobs"
+fi
+echo "$status" > "$run/exit_status"
+
+printf 'result\tcheck\tdetail\n' > "$run/compare.tsv"
+fail=0
+record() {
+  printf '%s\t%s\t%s\n' "$1" "$2" "$3" >> "$run/compare.tsv"
+  if [[ $1 == FAIL ]]; then fail=1; fi
+}
+if [[ $status -ne 0 ]]; then
+  record FAIL "pipeline run" "exit $status; see $run/logs/"
+else
+  record PASS "pipeline run" "step 0 and qa_snake --metrics exit 0"
+fi
+threads=$(grep -o 'numpy OpenBLAS threads: [0-9]*' "$run/logs/step0.log" |
+  head -n 1 || true)
+kernel=$(grep -o 'numpy OpenBLAS kernel: .*' "$run/logs/step0.log" |
+  head -n 1 || true)
+record INFO "OpenBLAS" "${threads:-threads not logged}; ${kernel:-kernel not logged}"
+for f in "${compared[@]}"; do
+  got=$run/repo/$f
+  if [[ ! -f "$got" || ! "$got" -nt "$run/start_marker" ]]; then
+    record FAIL "$f" "not regenerated by this run"
+  elif cmp -s "$got" "$repo/$f"; then
+    record PASS "$f" "byte-identical, sha256 $(sha256sum "$got" | cut -c1-12)..."
+  else
+    record FAIL "$f" "differs from the committed file; see $got"
+  fi
+done
+
+echo
+echo "== rebuild_new.sh: $run"
+column -t -s $'\t' "$run/compare.tsv"
+echo "timings (s):"
+column -t -s $'\t' "$run/timings.tsv"
+if [[ $fail -eq 0 ]]; then
+  echo "ALL PASS"
+  if [[ $keep -eq 0 ]]; then rac_scratch_remove "$run"; fi
+else
+  echo "SOME CHECKS FAILED (run folder kept)"
+fi
+exit "$fail"

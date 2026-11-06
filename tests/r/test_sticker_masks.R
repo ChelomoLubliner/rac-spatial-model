@@ -8,11 +8,13 @@
 #    contact pixels that the Python QA wrote to
 #    docs/qa/T4/new/sticker_erased_new.csv (both languages, same pixels).
 # 4. Step 1 (dataCC_1.Rmd, rendered in an Rscript subprocess) on the
-#    sentinel fixture of tests/fixtures/make_sentinel.py with and without an
-#    erase list: with it, shoe 1 loses exactly its contact pixels inside the
-#    rectangle, every count equals the record (erased) times the run's
-#    stamp mask plus the RAC pixels, and no control of shoe 1 lies in the
-#    rectangle; so the Rmd applies the list before the stamp mask and RACs.
+#    sentinel fixture of tests/fixtures/make_sentinel.py with its own erase
+#    list (one rectangle on shoe 6, T4 review) and with a test list (one
+#    rectangle on shoe 1) in its place: in each run every count equals the
+#    record (with that run's rectangles erased) times the run's stamp mask
+#    plus the RAC pixels, shoe 1 loses exactly its contact pixels inside the
+#    test rectangle, and no control of shoe 1 lies in it; so the Rmd applies
+#    the list before the stamp mask and the RACs.
 # Writes only below tempdir().
 #
 # Run from anywhere:  Rscript tests/r/test_sticker_masks.R
@@ -44,8 +46,13 @@ P_new <- rac_profile("new", root = root_slash)
 sm_new <- rac_read_sticker_masks(P_new)
 stopifnot(identical(names(sm_new), cols), nrow(sm_new) > 0,
           is.integer(sm_new$shoe), all(nzchar(trimws(sm_new$reason))))
-bad_rows <- c("1,0,5,1,5,x", "1,5,4,1,5,x", "1,1,5,1,256,x", "632,1,5,1,5,x",
-              "1,1,5,1,5,", "1,1,368,1,5,x")
+# one past the frame and the shoe count, from the profile
+w1 <- P_new$col_shoe + 1
+h1 <- P_new$row_shoe + 1
+n1 <- P_new$num_shoe + 1
+bad_rows <- c("1,0,5,1,5,x", "1,5,4,1,5,x", paste0("1,1,5,1,", w1, ",x"),
+              paste0(n1, ",1,5,1,5,x"), "1,1,5,1,5,",
+              paste0("1,1,", h1, ",1,5,x"))
 for (b in bad_rows) {
   tmp <- tempfile("stickers_")
   dir.create(tmp)
@@ -171,11 +178,16 @@ px <- Wf - (floor((loc$x + cx$rel_x_cord) / (2 * cx$rel_x_cord /
 py <- Hf - (floor((loc$y + cx$rel_Y_cord) / (2 * cx$rel_Y_cord /
                                               cx$rel_row_shoe)) +
               ceiling((Hf - cx$rel_row_shoe) / 2))
-expected_counts <- function(run, erase) {
+# the fixture's own erase list (the plain run) and the test rectangle (the
+# second run, where it replaces the fixture's list)
+fixture_rects <- read.csv(file.path(fixture, fx$inputs$sticker_masks),
+                          stringsAsFactors = FALSE)
+stopifnot(nrow(fixture_rects) == 1, fixture_rects$shoe != rect$shoe)
+expected_counts <- function(run, rects) {
   vapply(run$counts$shoe, function(s) {
     d <- raw[[s]]
-    if (erase && s == rect$shoe) {
-      d[rect$row0:rect$row1, rect$col0:rect$col1] <- 0
+    for (k in which(rects$shoe == s)) {
+      d[rects$row0[k]:rects$row1[k], rects$col0[k]:rects$col1[k]] <- 0
     }
     if (s %in% fx$r$contact_flip_shoes) d <- d[, ncol(d):1]
     d <- d * unname(run$allcont)
@@ -184,9 +196,15 @@ expected_counts <- function(run, erase) {
   }, numeric(1))
 }
 stopifnot(isTRUE(all.equal(as.numeric(plain$counts$pixel_count),
-                           expected_counts(plain, FALSE), tolerance = 0)),
+                           expected_counts(plain, fixture_rects),
+                           tolerance = 0)),
           isTRUE(all.equal(as.numeric(erased_run$counts$pixel_count),
-                           expected_counts(erased_run, TRUE), tolerance = 0)))
+                           expected_counts(erased_run, rect), tolerance = 0)))
+# the fixture's rectangle reaches the counts of the plain run: without it
+# shoe 6 (code 4) would have more pixels
+no_list <- expected_counts(plain, rect[0, ])
+stopifnot(no_list[plain$counts$shoe == fixture_rects$shoe] >
+            plain$counts$pixel_count[plain$counts$shoe == fixture_rects$shoe])
 drop <- plain$counts$pixel_count[1] - erased_run$counts$pixel_count[1]
 stopifnot(drop > 0)
 ctl <- erased_run$dataCC[erased_run$dataCC$shoe == 1 &

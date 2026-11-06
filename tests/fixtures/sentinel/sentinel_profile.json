@@ -28,7 +28,8 @@
         "locations": "data/locations_sentinel.txt",
         "locations_format": "space_no_header",
         "cross_check": null,
-        "sticker_masks": null
+        "sticker_masks": null,
+        "snake_overrides": null
       },
       "prototype": {
         "col_shoe": 44,
@@ -129,7 +130,8 @@
         "locations": "data/locations_sentinel.txt",
         "locations_format": "space_no_header",
         "cross_check": null,
-        "sticker_masks": null
+        "sticker_masks": "data/stickers_sentinel.csv",
+        "snake_overrides": "data/snake_overrides_sentinel.csv"
       },
       "prototype": {
         "col_shoe": 44,
@@ -195,7 +197,8 @@
           "alpha": 0.012,
           "beta_first": 12,
           "beta_second": 0.12,
-          "gamma": 0.0015
+          "gamma": 0.0015,
+          "first_closing_radius": 2
         },
         "write_html": false,
         "contour_out": "data/new_shoes/contour_sentinel_new.txt",

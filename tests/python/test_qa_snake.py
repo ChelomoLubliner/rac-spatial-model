@@ -1,14 +1,17 @@
-"""Snake QA of T4 (plan T4; decisions A-091 to A-096).
+"""Snake QA of T4 (plan T4; decisions A-091 to A-102).
 
 Geometry and metrics on synthetic shapes (a disk-shaped "print" and snakes
-that enclose it, cut into it, hang loose or cross themselves), the flag
-bands, the Python port of the R stamp mask against the committed OLD
+that enclose it, cut into it, hang loose or cross themselves; a RAC and a
+speck far outside: the absolute triggers of A-099), the flag bands, the
+Python port of the R stamp mask against the committed OLD
 data/all_cont.csv, the erase list (format, application, the committed NEW
-list), the BLAS-thread guard, forked snakes equal to serial ones (in a
-subprocess with one BLAS thread, as the NEW profile runs), and the
-committed NEW QA outputs (metrics table, its task copy, the contact sheets,
-every flagged shoe resolved). Reads only; temporary files go to a tempfile
-folder.
+list), the review file (format, classes, A-101), the command-line refusals
+(OLD has no sheets folder; --jobs needs fork), the BLAS-thread guard and
+the kernel getter, forked snakes equal to serial ones (on the sentinel
+fixture, in a subprocess with one BLAS thread, as the NEW profile runs:
+self-contained, T4 review), and the committed NEW QA outputs (metrics
+table, its task copy, the contact sheets, every flagged shoe resolved).
+Reads only; temporary files go to a tempfile folder.
 """
 
 import dataclasses
@@ -147,6 +150,42 @@ class Metrics(unittest.TestCase):
         self.assertEqual(m['touches_border'], 1)
         self.assertEqual(m['outside_mask_frac'], 1.0)
 
+    def test_absolute_triggers(self):
+        """A RAC 3 px or more outside the record fill, or contact more than
+        8 px outside it, flags the shoe although the share bands pass
+        (A-099; the review's case: one RAC of a RAC-rich shoe). The small
+        synthetic contour breaks the contour-length band, so only the
+        bands named here are read."""
+        def flags(m):
+            return set(q.flag_shoe(m).split(';')) & {
+                'rac_out_max_px', 'contact_out_max_px', 'rac_coverage',
+                'coverage'}
+        snake = circle((60, 45), 27)
+        fill = q.row_span_fill(contour_of(snake, SHAPE))
+        top = int(np.flatnonzero(fill[:, 45]).min())  # middle column
+        inside = [(60 + dr, 45 + dc) for dr in range(-10, 11, 2)
+                  for dc in range(-10, 11, 5)]  # 55 RACs inside
+        m = self.metrics(snake, racs=inside + [(top - 2, 45)])
+        self.assertEqual(m['rac_out_max_px'], 2.0)
+        self.assertEqual(flags(m), set())
+        m = self.metrics(snake, racs=inside + [(top - 3, 45)])
+        self.assertEqual(m['rac_out_max_px'], 3.0)
+        self.assertGreater(m['rac_coverage'], 0.9696)
+        self.assertEqual(flags(m), {'rac_out_max_px'})
+        # an isolated contact speck 9 px above the fill
+        speck = self.print_.copy()
+        speck[top - 9, 45] = True
+        m = q.snake_metrics(speck, contour_of(snake, SHAPE), self.mask,
+                            snake, inside)
+        self.assertEqual(m['contact_out_max_px'], 9.0)
+        self.assertGreater(m['coverage'], 0.99)
+        self.assertEqual(flags(m), {'contact_out_max_px'})
+        # no RAC: undefined, not a flag
+        m = self.metrics(snake)
+        self.assertTrue(math.isnan(m['rac_out_max_px']))
+        self.assertEqual(m['contact_out_max_px'], 0.0)
+        self.assertEqual(flags(m), set())
+
 
 class Flags(unittest.TestCase):
 
@@ -154,7 +193,8 @@ class Flags(unittest.TestCase):
         base = dict(coverage=1.0, tightness=1.0, self_intersections=0,
                     turning=3.0, max_turn_deg=15.0, n_contour_px=700,
                     touches_border=0, coverage_fill=1.0, rac_coverage=1.0,
-                    outside_mask_frac=0.05)
+                    outside_mask_frac=0.05, rac_out_max_px=0.0,
+                    contact_out_max_px=0.0)
         base.update(kw)
         return base
 
@@ -173,6 +213,16 @@ class Flags(unittest.TestCase):
                          'coverage')
         # a shoe without RACs has no RAC coverage: not a flag
         self.assertEqual(q.flag_shoe(self.row(rac_coverage=float('nan'))),
+                         '')
+        # the absolute triggers (A-099): >= 3 px for a RAC, > 8 px for
+        # contact (EDT distances are square roots of integers)
+        self.assertEqual(q.flag_shoe(self.row(rac_out_max_px=2.8284)), '')
+        self.assertEqual(q.flag_shoe(self.row(rac_out_max_px=3.0)),
+                         'rac_out_max_px')
+        self.assertEqual(q.flag_shoe(self.row(contact_out_max_px=8.0)), '')
+        self.assertEqual(q.flag_shoe(self.row(contact_out_max_px=8.0623)),
+                         'contact_out_max_px')
+        self.assertEqual(q.flag_shoe(self.row(rac_out_max_px=float('nan'))),
                          '')
 
     def test_bands_come_from_the_old_reference(self):
@@ -223,8 +273,11 @@ class Stickers(unittest.TestCase):
 
     def test_validation(self):
         head = 'shoe,row0,row1,col0,col1,reason\n'
-        for bad in ('1,0,5,1,5,x\n', '1,5,4,1,5,x\n', '1,1,5,1,256,x\n',
-                    '632,1,5,1,5,x\n', '1,1,5,1,5,\n', '1,1,368,1,5,x\n'):
+        p = load_profile('new')
+        # one past the frame and the shoe count, from the profile
+        w1, h1, n1 = p.W + 1, p.H + 1, p.num_shoe + 1
+        for bad in ('1,0,5,1,5,x\n', '1,5,4,1,5,x\n', f'1,1,5,1,{w1},x\n',
+                    f'{n1},1,5,1,5,x\n', '1,1,5,1,5,\n', f'1,1,{h1},1,5,x\n'):
             with self.subTest(row=bad):
                 with self.assertRaises(ValueError):
                     stickers.read_sticker_masks(self.profile_with(head + bad))
@@ -296,8 +349,12 @@ class Profiles(unittest.TestCase):
         self.assertEqual(p.snake_overrides,
                          REPO / 'data/new_shoes/snake_overrides_new.csv')
         over = acs.snake_overrides(p)
-        self.assertTrue(over and all(v == {'first_closing_radius': 24}
-                                     for v in over.values()))
+        # closing radius 24, or 16 where 24 breaks another band (A-097,
+        # A-102); no override changes the ellipse
+        self.assertTrue(over and all(
+            set(v) == {'first_closing_radius'}
+            and v['first_closing_radius'] in (16, 24) for v in over.values()))
+        self.assertEqual(over[165], {'first_closing_radius': 16})
         self.assertEqual(acs.snake_params(p, min(over)).first_closing_radius,
                          24)
         self.assertEqual(acs.snake_params(p, None), p.snake)
@@ -363,45 +420,127 @@ class Blas(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 acs.check_blas_threads(new)
 
+    def test_corename(self):
+        """The OpenBLAS kernel numpy chose (logged by step 0, A-092): a
+        non-empty name, or None where the getter is missing."""
+        name = acs.numpy_blas_corename()
+        self.assertTrue(name is None or (isinstance(name, str) and name))
+
     def test_jobs_identical(self):
-        """Forked snakes equal serial ones bit for bit (8 NEW shoes, one
-        BLAS thread, as the NEW profile runs; a subprocess, because the
-        thread count is fixed when numpy loads)."""
-        p = load_profile('new')
-        if not p.image_path('cleaned_shoes', 0).is_file():
-            self.skipTest('no NEW step-0 images (run step 0 first)')
+        """Forked snakes equal serial ones bit for bit, on the sentinel
+        fixture (step 0a-0b in a temporary root, then the 6 shoe snakes
+        with jobs 1 and 3), with one BLAS thread as the NEW profile runs;
+        a subprocess, because the thread count is fixed when numpy loads.
+        Self-contained: it needs no step-0 output of the work tree (T4
+        review; it used to skip in a fresh checkout)."""
         code = (
-            'import json, sys, numpy as np\n'
-            'from contour_algorithm import active_contour_snake as acs\n'
+            'import json, sys, shutil\n'
+            'from pathlib import Path\n'
+            'import numpy as np\n'
+            'from contour_algorithm import active_contour_snake as m\n'
+            'from contour_algorithm import main as step0\n'
             'from contour_algorithm.profiles import load_profile\n'
-            'p = load_profile("new")\n'
-            'idx = [0, 79, 157, 236, 315, 394, 473, 552]\n'
-            'import contour_algorithm.active_contour_snake as m\n'
-            'def run(jobs):\n'
-            '    m._JOB.update(profile=p, list_contour=None, qa=True)\n'
-            '    if jobs == 1:\n'
-            '        res = [m._shoe_job(i) for i in idx]\n'
-            '    else:\n'
-            '        import multiprocessing as mp\n'
-            '        with mp.get_context("fork").Pool(jobs) as pool:\n'
-            '            res = pool.map(m._shoe_job, idx)\n'
-            '    m._JOB.clear()\n'
-            '    return res\n'
+            'fixture, root = Path(sys.argv[1]), Path(sys.argv[2])\n'
+            'shutil.copytree(fixture / "data", root / "data")\n'
+            'p = load_profile("new", file=fixture / "sentinel_profile.json",'
+            ' root=root)\n'
+            'step0.run(p, steps=("create", "contour"), log=lambda *a: None)\n'
             'm.save_img = lambda *a, **k: None\n'
-            'a, b = run(1), run(4)\n'
-            'same = all(np.array_equal(x[0], y[0]) and all(np.array_equal('
-            'x[1][k], y[1][k]) for k in ("init", "first", "second"))'
-            ' for x, y in zip(a, b))\n'
-            'print(json.dumps({"same": bool(same), "threads": '
-            'acs.numpy_blas_threads()}))\n')
+            'lc = np.load(p.saved_path("list_contour", "npy"))\n'
+            'a = m.run_snakes(p, lc, jobs=1, qa=True)\n'
+            'b = m.run_snakes(p, lc, jobs=3, qa=True)\n'
+            'same = all(np.array_equal(x, y) for x, y in zip(a[0], b[0]))\n'
+            'same = same and all(np.array_equal(x[k], y[k]) for x, y in '
+            'zip(a[1], b[1]) for k in ("init", "first", "second"))\n'
+            'print(json.dumps({"same": bool(same), "n": len(a[0]), '
+            '"threads": m.numpy_blas_threads()}))\n')
         env = {**os.environ, 'OPENBLAS_NUM_THREADS': '1',
-               'MPLBACKEND': 'Agg', 'PYTHONDONTWRITEBYTECODE': '1'}
+               'MPLBACKEND': 'Agg', 'PYTHONDONTWRITEBYTECODE': '1',
+               'TQDM_DISABLE': '1'}
         env.pop('RAC_PROFILE_FILE', None)
-        out = subprocess.run([sys.executable, '-B', '-c', code], cwd=REPO,
-                             env=env, capture_output=True, text=True,
-                             timeout=600, check=True).stdout
+        with tempfile.TemporaryDirectory(prefix='jobs_') as tmp:
+            out = subprocess.run(
+                [sys.executable, '-B', '-c', code,
+                 str(REPO / 'tests/fixtures/sentinel'), tmp], cwd=REPO,
+                env=env, capture_output=True, text=True, timeout=600,
+                check=True).stdout
         got = json.loads(out.strip().splitlines()[-1])
-        self.assertEqual(got, {'same': True, 'threads': 1})
+        self.assertEqual(got, {'same': True, 'n': 6, 'threads': 1})
+
+
+class Review(unittest.TestCase):
+    """The review file (read_review, A-101)."""
+
+    def profile_with(self, text):
+        tmp = tempfile.TemporaryDirectory(prefix='review_')
+        self.addCleanup(tmp.cleanup)
+        (Path(tmp.name) / 'qa').mkdir()
+        (Path(tmp.name) / 'qa' / 'snake_review_new.csv').write_text(text)
+        p = load_profile('new')
+        prep = dict(p.prep)
+        prep['snake_qa_dir'] = 'qa'
+        return dataclasses.replace(p, root=Path(tmp.name), prep=prep)
+
+    def test_valid_and_invalid(self):
+        head = 'shoe,resolution,review_class,note\n'
+        ok = self.profile_with(head + '3,ok_after_review,,a note here\n'
+                               '5,,partial_print,another note\n')
+        review = q.read_review(ok)
+        self.assertEqual(list(review.index), [3, 5])
+        table = pd.DataFrame({'shoe': [3, 4, 5], 'qa_flags': ['x', '', '']})
+        merged = q.with_review(ok, table)
+        self.assertEqual(merged['resolution'].tolist(),
+                         ['ok_after_review', '', ''])
+        self.assertEqual(merged['review_class'].tolist(),
+                         ['', '', 'partial_print'])
+        for bad in (head + '3,maybe,,a note\n',          # resolution
+                    head + '3,,blurry,a note\n',         # class
+                    head + '3,,,a note\n',               # neither
+                    head + '3,ok_after_review,,\n',      # no note
+                    head + '3,ok_after_review,,a\n3,,spike,b\n',
+                    'shoe,resolution,note\n3,ok_after_review,a\n'):
+            with self.subTest(text=bad):
+                with self.assertRaises(ValueError):
+                    q.read_review(self.profile_with(bad))
+
+
+class CommandLine(unittest.TestCase):
+    """The refusals of qa_snake.main (T4 review)."""
+
+    def args(self, **kw):
+        import argparse
+        base = dict(sheets=False, thresholds=None, jobs=1)
+        base.update(kw)
+        return argparse.Namespace(**base)
+
+    def test_old_has_no_sheets_folder(self):
+        old = load_profile('old')
+        self.assertIsNone(old.prep_path('sheets_dir'))
+        self.assertIsNone(q.task_copy_path(old))
+        self.assertIn('--sheets', q.refusal(old, self.args(sheets=True)))
+        self.assertIn('--thresholds',
+                      q.refusal(old, self.args(thresholds='18,29')))
+        self.assertEqual(q.refusal(old, self.args()), '')
+        new = load_profile('new')
+        self.assertEqual(q.refusal(new, self.args(sheets=True,
+                                                  thresholds='18')), '')
+        self.assertEqual(q.task_copy_path(new),
+                         REPO / 'docs/qa/sheets_new/snake_qa_new.csv')
+
+    def test_jobs_need_fork(self):
+        import multiprocessing
+        from unittest import mock
+        new = load_profile('new')
+        with mock.patch.object(multiprocessing, 'get_all_start_methods',
+                               return_value=['spawn']):
+            self.assertIn('fork', q.refusal(new, self.args(jobs=2)))
+            self.assertEqual(q.refusal(new, self.args(jobs=1)), '')
+            with self.assertRaises(RuntimeError):
+                acs.run_snakes(new, [None, None], jobs=2)
+            from contour_algorithm import main as step0
+            with mock.patch.dict(os.environ, {'RAC_DATASET': 'new'}):
+                os.environ.pop('RAC_PROFILE_FILE', None)
+                self.assertEqual(step0.main(['--jobs', '2']), 2)
 
 
 class Files(unittest.TestCase):
@@ -417,9 +556,13 @@ class Files(unittest.TestCase):
         self.assertEqual(t['shoe'].tolist(), list(self.p.analysis_shoes()))
         self.assertEqual(t['record'].tolist(),
                          list(range(1, len(t) + 1)))
-        task_copy = REPO / 'docs/qa/snake_qa_new.csv'
+        # the task's name, in the NEW sheets folder (user rule 1), written
+        # by qa_snake --metrics (A-100)
+        task_copy = q.task_copy_path(self.p)
+        self.assertEqual(task_copy.parent, self.p.prep_path('sheets_dir'))
         self.assertEqual(task_copy.read_bytes(),
                          self.p.prep_path('snake_qa').read_bytes())
+        self.assertFalse((REPO / 'docs/qa/snake_qa_new.csv').exists())
         per = q.SHEET_COLUMNS * q.SHEET_ROWS
         n_sheets = math.ceil(len(t) / per)
         folder = self.p.prep_path('sheets_dir')
@@ -462,6 +605,10 @@ class Files(unittest.TestCase):
                 self.assertGreater(len(str(row['note']).strip()), 10)
         passed = t[t['qa_flags'] == '']
         self.assertTrue((passed['resolution'] == '').all())
+        # every listed shoe is a NEW shoe; the classes are known (A-101)
+        review = q.read_review(self.p)
+        self.assertTrue(set(review.index) <= set(self.p.analysis_shoes()))
+        self.assertTrue(set(t['review_class']) <= set(q.REVIEW_CLASSES))
 
 
 if __name__ == '__main__':

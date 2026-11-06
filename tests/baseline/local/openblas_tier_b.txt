@@ -1,0 +1,12 @@
+# numpy's bundled OpenBLAS during the OLD step-0 baselines (added in the T4
+# review fixes, 2026-11-06; decisions A-092, A-103). The snake depends on the
+# thread count: both baselines were written with the library default, 16
+# threads on this 16-CPU machine (AMD Ryzen 7 5800U), and numpy's OpenBLAS
+# 0.3.29 (a DYNAMIC_ARCH build) chose the Haswell kernel. Evidence: every run
+# that reproduces Tier B (WSL) or Tier A (venv-wind) logs
+# "numpy OpenBLAS threads: 16" (T4 reproducibility review, LOG 2026-11-06
+# 16:05; T4 review fixes, docs/tests/T4-review-fixes-results.md), and OLD
+# step 0 with one thread changes 32 of 386 records (F56). Read by
+# tests/regress_old.sh, which stops when the count differs.
+threads 16
+kernel Haswell

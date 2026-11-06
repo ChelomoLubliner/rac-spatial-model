@@ -2,6 +2,8 @@
 # Record the software environment of the Tier B reruns (plan T1 step 7).
 # Read-only: prints versions; nothing is installed or changed.
 # Usage: bash tests/lib/write_environment.sh > tests/baseline/local/environment.txt
+#        bash tests/lib/write_environment.sh --openblas >> <record>  (only
+#        the numpy OpenBLAS section: threads and kernel; T4 review fixes)
 # Optional: RAC_VENV_PY, RAC_THESIS_REPO, RAC_WIN_PY, RAC_WIN_RSCRIPT
 # (the Windows interpreters are queried only if they exist).
 
@@ -15,6 +17,26 @@ win_r=${RAC_WIN_RSCRIPT:-/mnt/c/Users/mehes/AppData/Local/Programs/R/R-4.4.3/bin
 export PIP_DISABLE_PIP_VERSION_CHECK=1 PIP_NO_CACHE_DIR=1
 # WSL variables reach a Windows process only through WSLENV.
 export WSLENV="${WSLENV:+$WSLENV:}PIP_DISABLE_PIP_VERSION_CHECK:PIP_NO_CACHE_DIR"
+
+# numpy's bundled OpenBLAS: the thread count it runs with the library
+# default (the OPENBLAS/GOTO/OMP thread variables removed) and the CPU
+# kernel it chose at run time; the snake depends on both (A-092, A-103)
+openblas_section() {
+  echo "numpy OpenBLAS (threads with the library default, kernel):"
+  (cd "$repo" && timeout 600 env -u OPENBLAS_NUM_THREADS -u GOTO_NUM_THREADS \
+    -u OMP_NUM_THREADS PYTHONDONTWRITEBYTECODE=1 "$py" -B -c \
+    'from contour_algorithm.active_contour_snake import (
+    numpy_blas_corename, numpy_blas_threads)
+print("threads", numpy_blas_threads(), "kernel", numpy_blas_corename())')
+}
+if [[ "${1:-}" == --openblas ]]; then
+  # only this section (appended to an existing environment record)
+  echo
+  echo "## numpy OpenBLAS, recorded $(date --iso-8601=seconds) (T4 review fixes)"
+  echo "WSL thesis venv: $py"
+  openblas_section
+  exit 0
+fi
 
 echo "# Environment of the T1 Tier B reruns, recorded $(date --iso-8601=seconds)"
 echo
@@ -41,6 +63,7 @@ echo
 echo "## Python (WSL thesis venv: $py)"
 timeout 600 "$py" -B -c 'import sys; print(sys.version)'
 timeout 600 "$py" -B -m pip freeze
+openblas_section
 if [[ -x "$win_py" ]]; then
   echo
   echo "## Python (Windows venv-wind, diagnostics only: $win_py)"

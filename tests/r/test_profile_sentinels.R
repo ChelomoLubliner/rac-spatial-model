@@ -6,7 +6,8 @@
 # (6 shoes of 40 x 60 px, dataset `new` of its profile file, selected with
 # the test-only RAC_PROFILE_FILE) inside a temporary root, and checks that
 # the sentinel values, which differ from both real datasets, shape the
-# outputs: stamp threshold 2 and sweep bound 40 (all_cont), the R flip list
+# outputs: stamp threshold 2 and sweep bound 40 (all_cont, from the records
+# with the fixture's erase rectangle on shoe 6 erased), the R flip list
 # [3], 5 controls per shoe, seed 7 (two renders identical, seed 8
 # different), the skip list (shoe 4 without RACs, shoe 5 excluded: codes 1-4
 # = shoes 1, 2, 3, 6), the data coordinates at 20 px per unit (RAC pixels by
@@ -91,6 +92,15 @@ shoes <- lapply(seq_len(N), function(i) {
   b <- raw[(i - 1) * (W * H + 2) + seq_len(W * H)]
   matrix(as.integer(b == as.raw(49)), H, W, byrow = TRUE)
 })
+# the fixture's erase list (one rectangle on shoe 6, T4 review), applied to
+# the stored records before the flip, as step 1 does (A-095)
+erase <- read.csv(file.path(fixture, fx$inputs$sticker_masks),
+                  stringsAsFactors = FALSE)
+stopifnot(nrow(erase) >= 1)
+for (k in seq_len(nrow(erase))) {
+  shoes[[erase$shoe[k]]][erase$row0[k]:erase$row1[k],
+                         erase$col0[k]:erase$col1[k]] <- 0L
+}
 shoes[[3]] <- shoes[[3]][, W:1]
 
 # The legacy stamp sweep, re-implemented with explicit bounds.
