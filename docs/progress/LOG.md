@@ -965,3 +965,47 @@ Chronological; newest entry at the bottom. Each entry: what was done, results (r
 **Open.** A-087 (keep the legacy mapping against the strict criterion) and D-014 (correct the half-pixel offset in both datasets?) need Shlomo and Micha. A-075 still needs Shlomo's confirmation. Of the T2 engineering review's optional findings, 1 is done (A-090) and part of 3 (R now also checks the `cross_check` and `sticker_masks` paths); nit 2 (the sentinel snake test asks every reset value to change all six snakes) and the rest of 3 (Python accepts `a//b` path parts and a dot-file output name, R refuses both) are left for a later task.
 
 **Blockers.** None.
+
+## 2026-11-06 11:33, T3-newdata review (reviewer:engineer)
+
+**Verdict: approve** (engineering lens). I re-ran the work instead of reading it, and the code is correct. The findings below are test gaps and nits, for the rest of T3.
+
+**Verified by re-running** (`<scratch>/review_t3/`):
+- `bash tests/run_all.sh old` at `826a814`: ALL PASS in 4 min 0 s. That is 143 Python tests (3 skipped live checks), 15 R scripts, flake8 on 55 files, shellcheck on 14, and the work tree unchanged. The R parser shows 1-ulp differences of x 11, y 4 (OLD) and x 4, y 2 (NEW), as reported.
+- `regress_old.sh --steps 1`: ALL PASS. The three Tier A CSVs and `shoe_codes.csv` are byte-identical (step 1 took 120 s).
+- **Full regeneration in a `git archive` copy of HEAD.** I deleted the committed T3 outputs first and reran `locations`, `calibrate_pixels` (OLD 82 s, NEW 126 s) and `shoe_quality`. All 7 CSVs are byte-identical to the committed files.
+- **My own script** (it does not import `contour_algorithm`) reproduces every headline number:
+  - The CSV text is the exact decimal half of the raw text (0 differences). Its values equal raw / 2 and the 2023 x, y bit for bit.
+  - Legacy hit rate: OLD 0.847821 / 0.990291, NEW 0.807775 / 0.974666. Off contact: 2,022 / 129 and 3,847 / 507.
+  - Case pixels: 13,249 and 19,990. The committed `dataCC.csv` also has 13,249 case rows.
+  - All-off shoes: OLD [9, 268]; NEW [69, 515, 629], with dilation [629]. NEW `aspix` equals the 2023 `COL/ROW`.
+  - Every optimum, the best rate at 300, and the "NEW at the OLD optimum" rate (0.834907) match.
+- **Pre-registration holds.** A-086 is unchanged since `a9981e8` (10:21:14). The implementer's calibration logs are from 10:28-10:33. The earlier timing scripts used random arrays, not real data.
+- **Repo state.**
+  - Raw inputs are untouched (Tier A).
+  - Every tracked file under a `new`/`new_shoes` folder has the `_new` suffix, except the three committed raw inputs/README.
+  - No CR in any changed code or CSV file. No attribution lines.
+  - The images match their descriptions. I opened NEW `calibration_curves`, NEW and OLD `offcontact_shoes`, and raw sheet 19 (frame artefacts 580/582/585/586/589, misregistered 599; OLD stickers on 59, 66, 142, 150, 374).
+- **Mutation check** (10 mutants, each in a scratch copy).
+  - Caught: `legacy_pixel` ceil->floor, the `best_shift` tie-break, a 4-neighbour dilation, NEW `prep` outputs unchecked at load, and a 6-decimal CSV.
+  - Equivalent (not a gap): `rng.choice(k, k)` gives the same stream as `rng.integers(0, k, k)`.
+  - Not caught: see findings 1 and 2.
+
+**Findings.**
+1. **Minor: the suite never runs `calibrate()` or `hit_matrix` on the real grids.**
+   - The committed tables are checked only through their components.
+   - Feeding the strict images to the dilated bootstrap inside `calibrate()` passes all 22 `test_calibration` tests. The dilated criterion is what A-087 rests on.
+   - Dropping the right-side padding of `hit_matrix` passes the Synthetic tests: their small grids never leave the image. On real stage C (up to 700 px per unit) it would wrap into the next RAC's row.
+   - Fix: a slow gate that reruns both calibrations and compares the three CSVs byte for byte (about 3.5 min; e.g. a `--check` mode like `locations`), plus one synthetic grid that overflows the right edge.
+2. **Minor: `rule_decision` / `dataset_conditions` have no unit test with built inputs.**
+   - Rule (iii) ignoring the row offset passes, because the only checks compare the function with its own stored output and with the one recorded outcome (offsets 0.25 px apart).
+   - Fix: add synthetic summaries (dr 1.25 px apart, hi == MARGIN, a flipped orientation).
+3. **Nit: the rejected orientations' stage-O optima sit on the grid edge (sx = 240).** So "0.44-0.55 for the other orientations" is a maximum within the grid. My probe with sx from 20 to 240 reaches at most 0.584 (OLD) and 0.557 (NEW), at the degenerate sx = 20. The conclusion stands; say so in F52 / the results doc.
+4. **Nit: LOG header times were guessed.** They were first written as 10:40 / 11:40 in commits made at 10:21 / 11:12, and corrected in `826a814`. Take them from `date`.
+5. **Nit: with `RAC_DATASET=old`, the T3 tools rewrite `docs/qa/T3/old/*` in place, with no A-075-style refusal.** The CSVs reproduce byte for byte, but the PNG bytes depend on the Pillow/matplotlib build (A-054).
+6. **Nit, three small code points:**
+   - `run_stage` stores `sx` and `sy` as int64. A non-integer px-per-unit would mislabel the grid rows; assert an integral s0.
+   - `on_contact_rate` is unused and untested.
+   - The dilated stages C and F use the strict stage-O orientation, while the dilated orientation condition reads the dilated stage-O optimum. This is harmless here, since both are mirrored and unflipped.
+
+**Not an engineering defect, for Shlomo:** A-087 keeps the legacy mapping although the pre-registered primary (strict) rule says otherwise. The departure is stated in A-087, the plan, the results doc and the profile comment. Nothing is hidden, and every number behind it reproduces.
