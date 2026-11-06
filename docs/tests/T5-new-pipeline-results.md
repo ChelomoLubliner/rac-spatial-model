@@ -6,7 +6,7 @@
 
 | Item | Result |
 |---|---|
-| Police stamps on NEW | **none**: the step-1 stamp sweep removes 0 px at threshold 8 (OLD: 1,110 px, the two stamp blobs beside the toe); every frame-artefact remnant and margin debris lies outside the R mask at threshold 8 and 13 |
+| Police stamps on NEW | **none**: the step-1 stamp sweep removes 0 px at threshold 8 (OLD: 1,110 px, the two stamp blobs beside the toe); the frame-artefact remnants lie outside the R mask at threshold 8 and 13, and so does the margin debris except a few isolated specks next to the sole, inside the mask region at both thresholds (section 4) |
 | R stamp threshold (A-110) | **8** (the OLD value), not the provisional proportional 13: 13 would remove 5,661 more contact px on 99 more shoes, 99.4% of them inside the shoe's own contour (real sole edge) |
 | Step 1 | 83,090 rows = 19,990 cases + 631 x 100 controls; S per shoe 1,345-18,504 px (median 8,925); `MEAN_OFFSET` **-4.465503119** (OLD -4.614310784); all 63,100 controls on S; 309 s |
 | Step-1 QA | the contact surface S of all 631 shoes on 13 sheets, **every sheet looked at**: no sticker, label or frame artefact in any S (all are erased by the erase list or removed by the R mask); S reaches outside the contour fill on 72 shoes (490 px; OLD 91 shoes, 4,585 px) and 7 controls (0.011%) landed there (OLD 63) |
@@ -18,6 +18,7 @@
 | Steps 4-6 | 8 NEW PDFs in `model_images/new/`, all looked at; PNG twins in `docs/qa/T5/new/` (A-111) |
 | Tests | `tests/r/test_new_outputs.R` (6 checks, 3 mutants caught), `tests/r/test_figures_png.R`, the NEW part of `tests/r/test_distances_vectorized.R`; `bash tests/run_all.sh` **ALL PASS** (184 Python tests, 3 skipped live checks; 17 R scripts; flake8; shellcheck; work tree unchanged) |
 | OLD regression | **identical**: `tests/regress_old.sh --steps 1-6` ALL PASS (five CSVs = Tier A byte for byte, `shoe_codes.csv` = `old_added_t2`, both models `identical()` to Tier B, 8 normalized PDFs = Tier B, Wald W 427.7804472165 = Tier B) and `--steps 0` ALL PASS (contour = Tier B, 1,556 intermediates = Tier B); the T4 QA tables recomputed, `tests/rebuild_new.sh` ALL PASS against `cb7340f` |
+| NEW determinism | a fresh rerun of NEW steps 1-6 reproduces every committed NEW output exactly (7 CSVs byte for byte, both models `identical()`, 8 PDFs after removing their dates; section 10.4) |
 
 ## 2. Step 1: does NEW need the police-stamp cleaning? (A-110)
 
@@ -679,6 +680,53 @@ user	42m37.706s
 sys	0m42.030s
 ```
 
+### 10.4 NEW determinism: a fresh rerun reproduces the committed NEW outputs
+NEW steps 1-6 rerun from scratch in a copy of the tree whose NEW step-1 to step-6 outputs were deleted, compared with the HEAD blobs (the committed probe; a first run of the same check from a scratch script, `<scratch>/t5/gates/new_rerun_oDk1Ah`, compared with the work-tree files and gave the same result, 18 min 39 s):
+```bash
+RAC_SCRATCH=<scratch>/t5/gates bash docs/qa/T5/probes/t5_new_rerun.sh
+```
+```
+<scratch>/t5/gates/new_rerun_2rRRp2
+run_pipeline.sh: dataset new, steps 1-6, logs logs/new
+step1: exit 0, 236.965078460 s
+step2: exit 0, 28.355498817 s
+step3_glmm: exit 0, 479.708655546 s
+step3_cml: exit 0, 289.120725662 s
+step4_glmm: exit 0, 14.464848168 s
+step4_cml: exit 0, 13.229880082 s
+step5: exit 0, 24.411488950 s
+step6: exit 0, 18.860276313 s
+run_pipeline.sh: done (new, steps 1-6)
+== CSVs (sha256: rerun vs HEAD)
+SAME  processed_data/new/dataCC_new.csv 3c064f9dc5f0
+SAME  processed_data/new/shoe_pixel_counts_new.csv 8faeb6735a39
+SAME  processed_data/new/all_cont_new.csv 6513cc4283e5
+SAME  processed_data/new/shoe_codes_new.csv ffbf32ae9bcf
+SAME  processed_data/new/dataCC_distance_temp_new.csv ee3769786c4b
+SAME  processed_data/new/dataCC_distance_new.csv 72e03d4efb89
+SAME  processed_data/new/wald_test_new.csv fff19dcce95b
+== models
+fixef         n=25   identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+vcov          n=625  identical=TRUE  all.equal(tol=0)=TRUE  max|diff|=    0       rel=    0
+[... 20 lines omitted: theta to wald_cml, every row identical=TRUE, all.equal(tol=0)=TRUE, max|diff| 0 or NA (character fields) ...]
+models: every field identical()
+== PDFs (normalized sha256)
+SAME  model_images/new/CI_cut_110_new.pdf 4e1e76fa04bf
+SAME  model_images/new/CI_cut_190_new.pdf d5f73244fa97
+SAME  model_images/new/CI_cut_250_new.pdf 139de94f41b9
+SAME  model_images/new/CI_shoe_cuts_new.pdf 02bdbf9fc1bd
+SAME  model_images/new/CML_MODEL_SHOE_new.pdf a550c2fb89f9
+SAME  model_images/new/NEW_X_NS_XY_SHOE_new.pdf edf868cfa0f8
+SAME  model_images/new/difference_random_cml_new.pdf 10611398f96a
+SAME  model_images/new/pixel_inten_JASAup_new.pdf 83b79944b3e0
+ALL SAME
+
+real	18m40.672s
+user	16m51.735s
+sys	1m49.113s
+```
+Every committed NEW output of steps 1-6 is reproduced exactly: the CSVs byte for byte (the case-control draw with the profile's seed included), both models `identical()` in every dumped field, the 8 figures after removing their dates. T8's `tests/e2e/test_new_rerun.sh` can start from this probe.
+
 ## 11. Timings (this machine, WSL; several jobs at once)
 
 | What | Time |
@@ -693,6 +741,9 @@ sys	0m42.030s
 | PNG twins NEW / OLD | 40.0 s / 44.7 s |
 | `tests/rebuild_new.sh --full` / fast | 438 s of steps (step 0 149 s, metrics 41 s, figures 150 s, thresholds 48 s, overrides 51 s) / 219 s of steps |
 | `test_new_outputs.R` / `test_figures_png.R` / `test_distances_vectorized.R` | 13.5 s / 17.5 s / 74.7 s |
+| NEW rerun of steps 1-6 with comparison (`t5_new_rerun.sh`) | 18 min 41 s (step 1 237 s, step 2 28 s, GLMM 480 s, CML 289 s, steps 4-6 71 s) |
+| OLD gates `regress_old.sh --steps 1-6` / `--steps 0` | 11 min 20 s / 7 min 23 s |
+| `run_all.sh` | 6 min 15 s; 5 min 47 s on the final tree |
 
 ## 12. Not done here, and open points
 

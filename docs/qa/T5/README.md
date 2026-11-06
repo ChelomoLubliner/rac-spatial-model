@@ -33,4 +33,4 @@ Written by T5-newmodel (2026-11-06). Every image below was opened and looked at;
 
 ## `probes/`
 
-`t5_stamp_mask.R`, `t5_stamp_figure.py`, `t5_stamp_ring.py` and `t5_t4_table_diff.py` (section 2), `t5_step1_sheets.py` and `t5_step1_zoom.py` (section 4), `t5_step2_figures.py` (section 5), `t5_model_summary.R` and `t5_side_by_side.R` (section 6), `t5_k8_edges.R` (section 7). Each states its usage in its header; they read committed files and write only to the folders named on their command line.
+`t5_stamp_mask.R`, `t5_stamp_figure.py`, `t5_stamp_ring.py` and `t5_t4_table_diff.py` (section 2), `t5_step1_sheets.py` and `t5_step1_zoom.py` (section 4), `t5_step2_figures.py` (section 5), `t5_model_summary.R` and `t5_side_by_side.R` (section 6), `t5_k8_edges.R` (section 7), `t5_new_rerun.sh` (section 10.4: a fresh rerun of NEW steps 1-6 compared with HEAD). Each states its usage in its header; they read committed files and write only to the folders named on their command line.
