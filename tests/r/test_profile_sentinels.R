@@ -14,8 +14,11 @@
 # frame of step 2 (44 x 66 px at 25 px per unit: every distance_shape is a
 # half-width of the fixture prototype in its own frame; a copy of step 2
 # that uses the data frame for the prototype fails), and the record-count
-# check of step 2 (a contour file one record short stops it). Writes only
-# below tempdir().
+# check of step 2 (a contour file one record short stops it). The fixture's
+# rel_x_cord / rel_Y_cord (data 0.3 / 0.6, prototype 0.35 / 0.7) differ from
+# the legacy 0.25 / 0.5 (T2 review), and copies of steps 1 and 2 with a
+# leftover 0.25 or 0.5 fail. The expected values are computed here from the
+# fixture's profile file. Writes only below tempdir().
 #
 # Run from anywhere:  Rscript tests/r/test_profile_sentinels.R
 root <- local({
@@ -26,6 +29,13 @@ pass <- function(name) cat("PASS", name, "\n")
 fixture <- file.path(root, "tests", "fixtures", "sentinel")
 profile_file <- file.path(fixture, "sentinel_profile.json")
 W <- 40; H <- 60; N <- 6
+fx <- jsonlite::fromJSON(profile_file, simplifyVector = TRUE)$datasets$new
+cx <- fx$coords             # data frame: 20 px per unit
+pc <- fx$prototype$coords   # prototype frame: 25 px per unit
+stopifnot(cx$rel_x_cord != 0.25, cx$rel_Y_cord != 0.5,
+          pc$rel_x_cord != 0.25, pc$rel_Y_cord != 0.5,
+          isTRUE(all.equal(cx$rel_col_shoe / cx$rel_Y_cord, 20)),
+          isTRUE(all.equal(pc$rel_col_shoe / pc$rel_Y_cord, 25)))
 
 # A fresh root with the step code and the fixture inputs.
 new_root <- function(profile = NULL) {
@@ -144,28 +154,60 @@ pass("n_controls 5: 5 controls per shoe")
 # RAC pixels by aspix with P$coords (20 px per unit, x mirrored)
 loc <- read.table(file.path(fixture, "data", "locations_sentinel.txt"),
                   col.names = c("shoe", "rac_num", "x", "y", "type"))
-loc$x <- loc$x / 2
-loc$y <- loc$y / 2
+loc$x <- loc$x / cx$divisor
+loc$y <- loc$y / cx$divisor
 loc <- loc[loc$shoe != 5, ]
-col <- W - (floor((loc$x + 0.25) / (2 * 0.25 / 10)) + ceiling((W - 10) / 2))
-row <- H - (floor((loc$y + 0.5) / (2 * 0.5 / 20)) + ceiling((H - 20) / 2))
+col <- W - (floor((loc$x + cx$rel_x_cord) / (2 * cx$rel_x_cord / cx$rel_col_shoe)) +
+              ceiling((W - cx$rel_col_shoe) / 2))
+row <- H - (floor((loc$y + cx$rel_Y_cord) / (2 * cx$rel_Y_cord / cx$rel_row_shoe)) +
+              ceiling((H - cx$rel_row_shoe) / 2))
 code_of <- match(loc$shoe, codes$shoe)
 want_cases <- unique(data.frame(shoe = code_of, x = (-W / 2 + col) / 20,
                                 y = -(-H / 2 + row) / 20))
-cases <- dcc[dcc$n_Acc == 1, c("shoe", "x", "y")]
+cases_of <- function(d) d[d$n_Acc == 1, c("shoe", "x", "y")]
+cases <- cases_of(dcc)
 # (+ 0 turns a negative zero, which R's CSV writes as 0, into 0)
 key <- function(d) sort(sprintf("%d %.9f %.9f", d$shoe, d$x + 0, d$y + 0))
 stopifnot(nrow(cases) == nrow(want_cases), identical(key(cases),
                                                      key(want_cases)))
 pass(sprintf("RAC pixels = aspix of P$coords (%d case pixels, one duplicate)",
              nrow(cases)))
-ctl <- dcc[dcc$n_Acc == 0, ]
-cc <- ctl$x * 20 + W / 2
-rr <- -ctl$y * 20 + H / 2
-stopifnot(all(abs(cc - round(cc)) < 1e-9), all(abs(rr - round(rr)) < 1e-9),
-          all(round(cc) >= 1 & round(cc) <= W),
-          all(round(rr) >= 1 & round(rr) <= H))
+on_grid <- function(d) {
+  ctl <- d[d$n_Acc == 0, ]
+  cc <- ctl$x * 20 + W / 2
+  rr <- -ctl$y * 20 + H / 2
+  all(abs(cc - round(cc)) < 1e-9) && all(abs(rr - round(rr)) < 1e-9) &&
+    all(round(cc) >= 1 & round(cc) <= W) && all(round(rr) >= 1 & round(rr) <= H)
+}
+stopifnot(on_grid(dcc))
 pass("control coordinates (c - col_shoe/2)/20 and -(r - row_shoe/2)/20")
+
+# copies of step 1 with a leftover legacy 0.25 / 0.5 in place of the
+# fixture's rel_x_cord / rel_Y_cord must fail (T2 review)
+mutate1 <- function(from, to) {
+  m <- new_root()
+  rmd <- file.path(m$root, "statistical_model", "dataCC_1.Rmd")
+  txt <- readLines(rmd)
+  stopifnot(length(grep(from, txt, fixed = TRUE)) == 1)
+  writeLines(sub(from, to, txt, fixed = TRUE), rmd)
+  st <- render(m, "dataCC_1.Rmd")
+  res <- if (st != 0) "render error" else {
+    d <- read.csv(out(m, "processed_data/new/dataCC_new.csv"))
+    if (!identical(key(cases_of(d)), key(want_cases))) "RAC pixels moved"
+    else if (!on_grid(d)) "controls off the 1/20 grid" else "PASSED (bad)"
+  }
+  unlink(m$root, recursive = TRUE)
+  res
+}
+m1 <- c(
+  x = mutate1("rel_x_cord = P$coords$rel_x_cord)", "rel_x_cord = 0.25)"),
+  y = mutate1("rel_Y_cord = P$coords$rel_Y_cord)", "rel_Y_cord = 0.5)"),
+  grid = mutate1("(-col_shoe/2+1:col_shoe)*rel_Y_cord/rel_col_shoe",
+                 "(-col_shoe/2+1:col_shoe)*0.5/rel_col_shoe"))
+stopifnot(all(m1 != "PASSED (bad)"))
+pass(sprintf(paste("mutation checks, step 1: aspix with 0.25 for rel_x_cord",
+                   "(%s), with 0.5 for rel_Y_cord (%s), control x with 0.5",
+                   "(%s)"), m1[["x"]], m1[["y"]], m1[["grid"]]))
 
 b <- new_root()
 stopifnot(render(b, "dataCC_1.Rmd") == 0)
@@ -191,8 +233,8 @@ proto <- png::readPNG(file.path(fixture, "data",
                                 "prototype_contour_sentinel.png"))
 stopifnot(identical(dim(proto), c(66L, 44L)))
 px <- which(proto > 0, arr.ind = TRUE)
-xs <- (-44 / 2 + px[, "col"]) * 0.5 / 12.5
-ys <- -(-66 / 2 + px[, "row"]) * 0.5 / 12.5
+xs <- (-44 / 2 + px[, "col"]) * pc$rel_Y_cord / pc$rel_col_shoe
+ys <- -(-66 / 2 + px[, "row"]) * pc$rel_Y_cord / pc$rel_col_shoe
 half <- c(tapply(xs, ys, function(v) abs(min(v))), tapply(xs, ys, max))
 tmp_csv <- tempfile(fileext = ".csv")
 write.csv(data.frame(h = half), tmp_csv, row.names = FALSE)
@@ -241,10 +283,14 @@ mutate <- function(from, to) {
 }
 r1 <- mutate("P$prototype$col_shoe", "P$col_shoe")
 r2 <- mutate("P$prototype$coords$rel_col_shoe", "P$coords$rel_col_shoe")
-stopifnot(r1 != "PASSED (bad)", r2 == "values outside the prototype")
+r3 <- mutate("proto_rel_Y_cord <- P$prototype$coords$rel_Y_cord",
+             "proto_rel_Y_cord <- 0.5")
+stopifnot(r1 != "PASSED (bad)", r2 == "values outside the prototype",
+          r3 == "values outside the prototype")
 pass(sprintf(paste("mutation checks: step 2 with P$col_shoe as prototype",
-                   "width fails (%s); with the data scale fails (%s)"),
-             r1, r2))
+                   "width fails (%s); with the data scale fails (%s); with",
+                   "a leftover 0.5 for the prototype rel_Y_cord fails (%s)"),
+             r1, r2, r3))
 
 # a contour file one record short stops step 2 (A-053)
 s <- new_root()

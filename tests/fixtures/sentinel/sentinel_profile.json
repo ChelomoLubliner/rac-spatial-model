@@ -18,10 +18,10 @@
       ],
       "coords": {
         "divisor": 2,
-        "rel_col_shoe": 10,
-        "rel_row_shoe": 20,
-        "rel_x_cord": 0.25,
-        "rel_Y_cord": 0.5
+        "rel_col_shoe": 12,
+        "rel_row_shoe": 24,
+        "rel_x_cord": 0.3,
+        "rel_Y_cord": 0.6
       },
       "inputs": {
         "contacts": "data/contacts_sentinel.txt",
@@ -34,10 +34,10 @@
         "col_shoe": 44,
         "row_shoe": 66,
         "coords": {
-          "rel_col_shoe": 12.5,
-          "rel_row_shoe": 25,
-          "rel_x_cord": 0.25,
-          "rel_Y_cord": 0.5
+          "rel_col_shoe": 17.5,
+          "rel_row_shoe": 35,
+          "rel_x_cord": 0.35,
+          "rel_Y_cord": 0.7
         },
         "contour": "data/prototype_contour_sentinel.png",
         "mask": "data/prototype_mask_sentinel.png"
@@ -90,11 +90,11 @@
             15
           ],
           "n_points": 50,
-          "gaussian_sigma": 3,
-          "alpha": 0.015,
-          "beta_first": 10,
-          "beta_second": 0.1,
-          "gamma": 0.001
+          "gaussian_sigma": 2.5,
+          "alpha": 0.012,
+          "beta_first": 12,
+          "beta_second": 0.12,
+          "gamma": 0.0015
         },
         "write_html": false,
         "contour_out": "data/contour_sentinel.txt",
@@ -119,10 +119,10 @@
       ],
       "coords": {
         "divisor": 2,
-        "rel_col_shoe": 10,
-        "rel_row_shoe": 20,
-        "rel_x_cord": 0.25,
-        "rel_Y_cord": 0.5
+        "rel_col_shoe": 12,
+        "rel_row_shoe": 24,
+        "rel_x_cord": 0.3,
+        "rel_Y_cord": 0.6
       },
       "inputs": {
         "contacts": "data/contacts_sentinel.txt",
@@ -135,10 +135,10 @@
         "col_shoe": 44,
         "row_shoe": 66,
         "coords": {
-          "rel_col_shoe": 12.5,
-          "rel_row_shoe": 25,
-          "rel_x_cord": 0.25,
-          "rel_Y_cord": 0.5
+          "rel_col_shoe": 17.5,
+          "rel_row_shoe": 35,
+          "rel_x_cord": 0.35,
+          "rel_Y_cord": 0.7
         },
         "contour": "data/prototype_contour_sentinel.png",
         "mask": "data/prototype_mask_sentinel.png"
@@ -191,11 +191,11 @@
             15
           ],
           "n_points": 50,
-          "gaussian_sigma": 3,
-          "alpha": 0.015,
-          "beta_first": 10,
-          "beta_second": 0.1,
-          "gamma": 0.001
+          "gaussian_sigma": 2.5,
+          "alpha": 0.012,
+          "beta_first": 12,
+          "beta_second": 0.12,
+          "gamma": 0.0015
         },
         "write_html": false,
         "contour_out": "data/new_shoes/contour_sentinel_new.txt",

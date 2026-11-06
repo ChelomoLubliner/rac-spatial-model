@@ -5,23 +5,33 @@ A tiny synthetic dataset whose profile holds sentinel values, so that the
 behaviour tests (tests/python/test_sentinel_profile.py,
 tests/r/test_profile_sentinels.R) can show that each profile value reaches
 the outputs of the real code: a leftover OLD literal (307, 395, 387, 150,
-300, 0.25, 0.5, 8, 18, 100, 313, the snake init) would give other outputs
-or an error. The values differ from both real datasets and, where the
-real datasets coincide, from each other:
+300, 0.25, 0.5, 8, 18, 100, 313, the snake init and snake parameters)
+would give other outputs or an error. Every value differs from both real
+datasets (T2 review: the snake parameters and rel_x_cord / rel_Y_cord
+used to be the real ones, so a hard-coded copy went unnoticed) and, where
+the real datasets coincide, from each other:
   - 6 shoes of 40 x 60 px (W x H), fixed-stride records with CRLF;
-  - data coords at 20 px per unit (rel_col_shoe 10, rel_row_shoe 20,
-    rel_x_cord 0.25, rel_Y_cord 0.5); locations in the NEW raw format
-    (space-separated, no header, leading space, coordinates x 2: divisor 2);
-  - a prototype of 44 x 66 px at 25 px per unit (rel_col_shoe 12.5,
-    rel_row_shoe 25), so the prototype frame differs from the data frame
-    in size and in scale;
+  - data coords at 20 px per unit (rel_col_shoe 12, rel_row_shoe 24,
+    rel_x_cord 0.3, rel_Y_cord 0.6); locations in the NEW raw format
+    (space-separated, no header, leading space, coordinates x 2: divisor 2),
+    each RAC at the centre of the coordinate bin that the legacy aspix
+    formulas map to its pixel (rac_coords). A leftover 0.25, 0.5, 150 or
+    300 in a mapping changes the pixel or the 1/20 grid of the controls,
+    which the tests check;
+  - a prototype of 44 x 66 px at 25 px per unit (rel_col_shoe 17.5,
+    rel_row_shoe 35, rel_x_cord 0.35, rel_Y_cord 0.7), so the prototype
+    frame differs from the data frame in size and in scale;
   - shoe 4 has no RACs (shoes_without_racs [4]), shoe 5 is excluded
     (excluded_shoes [5]): analysis shoes 1, 2, 3, 6, contour records 1-4;
   - Python flips shoe 2 (python.contact_flip_shoes), R flips shoe 3
     (r.contact_flip_shoes): different on purpose, so that each language
     is shown to read its own list;
   - superposition threshold 2, snake center (30, 20), radii (25, 15),
-    50 points; R stamp threshold 2, sweep bound 40, 5 controls, seed 7.
+    50 points, Gaussian sigma 2.5, alpha 0.012, beta 12 (first snake) and
+    0.12 (second), gamma 0.0015 (real: 3, 0.015, 10, 0.10, 0.001; chosen so
+    that every snake still encloses its sole, and each value set alone to
+    the real one changes every snake); R stamp threshold 2, sweep bound
+    40, 5 controls, seed 7.
 Shoes 1, 2 and 3 carry a 4 x 4 "stamp" in the top-left corner (shoe 3's
 moves to the top right when R flips it), which the R sweep removes.
 
@@ -30,6 +40,7 @@ Run from the repo root: python tests/fixtures/make_sentinel.py [OUT_DIR]
 """
 
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -39,6 +50,14 @@ from PIL import Image
 W, H, N = 40, 60, 6                 # data frame of the fixture
 PW, PH = 44, 66                     # prototype frame of the fixture
 PROFILE = 'sentinel_profile.json'
+# data coords (20 px per unit) and prototype coords (25 px per unit)
+COORDS = {'divisor': 2, 'rel_col_shoe': 12, 'rel_row_shoe': 24,
+          'rel_x_cord': 0.3, 'rel_Y_cord': 0.6}
+PROTO_COORDS = {'rel_col_shoe': 17.5, 'rel_row_shoe': 35,
+                'rel_x_cord': 0.35, 'rel_Y_cord': 0.7}
+SNAKE = {'center_rc': [30, 20], 'radii_rc': [25, 15], 'n_points': 50,
+         'gaussian_sigma': 2.5, 'alpha': 0.012, 'beta_first': 12,
+         'beta_second': 0.12, 'gamma': 0.0015}
 # per shoe: (row shift, col shift, row radius, col radius, has stamp)
 SOLES = [(0, 0, 24, 12, True), (1, 0, 23, 12, True), (0, 1, 24, 11, True),
          (-1, 0, 24, 12, False), (0, -1, 23, 12, False),
@@ -83,11 +102,18 @@ def shoes():
 
 
 def rac_coords(row, col):
-    """Raw (x 2) coordinates whose R aspix pixel is (row, col), 1-based:
-    the centre of the pixel's bin (20 px per unit, x mirrored)."""
-    x = (25 - col + 0.5) / 20 - 0.25
-    y = (40 - row + 0.5) / 20 - 0.5
-    return 2 * x, 2 * y
+    """Raw (x divisor) coordinates whose R aspix pixel is (row, col),
+    1-based: the centre of the pixel's bin, from the inverse of the legacy
+    formulas with COORDS (x mirrored):
+      aspix_x = W - (floor((x + rel_x_cord) / delx) + not_rel_col)."""
+    c = COORDS
+    delx = 2 * c['rel_x_cord'] / c['rel_col_shoe']
+    dely = 2 * c['rel_Y_cord'] / c['rel_row_shoe']
+    kx = W - math.ceil((W - c['rel_col_shoe']) / 2) - col
+    ky = H - math.ceil((H - c['rel_row_shoe']) / 2) - row
+    x = (kx + 0.5) * delx - c['rel_x_cord']
+    y = (ky + 0.5) * dely - c['rel_Y_cord']
+    return c['divisor'] * x, c['divisor'] * y
 
 
 def profile_entry(dataset, suffix):
@@ -101,15 +127,13 @@ def profile_entry(dataset, suffix):
         'dataset': dataset, 'suffix': suffix,
         'col_shoe': W, 'row_shoe': H, 'num_shoe': N,
         'shoes_without_racs': [4], 'excluded_shoes': [5],
-        'coords': {'divisor': 2, 'rel_col_shoe': 10, 'rel_row_shoe': 20,
-                   'rel_x_cord': 0.25, 'rel_Y_cord': 0.5},
+        'coords': dict(COORDS),
         'inputs': {'contacts': 'data/contacts_sentinel.txt',
                    'locations': 'data/locations_sentinel.txt',
                    'locations_format': 'space_no_header',
                    'cross_check': None, 'sticker_masks': None},
         'prototype': {'col_shoe': PW, 'row_shoe': PH,
-                      'coords': {'rel_col_shoe': 12.5, 'rel_row_shoe': 25,
-                                 'rel_x_cord': 0.25, 'rel_Y_cord': 0.5},
+                      'coords': dict(PROTO_COORDS),
                       'contour': 'data/prototype_contour_sentinel.png',
                       'mask': 'data/prototype_mask_sentinel.png'},
         'r': {'contact_flip_shoes': [3], 'stamp_threshold': 2,
@@ -135,10 +159,7 @@ def profile_entry(dataset, suffix):
                   'dataCC_distance_temp', 'dataCC_distance', 'wald_test')}},
         'python': {'images_dir': 'images_new' if new else 'images',
                    'contact_flip_shoes': [2], 'superpose_threshold': 2,
-                   'snake': {'center_rc': [30, 20], 'radii_rc': [25, 15],
-                             'n_points': 50, 'gaussian_sigma': 3,
-                             'alpha': 0.015, 'beta_first': 10,
-                             'beta_second': 0.10, 'gamma': 0.001},
+                   'snake': dict(SNAKE),
                    'write_html': False,
                    'contour_out': ('data/new_shoes/contour_sentinel_new.txt'
                                    if new else 'data/contour_sentinel.txt'),
