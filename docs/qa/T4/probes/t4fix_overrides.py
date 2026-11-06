@@ -85,12 +85,12 @@ OVERRIDES = {
           'contour, up to 3 px deep): the snakes start inside the rim and '
           'no closing radius recovers it (radius 16 and 24 recover 1 px and '
           'keep the coverage flag); this ellipse (2 px lower, 1 px left, '
-          'radii +5 and +3) encloses the rim; elsewhere the forefoot does '
-          'not move, the left side of the arch and the upper heel runs 1 px '
-          'wider at the median (at most 3 px) and the right side stays '
-          'within 1 px on 91% of the rows (at most 2 px); the enlarged '
-          'ellipse (185, 128) / (167, 98) also encloses the rim but bulges '
-          '3-4 px into the empty space below the pad'),
+          'radii +5 and +3) encloses the rim; elsewhere every part of the '
+          'outline moves by at most 1 px at the median and at most 3 px '
+          '(the left side of the arch), the right edge within 1 px on 91% '
+          'of the rows; the enlarged ellipse (185, 128) / (167, 98) also '
+          'encloses the rim but bulges 3-4 px into the empty space below '
+          'the pad'),
     173: (R24, A102,
           'toe top-left not printed: radius 24 widens the toe top to the '
           'faint marks there; radius 10 runs a diagonal with a peak at the '
