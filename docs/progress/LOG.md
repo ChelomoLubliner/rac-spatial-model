@@ -1079,3 +1079,51 @@ Chronological; newest entry at the bottom. Each entry: what was done, results (r
 **Next.** T5 (R steps 1-6 on NEW): step 1 now reads the erase list (NEW only); the NEW contour exists. Open for people: A-096 (mask 18 vs the plan's 29) and A-094 (closing radius for NEW) for Shlomo; the residuals of A-095 (580's bar) if anyone wants a hand-drawn heel. Not done: a separate reviewer pass (the plan's independent look at 10% and the flagged shoes) belongs to the next workflow step.
 
 **Blockers.** None.
+
+## 2026-11-06 15:55, T4-snake review (reviewer:engineer)
+
+**Verdict: changes required** (engineering lens). The delivered outputs are correct and reproduce exactly. The blocking item is a test gap (finding 1): it needs tests only, no rebuild.
+
+**Verified by re-running** (`<scratch>/rev_t4_eng/`):
+- `bash tests/run_all.sh` at `1a69e26`: ALL PASS. 172 Python tests (3 skipped live checks), 14 R scripts, flake8, shellcheck, work tree unchanged; 10 min 18 s under heavy parallel load.
+- `regress_old.sh --steps 0,1` at `1a69e26`: ALL PASS. OLD contour = Tier B (`e18d50df...`), 1,556 intermediates equal, three Tier A CSVs and `shoe_codes.csv` byte-identical, live check passes. Step 0 1,515 s, step 1 159 s (load about 27).
+- **NEW step 0 rebuilt from HEAD** in an rsync copy (thesis venv on `/mnt/c`, `--qa --jobs 12`): contour sha256 `88d55933...` = the committed file.
+- **`qa_snake` rerun on that build** (`--metrics --sheets --flagged --crosscheck`): byte-identical to the committed files. That covers `snake_metrics_new.csv`, `sticker_erased_new.csv`, `crosscheck_2023_new.csv` and all 64 regenerated PNGs (52 sheets, 12 flagged).
+- **Re-derived independently:**
+  - Pass rates: 619/631 NEW, 365/386 OLD.
+  - The OLD band percentiles and the [553, 816] band.
+  - Erase list: 3,406 px, 1,647 of them in the mask.
+  - 2023 cross-check: 19,993 vs 19,960 RACs inside; corr 0.9803 (probe output identical).
+  - The 9 override reasons equal the final metrics.
+  - The OLD reference table matches the committed OLD contour (bbox and contour px, 386/386).
+- **Threshold study with 16 vs 1 BLAS thread:** the t = 18 mask equals the official one both ways (35,156 px).
+- **Repo state:** no OLD committed file changed. After `e758dab` only `qa_snake.py` changed (not imported by step 0 or 1). No CR in changed text files. No attribution lines.
+
+**Findings.**
+1. **Major: no test pins the NEW step-0 behaviours of T4 (A-035 not extended).**
+   - In a scratch copy I removed three things: the Python erase-list call in `contacts_data`, the per-shoe overrides in `active_contour_shoe`, and the closing before the first snake. `test_qa_snake`, `test_contour_new`, `test_sentinel_profile`, `test_snake_geometry` and `test_io_shoes` still pass (45 OK).
+   - The sentinel fixture has no closing, no override and `sticker_masks: null`. Only R's step 1 has an erase-list test.
+   - So the committed NEW contour can go stale without any test failing.
+   - Fix: give the sentinel fixture a closing radius, an override for one shoe and an erase rectangle, and assert that each changes the step-0 outputs (as `test_values_reach_outputs` does). Optionally add a NEW rebuild gate: step 0 in scratch vs the committed sha256, about 2.5 min.
+2. **Minor: the 97% target holds only with the relaxed tightness band (A-093).**
+   - With the task's literal 0.95: NEW passes 602/631 (95.40%), the accepted OLD contours 89.64%.
+   - The reason for the relaxation is sound; state it beside the headline.
+   - A-093's "NEW: 24 shoes" below 0.95 is stale (now 20).
+3. **Minor: `docs/qa/snake_qa_new.csv` is not in a `new` folder (rule 1).** It is also a hand copy that no code writes. Move it into a NEW folder or drop it.
+4. **Minor: `qa_snake --thresholds` runs the prototype snakes without `check_blas_threads`.** It made no difference here, but the guard belongs there.
+5. **Minor: doc slips.**
+   - "16 R scripts" (results doc section 1, LOG, report): the suite runs 14.
+   - A-094 and A-098 cite results sections 5 and 9; the right ones are 6 and 8.
+   - The RAC-coverage band is 0.9695 in the docs and 0.9696 in `BANDS`.
+   - The section 6 variant commands no longer reproduce the table: `t4_variant.py '{}'` now runs closing 10 plus the 9 committed overrides.
+6. **Minor: A-092's "reproducible anywhere on this numpy build" says more than was tested.**
+   - One thread removes the core-count effect. But OpenBLAS chooses its kernels by CPU at run time, and the snake amplifies 1e-8 differences (A-060).
+   - Say "on this machine", or pin `OPENBLAS_CORETYPE` and log it.
+   - The OLD gate relies on the 16 default threads, so `regress_old.sh` could check the logged count.
+7. **Nits:**
+   - Commit `8c5f6b9` (`test:`) also adds a feature (`--crosscheck`) and data.
+   - `qa_snake.py:961` hard-codes the OLD stamp threshold 8.
+   - Tests hard-code the NEW dimensions + 1 (256, 368, 632).
+   - `test_record_is_its_shoe` is circular: the table's bboxes come from the same records. `test_rac_coverage` is the real record = shoe check.
+   - With OLD, `--sheets` and `--thresholds` crash on the null `sheets_dir`.
+   - `--jobs > 1` crashes on Windows (no fork).
