@@ -299,30 +299,33 @@ check("step 3 GLMM", {
   stopifnot(inherits(glmm, "glmerMod"), glmm@optinfo$conv$opt == 0,
             is.null(glmm@optinfo$conv$lme4$messages),
             length(fixef(glmm)) == 25, ngrps(glmm) == n_shoes,
-            nobs(glmm) == nrow(dist), identical(basis_of(glmm), b_new))
-  bad <- fails_of(glmm_vs_csv(glmm, dist, b_new))
+            nobs(glmm) == nrow(dist))
+  bad <- fails_of(c(basis = identical(basis_of(glmm), b_new),
+                    glmm_vs_csv(glmm, dist, b_new)))
   if (!is.null(bad)) {
     stop("the step-3 GLMM was not fitted on dataCC_distance_new.csv (",
          bad, " differ): rerun NEW steps 3-6")
   }
   sprintf(paste("step 3 GLMM: converged, 25 fixed effects, %d groups, %d",
-                "rows; fitted on the committed CSV (y = n_Acc, groups = the",
-                "shoe codes, getME(X) = the step-3 design rebuilt from the",
-                "CSV); sigma^2 %.4f"),
+                "rows; fitted on the committed CSV (its basis = the knots of",
+                "the CSV, y = n_Acc, groups = the shoe codes, getME(X) = the",
+                "step-3 design rebuilt from the CSV); sigma^2 %.4f"),
           ngrps(glmm), nobs(glmm), as.numeric(VarCorr(glmm)$shoe))
 })
 check("step 3 CML", {
   cml <- readRDS(rac_model_path(P, "CML_MODEL"))
   stopifnot(inherits(cml, "coxph"), length(coef(cml)) == 24,
-            all(is.finite(coef(cml))), identical(basis_of(cml), b_new))
-  bad <- fails_of(cml_vs_csv(cml, dist, b_new))
+            all(is.finite(coef(cml))))
+  bad <- fails_of(c(basis = identical(basis_of(cml), b_new),
+                    cml_vs_csv(cml, dist, b_new)))
   if (!is.null(bad)) {
     stop("the step-3 CML was not fitted on dataCC_distance_new.csv (",
          bad, " differ): rerun NEW steps 3-6")
   }
   sprintf(paste("step 3 CML: 24 coefficients, %d events; fitted on the",
-                "committed CSV (status = n_Acc, strata = the shoe codes,",
-                "model.matrix = the step-3 design without the intercept)"),
+                "committed CSV (its basis = the knots of the CSV, status =",
+                "n_Acc, strata = the shoe codes, model.matrix = the step-3",
+                "design without the intercept)"),
           cml$nevent)
 })
 for (f in c("NEW_X_NS_XY", "CML_MODEL")) {
