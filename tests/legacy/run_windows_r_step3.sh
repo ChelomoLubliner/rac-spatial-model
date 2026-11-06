@@ -19,8 +19,12 @@
 # of the legacy literal MODEL_FEATURE <- "NEW_X_NS_XY"; the driver sets
 # RAC_MODEL_FEATURE=NEW_X_NS_XY.
 # The Windows R has no pandoc, so the Rmd runs through knitr::knit (code
-# and output, no HTML). The copy is on the Linux file system; Windows R
-# reaches it through \\wsl.localhost (wslpath -w). The copy has no model
+# and output, no HTML), by rac_win_knit of tests/lib/win_r.sh: with the
+# chunk option error = FALSE, so a chunk error fails the knit, and a
+# "## Error" line in the .md fails it too (T2 review; decision A-084;
+# knitr's default error = TRUE had turned chunk errors into text). The copy
+# is on the Linux file system; Windows R reaches it through \\wsl.localhost
+# (wslpath -w). The copy has no model
 # file, so the knit must write saved_models/NEW_X_NS_XY.rds; it is listed
 # in outputs_expected.txt and must exist and be newer than that list after
 # the knit (tests/lib/run_outputs.sh, decision A-067). The reference GLMM is
@@ -47,11 +51,12 @@ here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 source "$here/../lib/scratch.sh"
 # shellcheck source=../lib/run_outputs.sh
 source "$here/../lib/run_outputs.sh"
+# shellcheck source=../lib/win_r.sh
+source "$here/../lib/win_r.sh"
 repo=$rac_repo_root
 commit=${RAC_WINR_COMMIT:-79247d8}
-win_r=${RAC_WIN_RSCRIPT:-/mnt/c/Users/mehes/AppData/Local/Programs/R/R-4.4.3/bin/Rscript.exe}
-if [[ ! -x "$win_r" ]]; then
-  echo "run_windows_r_step3.sh: Windows Rscript not found: $win_r" >&2
+if [[ ! -x "$rac_win_rscript" ]]; then
+  echo "run_windows_r_step3.sh: Windows Rscript not found: $rac_win_rscript" >&2
   exit 2
 fi
 
@@ -86,34 +91,15 @@ if ! grep -qE '^MODEL_FEATURE <- ("NEW_X_NS_XY"|rac_model_feature\(\))' \
   exit 2
 fi
 
-# R on Windows takes forward slashes in UNC paths.
-win_path() {
-  local p
-  p=$(wslpath -w "$1")
-  printf '%s' "${p//\\//}"
-}
-wd=$(win_path "$run/repo/statistical_model")
-cat > "$run/step3_win.R" <<EOF
-Sys.setenv(RGL_USE_NULL = "TRUE", RAC_DATASET = "old",
-           RAC_MODEL_FEATURE = "NEW_X_NS_XY")
-Sys.unsetenv("RAC_PROFILE_FILE")
-options(rgl.useNULL = TRUE)
-setwd("$wd")
-t0 <- proc.time()[["elapsed"]]
-knitr::knit("re_model_shoe_std_3.Rmd", output = "../../step3_win.md", quiet = TRUE)
-cat(sprintf("knit seconds %.1f\n", proc.time()[["elapsed"]] - t0))
-cat(R.version.string, "| lme4", as.character(packageVersion("lme4")),
-    "| Matrix", as.character(packageVersion("Matrix")), "\n")
-EOF
-
 fit="$run/repo/$ref_path"
 rac_outputs_begin "$run" "repo/$ref_path"
 start=$(date +%s.%N)
 echo "start $(date --iso-8601=seconds)" > "$run/timing.txt"
 status=0
-# cd /mnt/c: Windows cannot start a process in a \\wsl.localhost folder.
-(cd /mnt/c && "$win_r" "$(win_path "$run/step3_win.R")") 2>&1 |
-  tr -d '\r' > "$run/logs/step3_win.log" || status=$?
+# writes step3_win.R, step3_win.md and logs/step3_win.log
+rac_win_knit "$run" step3 "$run/repo/statistical_model" \
+  re_model_shoe_std_3.Rmd RAC_DATASET=old RAC_MODEL_FEATURE=NEW_X_NS_XY ||
+  status=$?
 end=$(date +%s.%N)
 {
   echo "end $(date --iso-8601=seconds)"
@@ -133,7 +119,9 @@ if [[ $status -eq 0 && $written -eq 0 ]]; then
       "$fit" 2>&1
   } > "$run/compare.txt" || status=$?
 else
-  echo "no model written by this knit (knit exit $status)" > "$run/compare.txt"
+  echo "no comparison: knit exit $status, model written by this knit:" \
+    "$([[ $written -eq 0 ]] && echo yes || echo no);" \
+    "see logs/step3_win.log" > "$run/compare.txt"
   if [[ $status -eq 0 ]]; then status=1; fi
 fi
 echo "$status" > "$run/exit_status"
