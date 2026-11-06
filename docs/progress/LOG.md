@@ -1485,3 +1485,46 @@ The descriptions are in the results doc, section 8, and in `snake-qa.md`.
 - The task's 97% is reached only under the T4 bands (98.10%); under the A-099 triggers it is 95.40%, with every flagged shoe reviewed.
 
 **Blockers.** None.
+
+## 2026-11-06 21:40, T4-snake second review fixes review (reviewer:engineer)
+
+**Verdict: approve** (engineering lens). The thread and kernel guards are correct and sit on every code path that runs a snake. Every refusal comes before anything is written. The NEW gate now compares with HEAD, and its new failure rows fire. Nothing OLD changed, and every number I recomputed matches the docs. The findings below are minor and need no rebuild.
+
+**Verified by re-running** (`<scratch>/rv_eng_t4fix2/`; with the thesis venv itself, not the implementer's T1 copy; load 16-30 from the other reviews):
+- `tests/rebuild_new.sh --full --keep` at `088457d`: ALL PASS (1 thread, kernel Haswell; contour `f7703bcd...`, the 4 tables, cross-check, threshold table, 2 figures, 52 sheets and 29 flagged figures = HEAD).
+- **Negative gate** (the implementer showed only the PASS path): a clone with `sticker_erased_new.csv` changed in the work tree and 170's old `im_169_new.png` put back untracked. `--full` gives exactly two FAIL rows ("the work tree's copy differs from HEAD (uncommitted change)"; "flagged figures: the set ... ?? .../im_169_new.png"), exit 1, run folder kept.
+- `bash tests/run_all.sh` in the work tree at `088457d`: ALL PASS (184 Python tests, 3 skipped live checks; 14 R scripts; flake8; shellcheck; work tree unchanged).
+- **Refusals** in a clean clone, all exit 2 with the reason, the clone left clean (no `images_new/`, contour unchanged):
+  - under `OPENBLAS_CORETYPE=Sandybridge`: NEW `main --steps snake`, `main --steps create` and `qa_snake --thresholds 18`, each naming the kernel;
+  - OLD `qa_snake --metrics --crosscheck`, refused before `--metrics` writes.
+- **Mutants** (12, in a fresh clone, against the targeted tests): 11 caught, and the clone was left clean every time.
+  - Caught: the check removed from `run()` (step 0a then writes only into the test's temp folder, which the test sees), from `prototype_mask_from` and from `active_contour_shoe`; the kernel part of `check_blas_threads`; the CLI pre-check; the step-0 fork guard; the `--crosscheck` refusal; `blas_kernel` not passed to `Profile`; its validation; the prune pattern without the suffix; the config pin changed to Zen.
+  - Not caught: finding 1.
+- **Numbers re-derived:**
+  - My own record reader: only records 170 (864 px) and 186 (85 px) differ from `0af52b05...`. 170's fill: +893 / -62 px, right edge within 1 px on 91.14% of the rows, arch at most 3 px. 186: at most 2 px, on its right edge only.
+  - From the committed tables: 602 pass; 29 flagged (24 `ok_after_review`, 5 `override`); 619 under the T4 bands; 589 with the literal 0.95; 62 review rows (28/3/7/9 classed, 15 unclassed).
+  - My own sequential erase from the raw file: all 49 per-rectangle counts equal `sticker_erased_new.csv` (4,149 px, 2,013 in the mask, 11 shoes). 186's new rectangle holds 6 contact px, 3 of them in the mask. 186 keeps exactly 13 cleaned px outside its fill (rows 259-263).
+  - Ellipse crossing before the fix (previous contour, the profile ellipse for every shoe): 43 shoes, 516 px, 159 outside (toe 29 shoes / 413 / 82, heel 15 / 103 / 77, the 15 named shoes). After, the probe on the final run: 42 shoes, 481 px, 127 outside on 27 shoes (toe 82, heel 45).
+  - `t4fix_overrides.py` rerun: byte-identical to the committed 24-row file (A-109). The 13 corrected tags match the history (9 overrides at `1771960`, 15 added at `405da3a`).
+- **Repo state:**
+  - The Tier A, `old_baseline` and `old_added_t2` checksums pass. Raw inputs are unchanged since `79247d8`; no R, `tools/`, baseline or OLD output changed since `015551b`.
+  - Every new artifact lies in a NEW folder with `_new`; the probes write only to argv paths or `snake_qa_path`.
+  - No CR outside the CRLF NEW contour. No attribution lines: the two grep hits are "regenerated without" and ".claude/".
+
+**Findings** (all minor):
+1. **The `prune_flagged` call in `qa_snake.main` is not tested.**
+   - Removing its two lines passes all 37 `test_qa_snake` tests. The implementer's prune mutant hit the function body (caught by `test_prune_flagged`), not the call.
+   - `rebuild_new.sh --full` cannot catch it: it empties the flagged folder in its copy before the run, so pruning never has anything to remove. Only `Files.test_flagged_figures` would notice, later, once a stale figure sits in the work tree.
+   - Fix: in `--full`, keep HEAD's folder in the copy and plant one stale `im_<unflagged>_new.png` that must be gone afterwards; or unit-test `main(['--flagged'])` with `load_run` and `flagged_figure` mocked.
+2. **`dd26bb8` is a red commit.** `test_qa_snake.Profiles.test_new_values` fails there: its old assertion that no override changes the ellipse meets 170's row. It passes again at `586c18a`, and `437ed27` passes. The series is not bisect-clean. No rewrite needed; next time, commit a data change together with its test.
+3. **Stale reason text on two older 186 rows.**
+   - Rows 212-216 x 187-190 and 260-263 x 182-184 (T4 review) say "one pixel inside the mask". The committed table, and my recount, give 0 and 3 in the final mask.
+   - The text seems to date from the T4-run mask (35,156 px, per the probe's docstring). This pass rewrote that probe and 186's frame-line account but kept the text.
+   - Fix: reword it in `t4fix_erase_list.py` and the list, and regenerate the erase table (the contour does not change).
+4. **Nit:** `t4fix2_ellipse_cross.py` hard-codes the toe/heel split as NEW rows (0-based 120 and 250 of 367), but it loads `load_profile()` (default OLD); its siblings pin `load_profile('new')`. Pin it too, or derive the split from `p.H`.
+
+**Note for Shlomo** (A-108, not a defect): the kernel pin lives in the shared profile. On a machine whose OpenBLAS picks another kernel, every NEW snake path refuses, even in a scratch copy (exploration, `--thresholds`, probes). That protects the committed contour as intended. If co-authors need NEW runs on other machines, refusing only a write of the committed contour would protect it just as well.
+
+**Not verified:** the OLD step-0 and steps 1-6 gates (the reproducibility reviewer is running them), the venv-wind runs, the 90/37 split of the 127 px, and the visual judgements (vision lens).
+
+**Times:** `rebuild_new.sh --full` 17 min 43 s (step 0 327 s, metrics 129 s, figures 366 s, thresholds 136 s, overrides figure 96 s); the negative `--full` 11 min 34 s; `run_all.sh` 10 min 48 s; 12 mutants about 13 min; the ellipse probe 4 min 37 s; the override writer 2 min 8 s.
