@@ -30,7 +30,7 @@ R_MODELS = ('NEW_X_NS_XY', 'CML_MODEL')
 R_FIGURES = ('NEW_X_NS_XY_SHOE', 'CML_MODEL_SHOE', 'CI_shoe_cuts',
              'CI_cut_110', 'CI_cut_190', 'CI_cut_250', 'pixel_inten_JASAup',
              'difference_random_cml')
-# OLD outputs added by T2 (not committed before T2).
+# OLD outputs added by T2 (committed in T2b and T2e).
 OLD_T2_FILES = {'processed_data/shoe_codes.csv',
                 'processed_data/wald_test.csv'}
 RAC_VARS = ('RAC_DATASET', 'RAC_PROFILE_FILE', 'RAC_MODEL_FEATURE',
@@ -127,12 +127,14 @@ class Old(unittest.TestCase):
                          'model_images/CI_cut_110.pdf')
 
     def test_old_outputs_are_the_committed_files(self):
+        """Every OLD output of the R steps and the contour is a tracked
+        file: the committed ones and the two that T2 added."""
         tracked = tracked_files()
         r_files = {v for k, v in all_outputs(self.p).items()
                    if k.startswith(('r.paths.', 'model:', 'figure:'))}
         r_files.add(rel(self.p.contour_out))
-        self.assertEqual(r_files - tracked, {PurePosixPath(x)
-                                             for x in OLD_T2_FILES})
+        self.assertEqual(r_files - tracked, set())
+        self.assertTrue({PurePosixPath(x) for x in OLD_T2_FILES} <= r_files)
 
     def test_prototype_frame(self):
         p = self.p
