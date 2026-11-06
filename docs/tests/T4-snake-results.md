@@ -2,16 +2,18 @@
 
 **Date:** 2026-11-06. **Task:** T4-snake (plan task T4). **Branch:** `feature/new-shoes-pipeline`. **Commits:** `1771960` (code, profile, erase list, overrides, tests), `e758dab` (NEW contour and QA outputs), `8c5f6b9` (contour tests, 2023 cross-check), then the docs commit. Decisions A-091 to A-098 (`docs/decisions.md`). Visual review: `docs/qa/snake-qa.md` (NEW section). Every number below is real output of the named command; `<scratch>` = `/tmp/claude-1000/-home-mehes-projects-rac-spatial-model/1d789329-e60a-4147-af28-9c8214affef3/scratchpad`, `VPY` = the thesis venv copied to the Linux filesystem in T1 (`<scratch>/t1/venv_copy/bin/python`, Python 3.12.3, the same packages as the thesis venv on `/mnt/c`; the official contour was rebuilt with the `/mnt/c` interpreter byte for byte, section 8).
 
+> **Revised by the T4 review fixes (2026-11-06):** the contour, the erase list, the overrides, the QA bands and the review file changed after the three T4 reviews; the current state and its evidence are in `docs/tests/T4-review-fixes-results.md` (contour `0af52b05...`; 601 of 631 pass the stricter bands of A-099, the other 30 reviewed). The numbers below are the T4 state, with the factual corrections of the review marked *(corrected)*.
+
 ## 1. Summary
 
 | Item | Result |
 |---|---|
 | NEW contour | `data/new_shoes/contour_Active_Contour_new.txt`, 631 records (no shoe skipped or excluded), CRLF stride 93,587, sha256 `88d559334a8c5f7b...` |
-| QA pass rate | **619 of 631 shoes (98.10%) pass every band** (target >= 97%); the 12 flagged shoes are reviewed: 1 `override` (shoe 8, also on the fallback), 11 `ok_after_review`; none excluded |
+| QA pass rate | **619 of 631 shoes (98.10%) pass every band** (target >= 97%); the 12 flagged shoes are reviewed: 1 `override` (shoe 8, also on the fallback), 11 `ok_after_review`; none excluded. *(corrected)* The 98.10% holds only with the tightness band relaxed to the OLD p1 (A-093): with the task's literal 0.95, 602 of 631 pass (95.40%), the accepted OLD contours 89.64% (A-106) |
 | What changed for NEW only | one OpenBLAS thread (A-092); first snake on the cleaned shoe closed with a disk of radius 10 (A-094); erase list of 25 frame-artefact rectangles on 8 shoes (A-095); cleaning mask from >= 18 shoes, not 29 (A-096); closing radius 24 on 9 shoes (A-097); init ellipse = the 2023 values (A-019 confirmed) |
 | Stickers | no police-type sticker on any NEW print; frame artefacts overlapping the mask erased (8 shoes), the rest removed by the cleaning; none survives in a cleaned shoe or a contour (looked at: all 13 cleaned and 13 final-snake sheets) |
 | OLD regression | `regress_old.sh --steps 0` ALL PASS (contour = Tier B, 1,556 intermediates = Tier B, live check) and `--steps 1` ALL PASS (three Tier A CSVs and `shoe_codes.csv` byte-identical), both at `e758dab` |
-| Tests | `bash tests/run_all.sh` ALL PASS at `8c5f6b9`: 172 Python tests (3 skipped live checks), 16 R scripts, flake8, shellcheck, work tree unchanged |
+| Tests | `bash tests/run_all.sh` ALL PASS at `8c5f6b9`: 172 Python tests (3 skipped live checks), 14 R scripts *(corrected: the T4 text said 16)*, flake8, shellcheck, work tree unchanged (the engineer's and the reproducibility reviewer's runs at `1a69e26` pass too; in a fresh clone 4 skips) |
 | Platform | a venv-wind (Windows) build of the same commit differs in 13 of 631 records (mean distance at most 1.24 px, max 3.6 px); everything before the snake is identical (A-098) |
 
 ## 2. The first NEW run (provisional profile) and the infrastructure
@@ -66,16 +68,21 @@ NEW R mask t 13 28948 px; count>=t 28949
 
 ## 3. QA metrics and bands (A-093)
 
-`contour_algorithm/qa_snake.py`, from the step-0 outputs of `--qa` (nothing recomputed): coverage (cleaned contact inside the final snake's polygon), `coverage_fill` (inside the record's row-span fill), `coverage_r` (R's contact surface), RAC coverage, tightness (polygon / convex hull of the cleaned contact), self-intersections, total turning and largest turn, gap and cut distances, contour pixels, share outside the mask, border, bounding box. Bands: coverage >= 0.99; tightness in [0.9047, 1.15]; no self-intersection; turning <= 4.4622; largest turn <= 31.46 degrees; contour pixels in [553, 816]; no border contact; `coverage_fill` >= 0.9886; RAC coverage >= 0.9695; outside the mask <= 0.3393.
+`contour_algorithm/qa_snake.py`, from the step-0 outputs of `--qa` (nothing recomputed): coverage (cleaned contact inside the final snake's polygon), `coverage_fill` (inside the record's row-span fill), `coverage_r` (R's contact surface), RAC coverage, tightness (polygon / convex hull of the cleaned contact), self-intersections, total turning and largest turn, gap and cut distances, contour pixels, share outside the mask, border, bounding box. Bands: coverage >= 0.99; tightness in [0.9047, 1.15]; no self-intersection; turning <= 4.4622; largest turn <= 31.46 degrees; contour pixels in [553, 816]; no border contact; `coverage_fill` >= 0.9886; RAC coverage >= 0.9696 *(corrected from 0.9695)*; outside the mask <= 0.3393.
 
-**OLD reference** (the committed contour; WSL snakes for the polygon metrics), written in a scratch copy:
+**OLD reference** (the committed contour; WSL snakes for the polygon metrics), written in a scratch copy. *(corrected: the exact sequence, with the restore step that the table needs to rebuild byte for byte, as the reproducibility review verified)*:
 ```bash
+# a scratch copy of the tree (no .git, images*/, logs/); the committed contour deleted, OLD step 0 with --qa (serial, 16 threads)
+rm data/contour_Active_Contour.txt
+RAC_DATASET=old MPLBACKEND=Agg $VPY -B -m contour_algorithm.main --qa
+# the committed (Tier A) contour put back: WSL step 0 writes Tier B, 30 records differ (A-060)
+git -C <repo> show 79247d8:data/contour_Active_Contour.txt > data/contour_Active_Contour.txt
 cd <scratch>/t4/old_qa/repo && RAC_DATASET=old MPLBACKEND=Agg $VPY -B -m contour_algorithm.qa_snake --metrics --jobs 14
 ```
 ```
 old: 386 shoes, 21 flagged, 365 pass every band (94.56%)
 ```
-OLD percentiles used by the bands (`docs/qa/T4/old/snake_metrics.csv`): `coverage_fill` p1 0.9886, RAC coverage p1 0.9695, outside the mask p99 0.3393, tightness p1 0.9047, turning p99 4.4622, largest turn p99 31.458. The accepted OLD contours fall below the task's tightness 0.95 on 27 shoes (minimum 0.848: waisted soles whose contour follows the arch), hence the OLD p1 as the low end; the task's 0.95 count is reported beside it.
+OLD percentiles used by the bands (`docs/qa/T4/old/snake_metrics.csv`): `coverage_fill` p1 0.9886, RAC coverage p1 0.969545 *(corrected: the band in `BANDS` is 0.9696, the text said 0.9695)*, outside the mask p99 0.3393, tightness p1 0.9047, turning p99 4.4622, largest turn p99 31.458. The accepted OLD contours fall below the task's tightness 0.95 on 27 shoes (minimum 0.848: waisted soles whose contour follows the arch), hence the OLD p1 as the low end; the task's 0.95 count is reported beside it.
 
 ## 4. Prototype cleaning mask: 18 vs 29 (A-096)
 
@@ -107,7 +114,7 @@ PASS step 1 applies the erase list before the stamp mask and the RACs: shoe 1 lo
 
 ## 6. Snake variants (A-094)
 
-Every variant on all 631 NEW shoes, bands of section 3 (`OPENBLAS_NUM_THREADS=1 T4=<scratch>/t4 $VPY -B docs/qa/T4/probes/t4_variant.py NAME 'JSON' 14 [old]`; NAME/JSON as in the table; `_threshold` builds another mask in scratch). Lines copied from each `summary.txt`:
+Every variant on all 631 NEW shoes, bands of section 3 (`OPENBLAS_NUM_THREADS=1 T4=<scratch>/t4 $VPY -B docs/qa/T4/probes/t4_variant.py NAME 'JSON' 14 [old]`; NAME/JSON as in the table; `_threshold` builds another mask in scratch). *(corrected)* The table records the exploration state: the probe applies the JSON to the profile's snake through `snake_params`, so at HEAD `'{}'` runs closing 10 with the committed overrides; to rerun the legacy rows use `{"first_closing_radius": 0}` and a profile without `inputs.snake_overrides`. Lines copied from each `summary.txt`:
 
 | Images | Variant | Pass | Flagged | coverage < 0.99 | tightness < 0.95 | self-int |
 |---|---|---|---|---|---|---|

@@ -21,9 +21,12 @@ RAC_DATASET=new python -m contour_algorithm.qa_snake [--metrics] [--sheets] [--f
 
 `--qa` also saves the initial ellipse and both snakes of every shoe and of the prototype (`saved/snake_points`,
 `saved/prototype_snake_points`), the input of `qa_snake`; `--jobs N` runs the shoe snakes in N forked processes
-(bit-identical to one process). Without them the outputs are the legacy ones. The NEW profile runs numpy's OpenBLAS
-with one thread (`python.blas_threads`; the snake depends on the thread count, decision A-092): `main` sets it and
-the snake step checks it.
+(bit-identical to one process; refused with exit 2 where the platform has no fork, i.e. Windows). Without them the
+outputs are the legacy ones. The NEW profile runs numpy's OpenBLAS with one thread (`python.blas_threads`; the snake
+depends on the thread count, decision A-092): `main` sets it and the snake step checks it; the step-0 log names the
+thread count and the CPU kernel OpenBLAS chose (`numpy OpenBLAS kernel: Haswell` here; A-103). `qa_snake` refuses
+`--sheets` and `--thresholds` for a profile without a sheets folder (OLD), checks the thread count before the
+threshold study, and with `--metrics` also writes the task's copy `docs/qa/sheets_new/snake_qa_new.csv` (A-104).
 
 `RAC_DATASET` is `old` (default; empty means old) or `new`. Every dimension, count, threshold,
 snake parameter and path comes from that dataset's profile: OLD writes the legacy names under
@@ -49,7 +52,7 @@ The CLI refuses, with exit 2 and before writing anything:
 | `active_contour_snake.py` | 0c | The two-pass snake of each shoe; the contour file (one record per analysis shoe) |
 | `distance_extremities.py` | 0d | Pixel (COL, ROW) of every RAC (`aspix_x`, `aspix_y`, as in R) |
 | `stickers.py` | 0a | The profile's erase list (`inputs.sticker_masks`, NEW only): rectangles of frame artefacts erased from the stored records when they are read (R does the same in step 1, `statistical_model/R/io.R`; A-095) |
-| `qa_snake.py` | T4 | Snake QA: per-shoe metrics and flag bands (A-093), contact sheets, QA figures, the mask threshold study, the 2023 cross-check, the Python port of the R stamp mask |
+| `qa_snake.py` | T4 | Snake QA: per-shoe metrics and flag bands (A-093; the absolute triggers `rac_out_max_px`, `contact_out_max_px`, A-099), the review file with its classes (A-101), contact sheets, QA figures, the mask threshold study, the 2023 cross-check, the Python port of the R stamp mask |
 | `main.py` | | The CLI above |
 
 ## Regression (OLD)
@@ -62,12 +65,14 @@ The ported step 0 with the OLD profile reproduces, on WSL, the T1 rerun of the v
 `test_snake_geometry.py`, `test_locations.py`, `test_sentinel_profile.py` (the profile values reach
 the outputs on a tiny fixture, A-035).
 
-## NEW profile (T4, decisions A-092 to A-097)
+## NEW profile (T4, decisions A-092 to A-097; T4 review fixes, A-099 to A-106)
 The NEW snake differs from the legacy one in four profile values, all inactive for OLD: one OpenBLAS thread;
 `snake.first_closing_radius` 10 (the first snake runs on the cleaned shoe closed with a disk of radius 10, so separate
 heel pads and lugs form one silhouette; the image of the second snake is unchanged); the cleaning mask from the shoes in
-contact on >= 18 of 631; per-shoe overrides (`inputs.snake_overrides`: closing radius 24 for 9 shoes). Every NEW contour
-is the snake of the cleaned shoe as for OLD; 619 of 631 pass every QA band (`docs/qa/snake-qa.md`).
+contact on >= 18 of 631; per-shoe overrides (`inputs.snake_overrides`: closing radius 24 for 22 shoes, 16 for one).
+The erase list (`inputs.sticker_masks`, 48 rectangles on 11 shoes) removes frame artefacts and debris before anything
+else. Every NEW contour is the snake of the cleaned shoe as for OLD; 601 of 631 pass every QA band and the other 30 are
+reviewed (`docs/qa/snake-qa.md`). `tests/rebuild_new.sh` rebuilds the committed contour and QA tables in a scratch copy.
 
 ## Known issues kept as they are (plan, known issues)
 - K1: the thesis flip of image 8 was dead code (`FOLDER` never equalled `'Images/Old_Shoes/'`), so
