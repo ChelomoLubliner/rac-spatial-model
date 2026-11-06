@@ -623,3 +623,29 @@ Chronological; newest entry at the bottom. Each entry: what was done, results (r
 **Open.** A-055 (vcov method for T5/T6) and A-060 (platform of the official NEW contour) are still proposals. Freezing venv-wind's base (A-071) needs the user.
 
 **Blockers.** None.
+
+## 2026-11-06 06:30, T2-profiles (implementer), done
+
+**What.** Dataset profiles for the whole pipeline (plan T2, order T2c, T2a, T2d, T2b, T2e of A-064), plus the optional vectorized step 2 and two fixes found on the way. Commits: `9adc036` and `6c3488f` (T2c: three unused modules dropped, A-073; 106 flake8 findings fixed, each module the same Python AST as its verbatim blob), `12e29d8` (T2a: `config/datasets.json`, `contour_algorithm/profiles.py`, `statistical_model/R/profile.R`), `69dc980` (T2d: the Python step 0 driven by the profile; `io_shoes`, `locations`, the CLI with the A-049 and A-075 refusals), `012753f` (T2b: the six Rmds and `config.R` driven by `P`; `tools/run_pipeline.sh`, `tests/regress_old.sh`, sentinel fixture and tests, no-hardcoding scans), `82c1661` (T2e: manual Wald in step 5, `processed_data/wald_test.csv`), `053b081` (`tests/legacy/run_windows_python_step0.sh`, the Tier A gate of step 0), `c9d782b` (vectorized step 2, default after its proof, A-076), `cf740fa` (CSVs through a binary connection, A-080), `ed68998` (the gate never chains step 0 into steps 2-6, A-081), then the docs commit. Decisions A-073 to A-081; plan Revision 6 (F45-F49). Commands and real outputs: `docs/tests/T2-profiles-results.md`.
+
+**Results.**
+- OLD unchanged: no committed file changed (24/24 Tier A checksums in every suite run). New OLD files: `processed_data/shoe_codes.csv` (code -> shoe) and `processed_data/wald_test.csv` (W = 428.693335001072 from the committed GLMM, vcov = the stored Hessian, W_rx 427.7674).
+- Step 0 (ported): WSL = Tier B (contour `e18d50df...` with CRLF, all 1,556 intermediates, RAC-pixel CSV); venv-wind (Python 3.13.14, Store 3.13.3824.0) = **Tier A** contour `ca8a07f2...` from the raw contacts, and all 387 snakes = the thesis run of 2025-11-13; the OLD gallery is byte-identical on both platforms.
+- Step 1: Tier A CSVs written directly (CRLF from the profile); under the Windows R too (after A-080).
+- Step 3 (refactored): Windows R 4.4.3 / lme4 1.1-37 reproduces the committed GLMM in 27/27 fields.
+- Step 5: `W = 428.6933, df = 24, p = 9.43e-76` on the committed models without car; with car (Windows R) `W_car = 428.6933`.
+- Vectorized step 2: both OLD CSVs = Tier A, 20-51 s instead of 19-23 min; identical to the legacy loops also on the WSL-contour chain and on the sentinel fixture.
+- NEW smoke test (scratch only): `RAC_DATASET=new` step 1 on the real NEW data wrote only `processed_data/new/*_new.csv` and `logs/*/new`: 83,090 rows = 631 x 100 + 19,990 case pixels (plan F2), contact px p5/p50/p95 4,864.5 / 8,921 / 14,284.5.
+- Gate: `tests/regress_old.sh --steps 0-6` ALL PASS at `ed68998` (step 0 = Tier B; steps 1-6 from the committed inputs: CSVs = Tier A, models `identical()` to Tier B in all 22 fields, 8/8 normalized PDFs = Tier B, W = 427.7804472165 = Tier B, the three live checks pass); `bash tests/run_all.sh old` ALL PASS (91 Python tests, 13 R scripts, flake8 46 files, shellcheck 12).
+- Mistake caught and fixed: my first two full gates chained step 0 into steps 2-6 and failed from step 2 on (2,722 rows of the 29 shoes whose WSL contour differs, A-060); the gate now runs `--steps 0` and `--steps 1-6` separately (A-081). Also fixed: `rac_profile()`'s default root came from the global environment (config.R passes it now); Windows text mode turned the profile's `\n` into CRLF (A-080).
+- Looked at: the venv-wind gallery sheet 1 (stickers beside the toe red and outside every contour, K1 strip on shoe 9, partial print 11), the sentinel fixture and its step-0 outputs (snakes enclose the soles, shoe 2 mirrored, stamps outside the mask and contours).
+
+**Timings (s).** Idle machine: ported step 0 378.6 (create 2.6, contour 20.3, snake 353.2; legacy 509 with plotly), step 1 110.1, vectorized step 2 20.4-22.1 (legacy 1,134-1,387 in T1; 1,193 in a loaded gate), step 5 24.4; final gate: step 0 340.0, step 1 103.1, step 2 20.4, GLMM 245.9, CML 202.3, step 4 13.0 and 12.9, step 5 23.0, step 6 18.1. Under load (three gates at once): step 0 708-979, venv-wind step 0 920.2, Windows R step 3 832. Fast suite `bash tests/run_all.sh old` about 2.6 min.
+
+**Side effects outside the repo.** Only `<scratch>/t2/` (run folders, logs, probes). Windows Python and R wrote only there; the thesis repo was only read (`active-contour_all.npy` by `test_io_shoes` and the Windows runner).
+
+**Next.** T3 (NEW readers, pixel calibration, census, overlap screen). The NEW profile values marked provisional (coords, stamp threshold 13, superposition threshold 29, snake init) are T3/T4 decisions. T5 still owes the NEW legacy-vs-vectorized step-2 check (2,000 NEW rows; needs the NEW contour).
+
+**Open.** A-055 (vcov method), A-060 (platform of the official NEW contour) stay proposals; freezing venv-wind's base (A-071) needs the user.
+
+**Blockers.** None.
