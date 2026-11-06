@@ -86,6 +86,13 @@ for (i in 1:num_shoe) {
   )
 }
 
+#Stickers and frame artefacts that overlap the prototype region are erased from the stored records first,
+#exactly as the Python step 0 does (profile inputs.sticker_masks; NEW only, OLD has none; decision A-095)
+sticker_masks <- rac_read_sticker_masks(P)
+if (!is.null(sticker_masks)) {
+  data <- rac_apply_sticker_masks(data, sticker_masks)
+}
+
 #Left shoes should be mirrored as all other shoes (OLD: shoe 9, compare image(data[[8]]) and image(data[[9]]);
 #the OLD contour of shoe 9 is not mirrored, known issue K1)
 for (i in P$r$contact_flip_shoes) {

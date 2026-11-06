@@ -1,0 +1,26 @@
+shoe,row0,row1,col0,col1,reason
+148,1,29,1,255,thin frame line (plate or paper edge) across the top above the toe; it touches the toe's top row
+148,30,30,101,106,left end of the same frame line inside the mask
+149,1,31,1,255,thin tilted frame line across the top above the toe
+186,1,30,1,255,double frame line across the top above the toe
+186,31,31,96,108,left end of the frame lines inside the mask
+186,31,31,140,156,right end of the frame lines inside the mask
+186,32,32,96,102,left end of the frame lines inside the mask
+186,32,32,146,156,right end of the frame lines inside the mask
+186,332,367,1,255,frame line along the bottom below the heel
+580,1,36,1,255,solid band with a straight edge across the top above the toe (the toe starts at row 41)
+580,317,326,168,255,tip of the solid wedge right of the heel inside the mask
+580,327,334,159,255,solid wedge and straight bar at the heel's lower right
+580,328,334,86,108,straight bar at the heel's lower left (same design 581 and 583: heel bottom near row 333)
+580,335,367,1,255,straight bar below the heel
+582,1,36,1,255,thin tilted frame line with a small wedge across the top above the toe
+585,335,335,76,96,thin tilted frame line under the heel
+585,336,336,86,126,thin tilted frame line under the heel
+585,337,337,119,161,thin tilted frame line under the heel
+585,338,338,151,167,thin tilted frame line under the heel
+586,1,36,1,255,thick textured band across the top above the toe (same design 587: toe from row 37)
+586,37,42,86,104,band left of the toe where it merges with the toe tip
+586,37,42,142,171,band right of the toe where it merges with the toe tip
+586,43,46,86,98,band remnants left of the toe
+586,43,46,157,171,band remnants right of the toe
+589,1,26,126,151,tip of the wedge at the top right inside the mask

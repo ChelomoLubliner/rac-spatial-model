@@ -2,11 +2,17 @@
 
 Usage, from the repository root:
   RAC_DATASET=old|new python -m contour_algorithm.main \\
-      [--steps create,contour,snake,distance] [--html]
+      [--steps create,contour,snake,distance] [--html] [--qa] [--jobs N]
 
 The dataset comes from RAC_DATASET (default old; plan section 4.1), every
 value and path from its profile (config/datasets.json). --html writes the
-per-shoe plotly views (A-017: off by default, 3.6 GB for OLD).
+per-shoe plotly views (A-017: off by default, 3.6 GB for OLD). --qa also
+saves the initial ellipse and both snakes of every shoe and of the
+prototype (saved/snake_points, saved/prototype_snake_points; the input of
+contour_algorithm.qa_snake, T4). --jobs N runs the shoe snakes in N forked
+processes (same results as one process, checked by
+tests/python/test_qa_snake.py). Without --qa and --jobs the outputs are
+the legacy ones (the OLD regression of tests/regress_old.sh).
 
 Refused (exit 2, before anything is written):
   - RAC_PROFILE_FILE set: it is a test hook; a fixture profile must never
@@ -37,7 +43,7 @@ def make_folders(profile, html):
     profile.contour_out.parent.mkdir(parents=True, exist_ok=True)
 
 
-def run(profile, steps=STEPS, html=None, log=print):
+def run(profile, steps=STEPS, html=None, log=print, qa=False, jobs=1):
     """Run the given steps of step 0 in order; return {step: seconds}."""
     # imported here, so that the refusals of main() need no numpy, and
     # with a headless matplotlib backend (figures of step 0c)
@@ -52,11 +58,11 @@ def run(profile, steps=STEPS, html=None, log=print):
             continue
         start = time.monotonic()
         if step == 'create':
-            create_files_shoes.main(profile)
+            create_files_shoes.main(profile, qa=qa)
         elif step == 'contour':
             contour.main(profile, html=html)
         elif step == 'snake':
-            active_contour_snake.main(profile)
+            active_contour_snake.main(profile, jobs=jobs, qa=qa)
         else:
             distance_extremities.main(profile, html=html)
         seconds[step] = time.monotonic() - start
@@ -73,6 +79,17 @@ def parse_steps(text):
     return steps
 
 
+def positive_int(text):
+    try:
+        value = int(text)
+    except ValueError:
+        value = 0
+    if value < 1:
+        raise argparse.ArgumentTypeError(f'--jobs takes a positive integer, '
+                                         f'not {text!r}')
+    return value
+
+
 def main(argv=None):
     if env('RAC_PROFILE_FILE', None) is not None:
         print('contour_algorithm.main: RAC_PROFILE_FILE is set; it is a test '
@@ -85,6 +102,11 @@ def main(argv=None):
                         help='comma list of ' + ','.join(STEPS))
     parser.add_argument('--html', action='store_true',
                         help='also write the plotly HTML views')
+    parser.add_argument('--qa', action='store_true',
+                        help='also save the initial ellipses and snakes '
+                             '(input of contour_algorithm.qa_snake)')
+    parser.add_argument('--jobs', type=positive_int, default=1,
+                        help='forked processes for the shoe snakes')
     args = parser.parse_args(argv)
     try:
         profile = load_profile()
@@ -98,9 +120,14 @@ def main(argv=None):
               'overwritten in place. Run tests/regress_old.sh (a scratch '
               'copy), or delete the file first.', file=sys.stderr)
         return 2
+    if profile.blas_threads is not None:
+        # before numpy is imported (run() imports it): the snake depends on
+        # the OpenBLAS thread count (A-092); OLD keeps the library default
+        os.environ['OPENBLAS_NUM_THREADS'] = str(profile.blas_threads)
     print(f'dataset {profile.dataset}: {profile.num_shoe} shoes of '
           f'{profile.W} x {profile.H} px, profile {profile.file}')
-    run(profile, args.steps, html=args.html or profile.write_html)
+    run(profile, args.steps, html=args.html or profile.write_html,
+        qa=args.qa, jobs=args.jobs)
     return 0
 
 

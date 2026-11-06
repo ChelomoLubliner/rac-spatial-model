@@ -9,12 +9,15 @@ import numpy as np
 from PIL import Image
 from tqdm import tqdm
 
-from .active_contour_snake import active_contour_on_prototype
+from .active_contour_snake import (active_contour_on_prototype,
+                                   save_snake_points)
 from .io_shoes import read_shoes
+from .stickers import apply_sticker_masks, read_sticker_masks
 
 
 def contacts_data(profile):
-    """Read the contact file, save one image per shoe and list_matrices.
+    """Read the contact file, erase the profile's sticker list
+    (stickers.py), save one image per shoe and list_matrices.
 
     `python.contact_flip_shoes` (1-based) are mirrored left to right, as
     the legacy flip of image 8 intended; for OLD the list is empty: the
@@ -24,6 +27,14 @@ def contacts_data(profile):
     shoes = read_shoes(profile.contacts, profile.W, profile.H,
                        profile.num_shoe)
     print('Total lines:', len(shoes))
+    # stickers and frame artefacts overlapping the prototype region, erased
+    # from the stored records before anything else (A-095; OLD: none)
+    stickers = read_sticker_masks(profile)
+    if len(stickers):
+        shoes, erased = apply_sticker_masks(shoes, stickers)
+        print(f'erase list: {len(stickers)} rectangles on '
+              f'{stickers["shoe"].nunique()} shoes, {sum(erased)} contact '
+              'pixels erased')
     for i in tqdm(range(len(shoes))):
         Image.fromarray(shoes[i]).save(profile.image_path('shoes', i))
     for shoe in profile.contact_flip_shoes:
@@ -58,7 +69,9 @@ def superposed_pixels(profile, list_lines):
     Image.fromarray(line).save(profile.saved_path(stem, 'png'))
 
 
-def main(profile):
+def main(profile, qa=False):
+    """Step 0a; with qa also the prototype's initial ellipse and snakes
+    (saved/prototype_snake_points, T4)."""
     print(f'{profile.dataset}\nmain_create_files_init')
     contacts_data(profile)
     list_lines = np.load(profile.saved_path('list_matrices', 'npy'))
@@ -66,4 +79,8 @@ def main(profile):
     print(f'Array of {len_lines} lines')
     superposition_all_shoes(profile, list_lines)
     superposed_pixels(profile, list_lines)
-    active_contour_on_prototype(profile)
+    record = {} if qa else None
+    active_contour_on_prototype(profile, record=record)
+    if qa:
+        save_snake_points(profile.saved_path('prototype_snake_points', 'npz'),
+                          [record])

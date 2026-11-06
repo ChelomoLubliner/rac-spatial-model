@@ -131,7 +131,7 @@ old_files <- outputs_of(P)
 namespaced <- function(f) {
   parts <- strsplit(f, "/", fixed = TRUE)[[1]]
   stem <- sub("\\.[A-Za-z]+$", "", parts[length(parts)])
-  any(parts[-length(parts)] %in% c("new", "new_shoes", "images_new")) &&
+  any(parts[-length(parts)] %in% c("new", "new_shoes", "images_new", "sheets_new")) &&
     endsWith(stem, "_new")
 }
 for (f in new_files) {

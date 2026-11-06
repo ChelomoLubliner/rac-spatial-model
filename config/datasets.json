@@ -29,7 +29,8 @@
         "locations": "data/locations_data.csv",
         "locations_format": "csv",
         "cross_check": null,
-        "sticker_masks": null
+        "sticker_masks": null,
+        "snake_overrides": null
       },
       "prototype": {
         "col_shoe": 307,
@@ -76,6 +77,7 @@
       "python": {
         "images_dir": "images",
         "contact_flip_shoes": [],
+        "blas_threads": null,
         "superpose_threshold": 18,
         "snake": {
           "center_rc": [200, 155],
@@ -104,7 +106,15 @@
         "pixel_calibration": "docs/qa/T3/old/pixel_calibration.csv",
         "calibration_grid": "docs/qa/T3/old/calibration_grid.csv",
         "shoe_contact": "docs/qa/T3/old/shoe_contact.csv",
-        "qa_dir": "docs/qa/T3/old"
+        "qa_dir": "docs/qa/T3/old",
+        "_comment_t4": [
+          "T4 snake QA (contour_algorithm.qa_snake; decisions A-091,",
+          "A-093): the OLD reference metrics of the snakes; OLD has no",
+          "contact sheets here (its gallery is docs/qa/sheets_old, T1)"
+        ],
+        "snake_qa": "docs/qa/T4/old/snake_metrics.csv",
+        "snake_qa_dir": "docs/qa/T4/old",
+        "sheets_dir": null
       }
     },
     "new": {
@@ -141,7 +151,19 @@
         "locations": "data/new_shoes/locations_data_new_raw.txt",
         "locations_format": "space_no_header",
         "cross_check": "data/new_shoes/locations_new_snake_2023.csv",
-        "sticker_masks": null
+        "_comment_sticker_masks": [
+          "T4 (decision A-095): frame artefacts that overlap the prototype",
+          "region, erased from the stored records by Python (step 0) and",
+          "R (step 1) before anything else; 1-based inclusive ranges"
+        ],
+        "sticker_masks": "data/new_shoes/sticker_masks_new.csv",
+        "_comment_snake_overrides": [
+          "T4 (decision A-097): per-shoe snake fallbacks of step 0 for the",
+          "shoes that fail QA with the profile snake (shoe,",
+          "first_closing_radius, center_r, center_c, radius_r, radius_c,",
+          "reason; an empty value keeps the profile's)"
+        ],
+        "snake_overrides": "data/new_shoes/snake_overrides_new.csv"
       },
       "prototype": {
         "_comment": "the OLD prototype frame for both datasets (A-001, A-006)",
@@ -188,10 +210,19 @@
         }
       },
       "python": {
-        "_comment": "superpose_threshold and snake init provisional (A-014, A-019; T4)",
+        "_comment": [
+          "T4 (docs/tests/T4-results.md): one OpenBLAS thread (the snake",
+          "depends on the thread count, A-092); the cleaning mask from the",
+          "shoes in contact on >= 18 of 631 (A-096, departing from the",
+          "proportional 29 of A-014); the 2023 init ellipse (A-019",
+          "confirmed); the first snake runs on the cleaned shoe closed with",
+          "a disk of radius 10, so separate heel pads and lugs form one",
+          "silhouette (A-094); every other snake value as OLD"
+        ],
         "images_dir": "images_new",
         "contact_flip_shoes": [],
-        "superpose_threshold": 29,
+        "blas_threads": 1,
+        "superpose_threshold": 18,
         "snake": {
           "center_rc": [185, 128],
           "radii_rc": [162, 95],
@@ -200,7 +231,8 @@
           "alpha": 0.015,
           "beta_first": 10,
           "beta_second": 0.10,
-          "gamma": 0.001
+          "gamma": 0.001,
+          "first_closing_radius": 10
         },
         "write_html": false,
         "contour_out": "data/new_shoes/contour_Active_Contour_new.txt",
@@ -220,7 +252,16 @@
         "pixel_calibration": "processed_data/new/pixel_calibration_new.csv",
         "calibration_grid": "docs/qa/T3/new/calibration_grid_new.csv",
         "shoe_contact": "docs/qa/T3/new/shoe_contact_new.csv",
-        "qa_dir": "docs/qa/T3/new"
+        "qa_dir": "docs/qa/T3/new",
+        "_comment_t4": [
+          "T4 snake QA (contour_algorithm.qa_snake; decisions A-091,",
+          "A-093): the per-shoe metrics and flags, the flagged-shoe",
+          "figures (<snake_qa_dir>/flagged) and the contact sheets",
+          "(<sheets_dir>/<kind>/<kind>_sheet_<kk>_new.png)"
+        ],
+        "snake_qa": "docs/qa/T4/new/snake_metrics_new.csv",
+        "snake_qa_dir": "docs/qa/T4/new",
+        "sheets_dir": "docs/qa/sheets_new"
       }
     }
   }

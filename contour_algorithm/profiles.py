@@ -43,7 +43,8 @@ LOCATION_FORMATS = ('csv', 'space_no_header')
 # The folders that hold only NEW files (user rule 1): every output of a
 # non-OLD profile lies below one of them, and its file stem ends with the
 # profile's suffix.
-NAMESPACE_FOLDERS = frozenset({'new', 'new_shoes', 'images_new'})
+NAMESPACE_FOLDERS = frozenset({'new', 'new_shoes', 'images_new',
+                               'sheets_new'})
 # Per-shoe image folders and their legacy file-name patterns (A-018: the
 # index is the 0-based image index, im0 is shoe 1).
 IMAGE_KINDS = MappingProxyType({
@@ -120,7 +121,12 @@ class Coords:
 
 @dataclass(frozen=True)
 class SnakeParams:
-    """Initial ellipse and active-contour parameters of step 0."""
+    """Initial ellipse and active-contour parameters of step 0.
+
+    The last two are optional NEW adaptations of the first snake (T4,
+    decision A-094); their defaults give the legacy snake: the radius of a
+    morphological closing (disk) of the cleaned shoe before the first
+    snake's blur (0: none) and that blur's sigma (None: gaussian_sigma)."""
     center_rc: tuple
     radii_rc: tuple
     n_points: int
@@ -129,6 +135,8 @@ class SnakeParams:
     beta_first: float
     beta_second: float
     gamma: float
+    first_closing_radius: int = 0
+    first_gaussian_sigma: float | None = None
 
 
 @dataclass(frozen=True)
@@ -164,6 +172,11 @@ class Profile:
     r: Mapping = field(repr=False)
     prep: Mapping = field(repr=False,
                           default_factory=lambda: MappingProxyType({}))
+    # threads of numpy's OpenBLAS for step 0 (None: the library's default,
+    # the machine's core count; the snake depends on it, decision A-092)
+    blas_threads: int | None = None
+    # per-shoe snake fallbacks (inputs.snake_overrides, T4, A-097)
+    snake_overrides: Path | None = None
 
     # --- dimensions -----------------------------------------------------
     @property
@@ -279,6 +292,8 @@ class Profile:
         out = {'python.contour_out': self.contour_out}
         for stem in ('list_matrices', 'list_contour', 'active-contour_all'):
             out[f'saved:{stem}'] = self.saved_path(stem, 'npy')
+        for stem in ('snake_points', 'prototype_snake_points'):  # --qa (T4)
+            out[f'saved:{stem}'] = self.saved_path(stem, 'npz')
         out['saved:all_shoes_superposed'] = self.saved_path(
             'all_shoes_superposed', 'png')
         for name in ('superposed', 'prototype_mask'):
@@ -319,7 +334,8 @@ def _output_paths(d: Mapping) -> tuple[dict, dict]:
 def _input_paths(d: Mapping) -> set:
     """The input files named by the profile entry d (relative)."""
     values = [d['inputs'].get(k) for k in ('contacts', 'locations',
-                                           'cross_check', 'sticker_masks')]
+                                           'cross_check', 'sticker_masks',
+                                           'snake_overrides')]
     values += [d['prototype']['contour'], d['prototype']['mask']]
     return {PurePosixPath(v) for v in values if v is not None}
 
@@ -437,15 +453,31 @@ def load_profile(dataset: str | None = None, file: Path | str | None = None,
     def p_opt(value, what):
         return None if value is None else p(value, what)
 
+    blas_threads = py.get('blas_threads')
+    if blas_threads is not None and (
+            isinstance(blas_threads, bool) or not isinstance(blas_threads, int)
+            or blas_threads < 1):
+        raise ValueError(f'profile {dataset!r}: python.blas_threads must be '
+                         'null or a positive integer')
     s = py['snake']
     snake = SnakeParams(
         center_rc=tuple(s['center_rc']), radii_rc=tuple(s['radii_rc']),
         n_points=s['n_points'], gaussian_sigma=s['gaussian_sigma'],
         alpha=s['alpha'], beta_first=s['beta_first'],
-        beta_second=s['beta_second'], gamma=s['gamma'])
+        beta_second=s['beta_second'], gamma=s['gamma'],
+        first_closing_radius=s.get('first_closing_radius', 0),
+        first_gaussian_sigma=s.get('first_gaussian_sigma'))
     if len(snake.center_rc) != 2 or len(snake.radii_rc) != 2:
         raise ValueError(f'profile {dataset!r}: snake center_rc and '
                          'radii_rc need 2 values (row, col)')
+    r = snake.first_closing_radius
+    if isinstance(r, bool) or not isinstance(r, int) or r < 0:
+        raise ValueError(f'profile {dataset!r}: snake first_closing_radius '
+                         'must be an integer >= 0')
+    if snake.first_gaussian_sigma is not None and not (
+            snake.first_gaussian_sigma > 0):
+        raise ValueError(f'profile {dataset!r}: snake first_gaussian_sigma '
+                         'must be null or > 0')
     for key, rel in d['r']['paths'].items():
         _rel(rel, f'r.paths.{key}')
     for key in ('knit_dir', 'log_dir'):
@@ -483,4 +515,7 @@ def load_profile(dataset: str | None = None, file: Path | str | None = None,
         superpose_threshold=int(py['superpose_threshold']),
         snake=snake, write_html=bool(py['write_html']),
         contour_out=p(py['contour_out'], 'python.contour_out'),
-        stems=_freeze(py['stems']), r=_freeze(d['r']), prep=_freeze(prep))
+        stems=_freeze(py['stems']), r=_freeze(d['r']), prep=_freeze(prep),
+        blas_threads=blas_threads,
+        snake_overrides=p_opt(inputs.get('snake_overrides'),
+                              'inputs.snake_overrides'))

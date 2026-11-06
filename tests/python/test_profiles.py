@@ -33,7 +33,7 @@ from contour_algorithm.profiles import env, load_profile
 REPO = Path(__file__).resolve().parents[2]
 PROFILE_FILE = REPO / 'config' / 'datasets.json'
 FIXTURE_PROFILE = REPO / 'tests/fixtures/sentinel/sentinel_profile.json'
-NEW_FOLDERS = {'new', 'new_shoes', 'images_new'}
+NEW_FOLDERS = {'new', 'new_shoes', 'images_new', 'sheets_new'}
 # The models and figures of the R steps are <models_dir>/<feature><suffix>
 # .rds and <images_dir>/<stem><suffix>.pdf (statistical_model/R/profile.R).
 R_MODELS = ('NEW_X_NS_XY', 'CML_MODEL')

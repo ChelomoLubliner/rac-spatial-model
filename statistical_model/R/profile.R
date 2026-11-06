@@ -55,7 +55,7 @@
 # too, and an OLD prep.qa_dir is a work folder of the OLD profile.
 
 RAC_DATASETS <- c("old", "new")
-RAC_NAMESPACE_FOLDERS <- c("new", "new_shoes", "images_new")
+RAC_NAMESPACE_FOLDERS <- c("new", "new_shoes", "images_new", "sheets_new")
 
 rac_env <- function(name, default) {
   v <- Sys.getenv(name, unset = NA_character_)
@@ -242,7 +242,7 @@ rac_profile <- function(dataset = rac_env("RAC_DATASET", "old"),
   for (key in c("contacts", "locations")) {
     .rac_check_rel(P$inputs[[key]], paste("inputs", key, sep = "."))
   }
-  for (key in c("cross_check", "sticker_masks")) {
+  for (key in c("cross_check", "sticker_masks", "snake_overrides")) {
     if (!is.null(P$inputs[[key]])) {
       .rac_check_rel(P$inputs[[key]], paste("inputs", key, sep = "."))
     }
