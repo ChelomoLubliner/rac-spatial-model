@@ -2141,3 +2141,66 @@ OLD is untouched: no tracked file is modified, and the Tier A and `old_added_t7`
    - Report it as a geometric-mean likelihood ratio, and as a share of the OLD in-sample gain (0.011 of 0.026 nats, 44%), not as the size of the location effect.
 
 **Not verified:** the OLD gates and the fast suite (other lenses); the slow calibration runs (I read their outputs but did not rerun them).
+
+## 2026-11-07 11:00, T6-compare review (reviewer:statistician)
+
+**Verdict: changes required** (statistics lens). The core inference is right and reproduces. The equality Wald tests, the offset sigma^2 pair, the mirrored areas and the RAC-coding finding all hold. But two readings in `docs/results/old-vs-new.md` go beyond what the data support, and both would reach Micha and the R&R. First, the location-specific "significant" differences and the "disjoint" forefoot bands are conditional on each dataset's RAC total. Second, "NEW higher along the forefoot edges" is not in the data. Both fixes are cheap: the bootstrap records already store the resampled shoe ids. OLD is untouched.
+
+**Verified** (my probes are in `<scratch>/t6review/`; the machine was idle):
+- **Equality Wald**, recomputed with my own code from the committed models and the bootstrap records:
+  - model-based: 129.523 (p 1.9e-16);
+  - paired shoe bootstrap: 51.878, F(24, 976) p 0.00143; each half of the draws gives 54.5 and 52.0;
+  - without reprints: 118.10 and 46.746 (p 0.0056).
+- **Why the bootstrap W is 2.5 times smaller.** The generalized design effects (the eigenvalues of V_model^-1 V_boot) run from 0.80 to 4.18, median 1.38. The OLD-NEW difference lies along the directions that clustering inflates most, so W falls 2.5-fold while the coefficient SEs grow only about 1.13-fold. The Hotelling reference, the paired draws, the whole-shoe resampling and the centring are all correct.
+- **sigma^2 with the offset.** A model-free shoe bootstrap (B 4,000) of F82's moment estimator gives NEW/OLD 0.71 [0.58, 0.88], z -3.3 (-2.95 without reprints). Its SEs of log sigma^2 (0.076 and 0.070) match those implied by the profile intervals (0.080 and 0.065). "NEW's shoes vary less in RAC density" holds.
+- **Areas.** The mirroring is right: plan F7, and `aspix_x` mirrors x. The 67 same_shoe location pairs register without a mirror, so the two locations files share one frame. "Within an area >= between areas" holds on every basis (finding 3).
+- **Checks I reran.** `tests/r/test_compare_old_new.R` ALL PASS (82 s; it wrote no file). The three OLD checksum lists pass, and `git diff HEAD` is empty.
+- **Figures I looked at:** the common-basis bootstrap maps, `ci_cuts_commonbasis_boot`, `empirical_density` and `areas14`. The empirical ratio panel shows the midfoot-top excess, the heel-front deficit and the heel-bottom excess. It shows no excess at the right toe edge, where the GLMM ratio is darkest red.
+
+**Findings.**
+1. **Major. The bootstrap |z| maps and the CI-cut bands hold each dataset's RAC total N fixed.**
+   - **Mechanism.** `t6_logdens_sd` (`compare_old_new.R:504-531`) calibrates every draw on the original rows and N. So it leaves out the shoe-sampling SD of the level: 0.056 (OLD) and 0.036 (NEW) on the log scale, against shape SDs of 0.069 and 0.050.
+   - **What changes when each draw is recalibrated on its own resampled shoes** (the ids are in the records):
+     - the SDs grow 1.31-fold (OLD) and 1.24-fold (NEW);
+     - "NEW significantly higher" falls from 27.7% to 21.5% of the prototype, "lower" from 5.4% to 3.9% (without reprints: 19.7% to 14.2%, and 11.5% to 6.6%);
+     - row-110 columns with disjoint bands fall from 10%/10% to 6%/0% (without reprints: 7%/20% to 1%/10%);
+     - at OLD's forefoot peak, OLD 4.77 [4.17, 5.51] and NEW 3.92 [3.55, 4.29] overlap (pointwise z about 2.3). So "disjoint also under the bootstrap" (results lines 15 and 138) is wrong for the calibrated estimator.
+   - **Model-free check** (whole-shoe bootstrap):
+     - overall density NEW/OLD 1.06 [0.93, 1.21], not significant;
+     - forefoot centre: 0.88 [0.73, 1.04] in absolute density, but 0.82 [0.72, 0.94] relative to each dataset's own level.
+   - **As a shape comparison** (each map divided by its own observed density): NEW is higher on 20% and lower on 12% of the prototype (15% and 13% away from the pinned edges), not "28% higher, 5% lower".
+   - The CI-cut figure's caption already says "shape, not level", but the text compares levels.
+   - **Fix:** for statements about levels, recalibrate each draw on its resampled shoes (my probe takes 33 s per bootstrap). For statements about shape, divide both maps by their observed densities. Then restate the Summary rows "How large" and "Where?", sections 5 and 6, and the LOG text.
+2. **Major. "NEW higher along the forefoot edges" is not in the data.**
+   - **The claims:** line 15 calls it "robust ... in the raw data"; line 108 says "up to about 2.1 at the right toe edge".
+   - **Model-free shoe-bootstrap ratios** (none excludes 1):
+     - right forefoot rim, outer 15% of the half-width: 1.12 [0.85, 1.51];
+     - outer 25%, right and left: 1.13 [0.93, 1.40] and 1.18 [0.92, 1.54];
+     - toe tip (y >= 0.42): 1.04 [0.82, 1.33]; right toe: 1.01 [0.80, 1.30];
+     - right midfoot edge: 1.19 [0.98, 1.46].
+   - **The pinned edges.** 24% of the "NEW higher" pixels lie within 0.03 units of OLD's K8-pinned edges, which are 6.8% of the prototype. Section 9 calls those edges not interpretable.
+   - **What the raw data do support:**
+     - heel bottom (y < -0.35): 1.23 [1.05, 1.45], as shape 1.15 [1.05, 1.27];
+     - the midfoot-top band: 1.32 [1.11, 1.59];
+     - the heel-front band: 0.63 [0.46, 0.89].
+   - **Fix:** drop the edge claim, or call it a spline feature at sparse edges. Report the shares without the pinned-edge band, and add a model-free regional table.
+3. **Minor. The area numbers A-T6-7 tells Naomi to quote depend on the basis.**
+   - Between areas: OLD 1.79 (step-3 basis), 1.96 (full tensor), 1.90 (finer y); NEW 1.58, 1.54, 1.65.
+   - Largest within-area p90/p10: OLD 2.63, 2.90, 4.48; NEW 2.64, 2.72, 3.13.
+   - The intervals use the model-based V, although bootstrap draws exist and the map SEs are 1.2-1.35 times larger under the bootstrap.
+   - The conclusion holds on every basis.
+   - **Fix:** quote a range, or the full-tensor values (no K8), with bootstrap intervals.
+4. **Minor. sigma^2 without the offset is fragile.**
+   - The moment-estimator bootstrap gives 0.83 [0.69, 1.02] (z -1.8; -1.6 without reprints), where the table reports p 0.021 and 0.048.
+   - **Fix:** call the no-offset difference not robust. The offset pair carries the claim (z -3.3 to -4.1).
+5. **Minor. The RAC-coding claim rests on print-level shares, which are indirect.**
+   - **RAC-level evidence:** on the 67 same_shoe pairs, 1,436 RACs match by location (within 0.008 units, after a translation of at most 0.03 and no mirror).
+   - Only 65% of them carry the same type. 258 RACs coded type 2 on the OLD print are type 1 on the NEW print; 73 go the other way. The type-1 share of the matched RACs is 0.27 (OLD) against 0.43 (NEW).
+   - **Fix:** add this cross-tabulation. It rules out "different RACs" as the explanation.
+6. **Minor. The "all" equality tests and the paired draws assume independent datasets.**
+   - `compare_old_new.R:456` says "the datasets are independent", but 67 NEW shoes are prints of OLD soles.
+   - So Cov(b_old, b_new) > 0, V1 + V2 overstates Var(d), and these tests are conservative.
+   - The without-reprints test (W 46.7, p 0.0056) is the one whose assumptions hold.
+   - **Fix:** label it the primary test, and state the direction of the bias.
+
+**Not verified:** the knit, `run_all.sh` and `regress_old.sh`; for OLD I relied on the empty `git diff HEAD` and the checksum lists.
