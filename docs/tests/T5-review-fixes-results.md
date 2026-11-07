@@ -582,6 +582,45 @@ exit 0
 ```
 ALL PASS: 184 Python tests (3 skipped live checks), 17 R scripts (`test_compare.R` new), flake8 88 files (`t5_band_figure.py` new), shellcheck 17 files, and the work tree unchanged by the tests.
 
+Rerun at the final docs commit `1a330ed` on the idle machine (the docs changed after the first run; no test reads their content):
+```bash
+time bash tests/run_all.sh        # at 1a330ed
+```
+```
+[... 422 lines omitted: as above (Ran 184 tests in 99.680s, OK (skipped=3); flake8: 88 files; shellcheck: 17 files) ...]
+== summary
+PASS         0s  sha256 committed_79247d8 (Tier A, 24 files)
+PASS         0s  sha256 old_baseline (11 OLD artifacts)
+PASS         0s  sha256 old_added_t2 (the 2 OLD files T2 added)
+PASS       127s  python unittest discover tests/python
+PASS         5s  Rscript tests/r/test_baseline_committed.R
+PASS        38s  Rscript tests/r/test_compare.R
+PASS        21s  Rscript tests/r/test_compare_glmm_fits.R
+PASS         3s  Rscript tests/r/test_compare_models.R
+PASS        45s  Rscript tests/r/test_distances_vectorized.R
+PASS        17s  Rscript tests/r/test_figures_png.R
+PASS        29s  Rscript tests/r/test_new_outputs.R
+PASS         2s  Rscript tests/r/test_no_hardcoding.R
+PASS         2s  Rscript tests/r/test_old_regression.R
+PASS        32s  Rscript tests/r/test_output_guards.R
+PASS         1s  Rscript tests/r/test_pixel_mapping.R
+PASS         2s  Rscript tests/r/test_profile.R
+PASS        49s  Rscript tests/r/test_profile_sentinels.R
+PASS         7s  Rscript tests/r/test_run_manifest.R
+PASS         2s  Rscript tests/r/test_step5_variant.R
+PASS         8s  Rscript tests/r/test_sticker_masks.R
+PASS         4s  Rscript tests/r/test_wald.R
+PASS         1s  flake8 (all Python files)
+PASS         4s  shellcheck (all shell scripts)
+PASS         0s  work tree unchanged by the tests (no file created or modified)
+ALL PASS
+
+real	6m39.886s
+user	6m1.257s
+sys	0m47.755s
+exit 0
+```
+
 ### 6.2 OLD regression: identical
 Steps 1-6 (the steps whose R code neighbours this task's changes; `compare.R`, the tests and `tools/figures_png.R`'s comment are on no OLD step's path, which this gate shows):
 ```bash

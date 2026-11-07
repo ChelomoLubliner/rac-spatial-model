@@ -1867,7 +1867,7 @@ Decisions A-113 to A-118; corrections appended to A-108 (14 of 631 records, not 
 - Two counts of the statistics review differ in my runs: the K8 left-edge shift exceeds 0.1 in 7 of 10 NEW bands (review: 6), the NEW right edge stays within 0.06 in 8 of 10 (review: 9); the deflated OLD LR is 22.3 (p 0.014), beyond chi^2_10's 5% point but not "far". The cut-250 and peak-window O/E move from 0.805 and 0.668 to 0.802 and 0.651 because rows on the window edges are now included explicitly.
 
 **Tests and gates.**
-- `bash tests/run_all.sh`: ALL PASS (184 Python tests with 3 skipped live checks; 17 R scripts, `test_compare.R` new; flake8 88 files; shellcheck 17; work tree unchanged), 10 min 3 s under load.
+- `bash tests/run_all.sh`: ALL PASS (184 Python tests with 3 skipped live checks; 17 R scripts, `test_compare.R` new; flake8 88 files; shellcheck 17; work tree unchanged), 10 min 3 s under load. Again at the final docs commit `1a330ed`: ALL PASS, 6 min 40 s on the idle machine.
 - The new or changed tests alone: `test_new_outputs.R` ALL PASS (32 s idle, 38 s loaded); `test_compare.R` ALL PASS (36 s); `test_no_hardcoding.R` ALL PASS, and it fires on `tools/figures_png.R` without the marker.
 
 **OLD regression: identical.**
