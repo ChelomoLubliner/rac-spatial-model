@@ -1981,3 +1981,49 @@ Decisions A-113 to A-118; corrections appended to A-108 (14 of 631 records, not 
    - The header line 7 of `test_no_hardcoding.R` is overlong.
 
 **Not verified:** the OLD gates themselves (I relied on the checksums, the diff and the kept run folders), the 34-minute NEW rerun, `t5_sigma2.R --offset-refit`, and the statistical judgements (other lenses).
+
+## 2026-11-07 02:55, T5-newmodel review fixes review (reviewer:reproducibility)
+
+**Verdict: approve** (reproducibility lens). I re-ran every OLD gate myself at the final code commit `2f49373` (the later `26625b8` and `f1acd06` change only this file) and checked each output with my own scripts against the `79247d8` blobs and the Tier B files. OLD is reproduced exactly: Tier A where the platform allows it (Windows R steps 1, 2, 3 and 5; venv-wind step 0) and Tier B on WSL. The RNG order is unchanged, and no NEW file can overwrite an OLD one. The main fix of this task (A-113) works: I reproduced both mutants in my own clean clone. The one code change on a model path (`fit_common_basis()`, A-118) leaves both OLD-basis refits byte-identical.
+
+**How I ran it** (`<scratch>/rv_t5b_repro/`). My scripts `my_cmp_models.R`, `my_pdf_cmp.py`, `my_contour_cmp.py` and `shift_record.py` use no repository helper. Load reached about 30 while the other two reviews ran.
+
+**OLD (re-run, not trusted).**
+- **Baseline.** My sha256 of the 24 `79247d8` blobs = `committed_79247d8.sha256` = the work tree, and `tests/baseline/` is unchanged since `8fefa20`. `git diff 79247d8 HEAD` modifies no OLD output; it only adds the two T2 files. Every committed OLD output keeps its February or March mtime, and the two T2 files keep theirs (2026-11-06 05:12 and 07:53). So nothing rewrote them in place, not even with equal bytes. The OLD profile block equals the one at `088457d`; since `12e29d8`, keys were only added.
+- **WSL steps 1-6** (`regress_old.sh --steps 1-6 --keep`): ALL PASS, about 20 minutes. My own checks:
+  - The five step-1/2 CSVs `cmp`-equal the `79247d8` blobs, and `shoe_codes.csv` equals its HEAD blob.
+  - The GLMM is `identical()` to the Tier B model file (`t1/legacy_r_oTZO3x`) in fixef, vcov, VarCorr, theta, logLik, deviance, ranef, y, X, u, nobs and the (absent) Hessian. Against the blob, y, X and nobs are identical, and the fit differs only by A-055 (fixef max 7.67e-4; sigma^2 0.9597959 vs 0.9597791).
+  - The CML is `identical()` to Tier B and to the blob in coef, vcov, loglik, n, nevent, iter and the linear predictors. Its `.rds` bytes differ only through the captured knit environment (terms, formula and call are `all.equal`).
+  - The 8 PDFs equal the Tier B PDFs once my own code blanks their dates.
+  - My W = b'V^-1 b: refit 427.7804472165, CML 420.6712420035.
+- **Step 5 alone, on the committed models** (`--steps 5`): `wald_test.csv` `cmp`-equals the committed file (W 428.693335001072, df 24, Hessian vcov).
+- **Windows R 4.4.3 / lme4 1.1-37, step 3** (`run_windows_r_step3.sh`, `RAC_WINR_COMMIT=2f49373`, 659 s): 27 of 27 fields = Tier A. My check: fixef, vcov, VarCorr, theta, logLik, deviance, ranef, y, X, u and the stored Hessian are `identical()` to the `79247d8` GLMM, and W is 428.6933350011 for both.
+- **Windows R steps 1, 2 and 5** (`run_windows_r_steps.sh --steps 1,2,5`, `RAC_WINR_COMMIT=2f49373`): ALL PASS. My check: the five CSVs `cmp`-equal the `79247d8` blobs, and `shoe_codes.csv` and `wald_test.csv` equal their HEAD blobs. car gives W = 428.6933, a relative difference of 4.8e-15 from the manual W. The 4 CI PDFs equal the `79247d8` PDFs once my code blanks their dates (Tier A).
+- **WSL step 0** (`--steps 0 --keep`): ALL PASS (16 threads, Haswell; 1,556 intermediates). My check: the contour equals the Tier B file (`t1/legacy_py_MXmkvc`) after LF -> CRLF. Exactly the 30 records of `contour_linux_diff.csv` differ from the blob, each with its recorded pixel count.
+- **venv-wind step 0** (`run_windows_python_step0.sh` at `26625b8`, whose code is `2f49373`; Python 3.13.14, Store base 3.13.3824.0; 566 s): the contour `cmp`-equals the `79247d8` blob (`ca8a07f2...`), and the four npy files = Tier B. This closes the previous review's "not verified at HEAD" (last run at `088457d`): the self-updating Store Python has not changed the result.
+- **RNG.** Each Rmd has one `set.seed(P$r$seed)` where `79247d8` had `set.seed(313)`, and the OLD seed is 313. The only consumer is step 1's `sample()`, and there is no RNG call in `statistical_model/R/*.R` or `config.R`. `dataCC.csv`, which holds the drawn controls, is byte-identical.
+- **Collisions.**
+  - This task added `new/heel_front_band_shoes_new.png`, `compare/residual_cells_old_vs_new.csv`, `compare/heel_front_band_old_vs_new.png` and four probes.
+  - Every NEW profile path differs from its OLD one. The only shared values are the two read-only prototype inputs.
+  - No literal OLD output path appears in `contour_algorithm/` or `tools/`, and `fit_oldbasis_new.R` refuses `RAC_DATASET=old`.
+  - In my clone, `figures_png.R` (OLD and NEW) and both refits wrote nothing into the tree.
+  - The no-collision check of `test_new_outputs.R` passes (48 NEW files).
+
+**NEW and this task's changes (re-run).**
+- **Mutants** (my own clone of `2f49373`, my own `shift_record.py`):
+  - M1, record 591 shifted one column right (1,232 bytes): FAIL at step 2, naming shoe 591; every other check passes.
+  - M2, the same with NEW step 2 rerun (107 rows of shoe 591 change, max |d new_x| 0.004234): FAIL at the step-3 GLMM, the step-3 CML and both OLD-basis refits, and every other check is still reported.
+  - The FAIL lines are the same as in the results doc.
+- **OLD-basis refits with HEAD's `fit_common_basis()`** (fresh clone): both `.rds` files are byte-identical to the committed ones (GLMM 774 s, CML 520 s).
+- **Figures.** NEW steps 4-6, re-rendered in the clone from the committed models: the 8 PDFs equal the committed ones once their dates are blanked, and `wald_test_new.csv` is byte-identical. `figures_png.R`: 16 of 16 PNG copies are byte-identical.
+- **Probes.** `t5_gof.R` and `t5_band_figure.py` rewrite `residual_cells_old_vs_new.csv` and both band PNGs byte for byte. The `t5_gof.R` output pasted in results section 3 equals my run line for line: the omissions are marked and their summaries are right, and only the timings differ.
+- **Tests.** In the work tree, `test_new_outputs.R` ALL PASS (53 s) and `test_compare.R` ALL PASS (66 s), and the tree stayed clean. `run_all.sh` in a clean clone at `26625b8`: ALL PASS (184 Python tests, 3 skipped; 17 R scripts; flake8 88 files; shellcheck 17; work tree unchanged), 9 min 12 s. No text file this task changed has a CR.
+
+**Findings** (none blocking):
+1. **Minor (carried; documented in A-113 (5)).** The fast suite still checks the NEW figures (8 PDFs, 16 PNG copies) for existence only. They are current today (checked above by hand), but a stale figure would pass until T8's `tests/e2e/test_new_rerun.sh` exists. T8 must make that check a gate; `t5_new_rerun.sh --oldbasis --png` is the starting point.
+2. **Minor (carried; A-117 is open for Shlomo).** A venv-wind NEW step 0 passes the thread and kernel guards and would rewrite 14 contour records in place. Only `git status`, `rebuild_new.sh` and, when step 2 changes, `test_new_outputs.R` would show it. This is acceptable as decided; revisit if NEW step 0 is ever run on Windows.
+3. **Note.** The implementer's OLD gates ran at `8de60f5`, not at the final commit. Everything after it is docs and probes (checked), and my runs at `2f49373` and `26625b8` give the same result.
+
+**Not verified:** the statistical content (other lens).
+
+**Times** (s, load up to about 30): OLD gate steps 1-6: step 1 130, step 2 35, GLMM 414, CML 440, steps 4-6 136; step 0 gate 1,180; Windows R GLMM 659; Windows R steps 1, 2 and 5: 120, 64 and 28; venv-wind step 0 566; OLD-basis refits 774 and 520; NEW steps 4-6 102; fast suite 552.
