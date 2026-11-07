@@ -15,7 +15,16 @@
 #      number of cases, so W does not compare across datasets).
 #   3. The cost of K8: Efron CML on the step-3 basis against the full
 #      tensor (main effects and interaction), likelihood-ratio statistic and
-#      df; the log-intensity at the left and the right edge of the data
+#      df; since the second T5 review fixes (A-116 corrected) the direct
+#      cluster-robust test of the same hypothesis: the Wald statistic of the
+#      10 main-effect coefficients of the full tensor fitted with
+#      cluster(shoe), with the model-based and the robust variance; the
+#      generalized design effects (the eigenvalues of naive.var^-1 var on
+#      those 10 coefficients) and the Rao-Scott corrections of the LR
+#      (first order LR / mean, second order with Satterthwaite df). (The
+#      T5 review fixes multiplied the LR by 0.57, the robust-to-model ratio
+#      of the 24-coefficient W of section 2: not a test of this hypothesis.)
+#      Then the log-intensity at the left and the right edge of the data
 #      (2nd and 98th percentile of new_x) relative to the median new_x, in
 #      10 y bands (deciles of y), under both fits; O/E across the width
 #      (u = new_x / distance_shape: -1 the left contour, +1 the right) of
@@ -127,11 +136,38 @@ for (ds in c("old", "new")) {
   lr <- 2 * (f$loglik[2] - r$loglik[2])
   dfd <- sum(!is.na(coef(f))) - sum(!is.na(coef(r)))
   cat(sprintf(paste("%s: K8 %d coef, loglik %.3f; full %d coef, loglik %.3f;",
-                    "LR %.2f on %d df (p %.2g, model-based); LR x 0.57",
-                    "(about the robust deflation of W in 2) %.1f\n"),
+                    "LR %.2f on %d df (p %.2g, model-based)\n"),
               ds, sum(!is.na(coef(r))), r$loglik[2], sum(!is.na(coef(f))),
-              f$loglik[2], lr, dfd, pchisq(lr, dfd, lower.tail = FALSE),
-              lr * 0.57))
+              f$loglik[2], lr, dfd, pchisq(lr, dfd, lower.tail = FALSE)))
+  # the same hypothesis (the 10 main effects = 0) with a cluster-robust
+  # variance: the full tensor refitted with cluster(shoe) (the same
+  # estimates), Wald on the main-effect coefficients
+  tm <- rep(1, nrow(d))
+  fc <- coxph(Surv(tm, n_Acc) ~ bx + by + bx:by + strata(shoe) +
+                cluster(shoe), data = d, ties = "efron")
+  cf <- coef(fc)
+  main <- grep(":", names(cf), invert = TRUE)
+  stopifnot(length(main) == dfd, !anyNA(cf),
+            identical(names(cf), names(coef(f))))
+  vn <- fc$naive.var[main, main]
+  vr <- fc$var[main, main]
+  wn <- wald(cf[main], vn)
+  wr <- wald(cf[main], vr)
+  ev <- Re(eigen(solve(vn) %*% vr, only.values = TRUE)$values)
+  rs1 <- lr / mean(ev)
+  df2 <- length(ev) * mean(ev)^2 / mean(ev^2)
+  rs2 <- lr * mean(ev) / mean(ev^2)
+  cat(sprintf(paste("   the %d main effects of the full tensor, cluster(shoe)",
+                    "(max |estimate - the fit above| %.1e): Wald",
+                    "model-based %.2f (p %.2g), cluster-robust %.2f (p %.2g);",
+                    "generalized design effects mean %.3f, range %.3f-%.3f;",
+                    "Rao-Scott LR / mean %.2f (p %.2g), second order %.2f on",
+                    "%.2f df (p %.2g)\n"),
+              length(main), max(abs(cf - coef(f))), wn,
+              pchisq(wn, dfd, lower.tail = FALSE), wr,
+              pchisq(wr, dfd, lower.tail = FALSE), mean(ev), min(ev),
+              max(ev), rs1, pchisq(rs1, dfd, lower.tail = FALSE), rs2, df2,
+              pchisq(rs2, df2, lower.tail = FALSE)))
   lp <- function(m, xv, yv) {
     X <- predict(bx, xv)
     Y <- predict(by, yv)

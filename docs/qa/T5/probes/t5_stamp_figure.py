@@ -23,11 +23,15 @@ pixels, and writes:
 
 Usage (repo root, thesis venv python), in this order (T5 review fixes:
 the probe does not run from a clean clone without its prerequisites):
-  1. NEW step 0 must have run in this tree, for the gitignored
-     images_new/saved/freq_min_18_new.png (RAC_DATASET=new
-     python -m contour_algorithm.main --jobs 14; on this machine it
-     rewrites the committed NEW contour with the same bytes), or run 2 and
-     3 from the repo/ folder of a `tests/rebuild_new.sh --keep` run;
+  1. it needs the gitignored images_new/saved/freq_min_18_new.png of NEW
+     step 0. Preferred: run 2 and 3 from the repo/ folder of a
+     `RAC_SCRATCH=<scratch> bash tests/rebuild_new.sh --keep` run, which
+     builds it in a scratch copy and leaves the work tree alone. Or run
+     NEW step 0 in this tree (RAC_DATASET=new python -m
+     contour_algorithm.main --jobs 14): it rewrites the committed NEW
+     contour in place, with the same bytes on this machine's WSL venv but
+     not on another platform (14 of 631 records differ under venv-wind,
+     A-117), so check `git status` afterwards;
   2. Rscript docs/qa/T5/probes/t5_stamp_mask.R NEW_DIR COMPARE_DIR SCRATCH
      (writes the masks and counts to SCRATCH and stamp_shoes_new.csv to
      NEW_DIR);
