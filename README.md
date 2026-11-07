@@ -138,9 +138,12 @@ RAC_DATASET=new python -m contour_algorithm.qa_snake --metrics --sheets --flagge
 minutes) and checks that the NEW contour and QA tables committed at HEAD are reproduced byte for byte;
 `--full` also rebuilds the contact sheets and QA figures (about 7 minutes). The snake depends on
 numpy's OpenBLAS thread count and kernel: the NEW profile fixes one thread and the kernel its contour
-was built with (Haswell here), and step 0 refuses to run with another, so an in-place NEW run cannot
-silently rewrite the committed contour; the OLD regression gate runs with the library default (16
-threads here, as the baselines) and refuses a machine where the thread count or the kernel differs
+was built with (Haswell here), and step 0 refuses to run with another. That does not pin the platform:
+NEW step 0 under the Windows venv passes both checks and writes a contour that differs in 14 of 631
+records, so run NEW step 0 only on WSL (decision A-117). An in-place rewrite of the committed contour
+shows in `git status`, makes `tests/r/test_new_outputs.R` fail once it changes Step 2, and makes
+`tests/rebuild_new.sh` fail. The OLD regression gate runs with the library default (16 threads here, as
+the baselines) and refuses a machine where the thread count or the kernel differs
 (`tests/baseline/local/openblas_tier_b.txt`).
 
 The NEW outputs of Steps 1-6 are committed too (T5): `processed_data/new/*_new.csv`,
@@ -153,8 +156,13 @@ RAC_DATASET=new tools/run_pipeline.sh --steps 1-6     # about 22 minutes here
 
 NEW prints carry no police stamp, so the stamp mask of Step 1 removes nothing there beyond the pixels in
 contact on fewer than 8 shoes (the OLD threshold; decision A-110). `tests/r/test_new_outputs.R` checks
-these outputs against the raw data and the committed contour, so a NEW contour changed later fails it until
-Steps 2-6 are rerun. Two NEW-only tools: `RAC_DATASET=new Rscript tools/fit_oldbasis_new.R NEW_X_NS_XY`
+these outputs against the raw data and the committed contour: it recomputes Step 2 for every shoe (byte
+for byte) and checks that both Step 3 models and both OLD-basis refits were fitted on the committed Step 2
+CSV (and the Step 5 Wald CSV on the Step 3 GLMM), so a NEW contour changed later fails it until Steps 2,
+3 and 5 and the two refits are rerun (decision A-113). The Step 4-6 figures are checked only for
+existence: rerun Steps 4-6 and the PNG copies too after any change
+(`docs/qa/T5/probes/t5_new_rerun.sh --oldbasis --png` compares a full rerun with the committed files).
+Two NEW-only tools: `RAC_DATASET=new Rscript tools/fit_oldbasis_new.R NEW_X_NS_XY`
 (or `CML_MODEL`) refits the NEW data on the OLD spline knots
 (`saved_models/new/<model>_oldbasis_new.rds`, for the old-vs-new comparison; A-112), and
 `RAC_DATASET=old|new Rscript tools/figures_png.R <folder>` draws PNG copies of the Step 4-6 figures with the
