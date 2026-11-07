@@ -1,0 +1,13 @@
+"model","comparison","variance","W","df","p","reference","B","samples","primary"
+"GLMM","OLD vs NEW (all), OLD basis","model-based (GLMM: RX)",129.522693672727,24,1.89272752177029e-16,"chi2",NA,"shared soles ignored: conservative",FALSE
+"GLMM","OLD vs NEW without reprints, OLD basis","model-based (GLMM: RX)",118.096488144688,24,2.11522660228147e-14,"chi2",NA,"independent (no NEW reprint of an OLD sole)",FALSE
+"GLMM","OLD vs NEW group B only, OLD basis","model-based (GLMM: RX)",46.3212143790785,24,0.00404967740042997,"chi2",NA,"shared soles ignored: conservative",FALSE
+"CML","OLD vs NEW (all), OLD basis","model-based (GLMM: RX)",129.880289734439,24,1.63069935861631e-16,"chi2",NA,"shared soles ignored: conservative",FALSE
+"CML","OLD vs NEW without reprints, OLD basis","model-based (GLMM: RX)",118.662704574315,24,1.67804099037173e-14,"chi2",NA,"independent (no NEW reprint of an OLD sole)",FALSE
+"CML","OLD vs NEW group B only, OLD basis","model-based (GLMM: RX)",46.2963109506639,24,0.0040778105978112,"chi2",NA,"shared soles ignored: conservative",FALSE
+"GLMM","OLD vs NEW (all), OLD basis","shoe bootstrap (paired difference draws)",51.8782020653195,24,0.00143056963846608,"F(24, 976)",1000,"shared soles ignored: conservative",FALSE
+"GLMM","OLD vs NEW without reprints, OLD basis","shoe bootstrap (paired difference draws)",46.7458816929707,24,0.00561715388156617,"F(24, 976)",1000,"independent (no NEW reprint of an OLD sole)",TRUE
+"CML (Efron ties, indicative)","OLD vs NEW (all), OLD basis","model-based",127.978717430319,24,3.59829853072124e-16,"chi2",NA,"shared soles ignored: conservative",FALSE
+"CML (Efron ties, indicative)","OLD vs NEW (all), OLD basis","cluster-robust (shoe)",53.1562120550162,24,0.000551646770020404,"chi2",NA,"shared soles ignored: conservative",FALSE
+"CML (Efron ties, indicative)","OLD vs NEW without reprints, OLD basis","model-based",118.918795750391,24,1.51108569316557e-14,"chi2",NA,"independent (no NEW reprint of an OLD sole)",FALSE
+"CML (Efron ties, indicative)","OLD vs NEW without reprints, OLD basis","cluster-robust (shoe)",46.1599958024626,24,0.00423510231505162,"chi2",NA,"independent (no NEW reprint of an OLD sole)",FALSE

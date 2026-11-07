@@ -1,0 +1,2147 @@
+---
+title: "OLD vs NEW: the comparison of the two datasets (plan T6)"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+What this file does (plan T6; results and their reading in
+`docs/results/old-vs-new.md`, commands and outputs in
+`docs/tests/T6-results.md`):
+
+* (a, item 6) the data: shoes, RACs, contact surface, RAC density and RAC type
+  per dataset; (b) the contours and the step-2 distances;
+* (c, items 2-3) the models: sigma^2 without and with the offset, the fixed
+  effects on the common (OLD) basis with their z-differences, equality Wald
+  tests, and the all-spatial Wald test of each dataset;
+* (d, item 1) the maps on the common prototype grid on one colour scale, with
+  the difference and the ratio, for both models, and the sensitivities of the
+  plan (common basis, full tensor, finer y knots, NEW without the reprinted
+  shoes, NEW without group A);
+* (e, item 4) the confidence intervals at the cuts (rows 110, 190, 250) of
+  both datasets on the same axes;
+* (item 5) the within- and between-area ratios in Naomi's 14 areas;
+* (g) the Random - CML difference of each dataset.
+
+Added by the T6 review fixes: the shoe-bootstrap bands and |z| maps in two
+versions, the absolute density (each draw recalibrated on its own resampled
+shoes, so the overall level's sampling error is in) and the shape (each map
+divided by its dataset's observed RAC density); the shares of the prototype
+that differ, also away from the K8-pinned edges; a model-free table of RAC
+density by region with whole-shoe bootstrap intervals; a model-free
+bootstrap of the sigma^2 comparison (the moment estimator of plan F82); the
+RAC-level type cross-tabulation on the reprinted soles; the area ratios on
+every basis, with shoe-bootstrap intervals where draws exist (the full
+tensors got their own bootstraps); the equality tests labelled by whether
+their samples are independent (without the reprints: the primary test).
+
+Run from `statistical_model/`, after `tools/fit_compare_models.R` has written
+its fits (the list of jobs is in that file):
+`Rscript -e 'rmarkdown::render("compare_old_new_7.Rmd", output_dir = "../logs/knit/compare", intermediates_dir = tempdir())'`.
+A missing fit stops the run. Only for development, `T6_ALLOW_MISSING=1` knits
+with the fits that exist and skips (and lists) every comparison whose fits
+are missing; the committed outputs come from a run without it.
+Every output is a new file built from both datasets: `processed_data/compare/*_old_vs_new.csv`,
+`model_images/compare/*_old_vs_new.pdf` and the PNG copies `docs/qa/T6/*_old_vs_new.png`.
+
+```{r t6_setup}
+t_start <- proc.time()[["elapsed"]]
+ROOT_PATH <- paste(dirname(getwd()), "/", sep = "")
+for (f in c("profile.R", "io.R", "compare.R", "compare_old_new.R")) {
+  source(paste(ROOT_PATH, "statistical_model/R/", f, sep = ""))
+}
+suppressMessages({
+  library(splines)
+  library(lme4)
+  library(survival)
+  library(ggplot2)
+})
+P_old <- rac_profile("old", root = ROOT_PATH)
+P_new <- rac_profile("new", root = ROOT_PATH)
+PS <- list(old = P_old, new = P_new)
+set.seed(P_old$r$seed) # the parametric simulations below (the OLD profile's seed)
+px_per_unit <- P_old$prototype$coords$rel_col_shoe / P_old$prototype$coords$rel_Y_cord
+cut_rows <- c(110, 190, 250) # the CI cuts of step 5 (prototype rows)
+# colours (validated for colour-vision deficiency with the dataviz palette
+# validator: OLD blue, NEW orange, the third series aqua with direct labels)
+COL <- c(old = "#2a78d6", new = "#eb6834", norep = "#1baf7a", groupB = "#6250d6")
+SEQ <- grDevices::colorRampPalette(c("#cde2fb", "#9ec5f4", "#6da7ec", "#3987e5",
+                                     "#256abf", "#184f95", "#0d366b"))(120)
+DIV <- grDevices::colorRampPalette(c("#0d366b", "#256abf", "#6da7ec", "#b7d3f6",
+                                     "#f0efec", "#f4c2bd", "#e8817b", "#c93a39",
+                                     "#7a1c1c"))(121)
+INK <- "#0b0b0b"
+INK2 <- "#52514e"
+GRID_COL <- "#e1e0d9"
+dpi <- 144
+out_csv <- function(x, stem) {
+  path <- rac_ensure_dir(t6_compare_path(P_old, "csv", stem))
+  con <- file(path, "wb")
+  on.exit(close(con))
+  utils::write.csv(x, con, row.names = FALSE, eol = "\n")
+  invisible(path)
+}
+save_fig <- function(stem, width, height, draw) {
+  pdf_path <- rac_ensure_dir(t6_compare_path(P_old, "pdf", stem))
+  png_path <- rac_ensure_dir(t6_compare_path(P_old, "png", stem))
+  grDevices::pdf(pdf_path, width = width, height = height)
+  draw()
+  grDevices::dev.off()
+  grDevices::png(png_path, width = width, height = height, units = "in",
+                 res = dpi, type = "cairo")
+  draw()
+  grDevices::dev.off()
+  cat("figure:", basename(pdf_path), "and", basename(png_path), "\n")
+  invisible(png_path)
+}
+theme_t6 <- function() {
+  theme_minimal(base_size = 11) +
+    theme(panel.grid.minor = element_blank(),
+          panel.grid.major = element_line(colour = GRID_COL, linewidth = 0.3),
+          axis.text = element_text(colour = INK2),
+          axis.title = element_text(colour = INK),
+          strip.text = element_text(colour = INK, face = "bold", hjust = 0),
+          legend.position = "top", legend.title = element_blank(),
+          plot.title = element_text(colour = INK, face = "bold"),
+          plot.subtitle = element_text(colour = INK2),
+          plot.caption = element_text(colour = INK2, hjust = 0),
+          plot.title.position = "plot", plot.caption.position = "plot")
+}
+# subtitles and captions of the ggplot figures, wrapped to the figure width
+# (about 12 characters per inch at the theme's text size)
+wrap_txt <- function(x, width_in) paste(strwrap(x, width = floor(11 * width_in)), collapse = "\n")
+```
+
+## Inputs
+
+```{r t6_inputs}
+read_step2 <- function(P) {
+  d <- read.csv(rac_path(P, "dataCC_distance"), header = TRUE)
+  subset(d, select = c("n_Acc", "x", "y", "shoe", "row_number", "horiz_dist",
+                       "new_x", "min_dist", "distance_shape"))
+}
+D <- lapply(PS, read_step2)
+CODES <- lapply(PS, function(P) read.csv(rac_path(P, "shoe_codes"), header = TRUE))
+PC <- lapply(PS, function(P) read.csv(rac_path(P, "pixel_counts"), header = TRUE))
+LOC <- lapply(PS, read_locations)
+MEAN_OFFSET <- vapply(PS, function(P) {
+  mean(log(P$r$n_controls / read.csv(rac_path(P, "pixel_counts"))$pixel_count))
+}, 0)
+stopifnot(identical(CODES$new$code, CODES$new$shoe))
+reprints <- t6_reprint_ids(ROOT_PATH)
+group_a <- CODES$new$shoe[t6_group_a(CODES$new$shoe)]
+n_shoes <- vapply(D, function(d) length(unique(d$shoe)), 0L)
+cat(sprintf("shoes: OLD %d, NEW %d; NEW reprint or uncertain (T0 review): %d; NEW group A: %d\n",
+            n_shoes[["old"]], n_shoes[["new"]], length(reprints), length(group_a)))
+print(MEAN_OFFSET, digits = 10)
+
+# the fits: committed step-3 models (own bases), the NEW refits on the OLD
+# basis (T5, A-112), the offset refits and the T6 sensitivity fits
+# (tools/fit_compare_models.R)
+allow_missing <- identical(Sys.getenv("T6_ALLOW_MISSING"), "1")
+skipped <- character(0)
+need <- function(path) {
+  if (!file.exists(path)) {
+    stop("missing fit ", path, ": run tools/fit_compare_models.R first",
+         call. = FALSE)
+  }
+  path
+}
+optional <- function(path) {
+  if (file.exists(path)) return(readRDS(path))
+  if (!allow_missing) need(path)
+  skipped <<- c(skipped, sub(ROOT_PATH, "", path, fixed = TRUE))
+  NULL
+}
+have <- function(...) all(c(...) %in% names(FIT))
+model_summary <- function(path, label, data, offset_refit = FALSE) {
+  m <- readRDS(need(path))
+  if (inherits(m, "merMod")) stopifnot(nobs(m) == nrow(data))
+  if (inherits(m, "coxph")) stopifnot(m$n == nrow(data))
+  s <- t6_from_model(m, label, data)
+  s$offset_refit <- offset_refit
+  if (inherits(m, "merMod")) {
+    s$vcov_default <- as.matrix(vcov(m))  # the stored Hessian if any (K11)
+    dimnames(s$vcov_default) <- dimnames(s$vcov)
+  }
+  rm(m)
+  invisible(gc())
+  s
+}
+t6_record <- function(P, stem) optional(t6_fit_path(P, stem))
+FIT <- list(
+  glmm_old = model_summary(rac_model_path(P_old, "NEW_X_NS_XY"), "OLD GLMM", D$old),
+  cml_old = model_summary(rac_model_path(P_old, "CML_MODEL"), "OLD CML", D$old),
+  glmm_new = model_summary(rac_model_path(P_new, "NEW_X_NS_XY"), "NEW GLMM", D$new),
+  cml_new = model_summary(rac_model_path(P_new, "CML_MODEL"), "NEW CML", D$new),
+  glmm_new_ob = model_summary(rac_model_path(P_new, "NEW_X_NS_XY_oldbasis"),
+                              "NEW GLMM, OLD basis", D$new),
+  cml_new_ob = model_summary(rac_model_path(P_new, "CML_MODEL_oldbasis"),
+                             "NEW CML, OLD basis", D$new),
+  off_old = model_summary(rac_model_path(P_old, "NEW_X_NS_XY_offset"),
+                          "OLD GLMM with offset", D$old, offset_refit = TRUE),
+  off_new = model_summary(rac_model_path(P_new, "NEW_X_NS_XY_offset"),
+                          "NEW GLMM with offset", D$new, offset_refit = TRUE))
+stems <- list(old = c(glmm_full = "NEW_X_NS_XY_full", cml_full = "CML_MODEL_full",
+                      glmm_fineY0 = "NEW_X_NS_XY_fineY_nagq0",
+                      glmm_nagq0 = "NEW_X_NS_XY_nagq0"),
+              new = c(glmm_full = "NEW_X_NS_XY_full", cml_full = "CML_MODEL_full",
+                      glmm_fineY0 = "NEW_X_NS_XY_fineY_nagq0",
+                      glmm_fineYold0 = "NEW_X_NS_XY_fineYold_nagq0",
+                      glmm_nagq0 = "NEW_X_NS_XY_nagq0",
+                      glmm_norep = "NEW_X_NS_XY_oldbasis_norep",
+                      cml_norep = "CML_MODEL_oldbasis_norep",
+                      glmm_groupB = "NEW_X_NS_XY_oldbasis_groupB",
+                      cml_groupB = "CML_MODEL_oldbasis_groupB",
+                      off_norep = "NEW_X_NS_XY_offset_oldbasis_norep"))
+for (ds in names(stems)) {
+  for (k in names(stems[[ds]])) {
+    FIT[[paste(k, ds, sep = "_")]] <- t6_record(PS[[ds]], stems[[ds]][[k]])
+  }
+}
+# the exact CMLs on the finer y basis (84 coefficients) take 1-2 h and about
+# 3.5 GB each (survival's exact method; plan T6, A-119): they enter the CML
+# figures when their fits exist, and the run lists them when they do not
+# (the finer-y sensitivity itself is always there through the GLMMs, nAGQ 0)
+slow_missing <- character(0)
+slow_cml <- list(old = c(cml_fineY = "CML_MODEL_fineY"),
+                 new = c(cml_fineY = "CML_MODEL_fineY", cml_fineYold = "CML_MODEL_fineYold"))
+for (ds in names(slow_cml)) {
+  for (k in names(slow_cml[[ds]])) {
+    p <- t6_fit_path(PS[[ds]], slow_cml[[ds]][[k]])
+    if (file.exists(p)) {
+      FIT[[paste(k, ds, sep = "_")]] <- readRDS(p)
+    } else {
+      slow_missing <- c(slow_missing, sub(ROOT_PATH, "", p, fixed = TRUE))
+    }
+  }
+}
+# the GLMMs on the finer y basis with nAGQ = 1, if their (long) fits finished
+# (otherwise the finer-y GLMM maps use the nAGQ = 0 fits, checked against
+# nAGQ = 1 on the step-3 basis in the chunk t6_nagq0)
+fine1 <- list(old = c(fineY = "NEW_X_NS_XY_fineY"),
+              new = c(fineY = "NEW_X_NS_XY_fineY", fineYold = "NEW_X_NS_XY_fineYold"))
+for (ds in names(fine1)) {
+  for (k in names(fine1[[ds]])) {
+    p <- t6_fit_path(PS[[ds]], fine1[[ds]][[k]])
+    if (file.exists(p)) FIT[[paste("glmm", k, ds, sep = "_")]] <- readRDS(p)
+  }
+}
+# readable labels of the T6 fits (their records carry the file stem)
+nice <- c(glmm_full = "GLMM, full tensor", cml_full = "CML, full tensor",
+          cml_fineY = "CML, finer y", cml_fineYold = "CML, OLD's finer y",
+          glmm_fineY0 = "GLMM, finer y (nAGQ 0)", glmm_fineYold0 = "GLMM, OLD's finer y (nAGQ 0)",
+          glmm_fineY = "GLMM, finer y", glmm_fineYold = "GLMM, OLD's finer y",
+          glmm_nagq0 = "GLMM, nAGQ 0", glmm_norep = "GLMM, no reprints, OLD basis",
+          cml_norep = "CML, no reprints, OLD basis", glmm_groupB = "GLMM, group B, OLD basis",
+          cml_groupB = "CML, group B, OLD basis",
+          off_norep = "GLMM with offset, no reprints, OLD basis")
+for (nm in names(FIT)) {
+  k <- sub("_(old|new)$", "", nm)
+  if (k %in% names(nice)) FIT[[nm]]$label <- paste(toupper(sub("^.*_", "", nm)), nice[[k]])
+}
+# every fit is tied to the step-2 rows of its shoes (a stale fit fails here)
+data_of <- function(fit, ds) D[[ds]][D[[ds]]$shoe %in% fit$shoes, ]
+ds_of <- function(nm) if (endsWith(nm, "_old")) "old" else "new"
+for (nm in names(FIT)) {
+  f <- FIT[[nm]]
+  d <- data_of(f, ds_of(nm))
+  stopifnot(f$nobs == nrow(d), f$n_cases == sum(d$n_Acc))
+}
+# the shoe bootstraps of the GLMMs (PIRLS surrogate at the fit's theta,
+# tools/fit_compare_models.R boot_*): OLD on its own step-3 basis, NEW (all,
+# and without the reprints) on the OLD basis, the common basis of the
+# coefficient comparison
+BOOT <- list(old = optional(t6_fit_path(P_old, "NEW_X_NS_XY_bootpirls")),
+             new_ob = optional(t6_fit_path(P_new, "NEW_X_NS_XY_oldbasis_bootpirls")),
+             norep = optional(t6_fit_path(P_new, "NEW_X_NS_XY_oldbasis_norep_bootpirls")))
+boot_fit <- c(old = "glmm_old", new_ob = "glmm_new_ob", norep = "glmm_norep_new")
+for (k in names(BOOT)) {
+  if (is.null(BOOT[[k]]) || !have(boot_fit[[k]])) {
+    BOOT[[k]] <- NULL
+    next
+  }
+  r <- BOOT[[k]]
+  f <- FIT[[boot_fit[[k]]]]
+  stopifnot(identical(r$spec[-1], f$spec[-1]), ncol(r$ids) == length(f$shoes),
+            all(r$ids %in% f$shoes))
+  t6_boot_draws(r, f)
+  cat(sprintf("bootstrap %s: %d draws (%d failed), seed %d, theta %.6f, %.0f s, |beta_pirls(all) - fit| max %.2g\n",
+              k, nrow(r$draws), length(r$failed), r$seed, r$theta, r$seconds,
+              max(abs(r$beta_all - r$coef))))
+}
+# the shoe bootstraps of the full tensors (each dataset on its own step-3
+# knots, no K8 pin): the intervals of Naomi's area ratios (T6 review fixes)
+BOOT_FULL <- list(old = optional(t6_fit_path(P_old, "NEW_X_NS_XY_full_bootpirls")),
+                  new = optional(t6_fit_path(P_new, "NEW_X_NS_XY_full_bootpirls")))
+for (k in names(BOOT_FULL)) {
+  nm <- paste("glmm_full", k, sep = "_")
+  if (is.null(BOOT_FULL[[k]]) || !have(nm)) {
+    BOOT_FULL[[k]] <- NULL
+    next
+  }
+  r <- BOOT_FULL[[k]]
+  f <- FIT[[nm]]
+  stopifnot(identical(r$spec[-1], f$spec[-1]), ncol(r$ids) == length(f$shoes),
+            all(r$ids %in% f$shoes))
+  t6_boot_draws(r, f)
+  cat(sprintf("bootstrap full_%s: %d draws (%d failed), seed %d, theta %.6f, %.0f s, |beta_pirls(all) - fit| max %.2g\n",
+              k, nrow(r$draws), length(r$failed), r$seed, r$theta, r$seconds,
+              max(abs(r$beta_all - r$coef))))
+}
+# profile-likelihood intervals of sigma^2 (tools/fit_compare_models.R profile_*)
+PROF <- list(glmm_old = optional(t6_fit_path(P_old, "profile_NEW_X_NS_XY")),
+             glmm_new = optional(t6_fit_path(P_new, "profile_NEW_X_NS_XY")),
+             off_old = optional(t6_fit_path(P_old, "profile_NEW_X_NS_XY_offset")),
+             off_new = optional(t6_fit_path(P_new, "profile_NEW_X_NS_XY_offset")),
+             glmm_norep_new = optional(t6_fit_path(P_new, "profile_NEW_X_NS_XY_oldbasis_norep")),
+             off_norep_new = optional(t6_fit_path(P_new, "profile_NEW_X_NS_XY_offset_oldbasis_norep")))
+PROF <- PROF[!vapply(PROF, is.null, TRUE)]
+for (k in names(PROF)) {
+  if (!have(k) || abs(PROF[[k]]$theta_hat - FIT[[k]]$theta) > 1e-10) {
+    stop("profile ", k, " does not belong to the fit ", k, call. = FALSE)
+  }
+}
+fit_table <- do.call(rbind, lapply(names(FIT), function(nm) {
+  f <- FIT[[nm]]
+  data.frame(fit = nm, label = f$label, model = f$feature,
+             basis = f$spec$type, knots_x = length(f$spec$knots_x),
+             knots_y = length(f$spec$knots_y), coefficients = length(f$coef),
+             shoes = length(f$shoes), rows = f$nobs, cases = f$n_cases,
+             nAGQ = if (is.null(f$nAGQ)) NA else f$nAGQ,
+             conv = f$conv, messages = paste(f$messages, collapse = "; "),
+             sigma2 = f$sigma2, loglik = f$loglik,
+             seconds = if (is.null(f$seconds)) NA else round(f$seconds))
+}))
+print(fit_table, row.names = FALSE)
+out_csv(fit_table, "fits")
+```
+
+## (a) The data
+
+```{r t6_data}
+shoe_table <- function(ds) {
+  d <- D[[ds]]
+  codes <- CODES[[ds]]
+  id <- codes$shoe[match(sort(unique(d$shoe)), codes$code)]
+  cases <- as.numeric(tapply(d$n_Acc, d$shoe, sum))
+  racs <- as.numeric(table(factor(LOC[[ds]]$shoe, levels = id)))
+  px <- PC[[ds]]$pixel_count[match(id, PC[[ds]]$shoe)]
+  data.frame(dataset = toupper(ds), id = id, racs = racs, cases = cases,
+             px = px, density = 1000 * cases / px)
+}
+ST <- rbind(shoe_table("old"), shoe_table("new"))
+ST$dataset <- factor(ST$dataset, levels = c("OLD", "NEW"))
+q <- function(v, p) as.numeric(stats::quantile(v, p))
+top10 <- function(v) {
+  v <- sort(v, decreasing = TRUE)
+  sum(v[seq_len(ceiling(length(v) / 10))]) / sum(v)
+}
+data_summary <- do.call(rbind, lapply(c("OLD", "NEW"), function(ds) {
+  s <- ST[ST$dataset == ds, ]
+  dd <- D[[tolower(ds)]]
+  data.frame(dataset = ds, shoes = nrow(s), racs = sum(s$racs),
+             rac_pixels = sum(s$cases), controls = sum(dd$n_Acc == 0),
+             cc_rows = nrow(dd),
+             racs_min = min(s$racs), racs_median = median(s$racs),
+             racs_mean = mean(s$racs), racs_p90 = q(s$racs, 0.9),
+             racs_max = max(s$racs), top10_share = top10(s$racs),
+             px_p5 = q(s$px, 0.05), px_median = median(s$px),
+             px_p95 = q(s$px, 0.95), px_mean = mean(s$px),
+             density_median = median(s$density),
+             density_overall = 1000 * sum(s$cases) / sum(s$px),
+             var_log_100_px = var(log(100 / s$px)),
+             cor_log_n_log_px = cor(log(s$cases), log(s$px)),
+             mean_offset = MEAN_OFFSET[[tolower(ds)]])
+}))
+print(t(data_summary))
+out_csv(data_summary, "data_summary")
+# per-shoe tests of the distributions (descriptive: the shoes are not a
+# random sample of one population, and 67 NEW shoes reprint OLD ones)
+for (v in c("racs", "px", "density")) {
+  w <- stats::wilcox.test(ST[[v]][ST$dataset == "OLD"], ST[[v]][ST$dataset == "NEW"])
+  cat(sprintf("%s per shoe: OLD median %.4g, NEW median %.4g; Wilcoxon p %.3g\n",
+              v, median(ST[[v]][ST$dataset == "OLD"]),
+              median(ST[[v]][ST$dataset == "NEW"]), w$p.value))
+}
+types <- do.call(rbind, lapply(names(LOC), function(ds) {
+  tt <- table(factor(LOC[[ds]]$type, levels = sort(unique(c(LOC$old$type, LOC$new$type)))))
+  data.frame(dataset = toupper(ds), type = as.integer(names(tt)),
+             racs = as.numeric(tt), share = as.numeric(tt) / sum(tt))
+}))
+print(types, digits = 3, row.names = FALSE)
+out_csv(types, "rac_types")
+# RAC type mix per shoe: the share of type 1 and of type 2 among each shoe's RACs
+type_mix <- do.call(rbind, lapply(names(LOC), function(ds) {
+  l <- LOC[[ds]]
+  data.frame(dataset = toupper(ds),
+             share1 = as.numeric(tapply(l$type == 1, l$shoe, mean)),
+             share2 = as.numeric(tapply(l$type == 2, l$shoe, mean)))
+}))
+for (ds in c("OLD", "NEW")) {
+  s <- type_mix[type_mix$dataset == ds, ]
+  cat(sprintf("%s: per-shoe share of type 1: median %.2f, p10 %.2f, p90 %.2f; type 2: median %.2f\n",
+              ds, median(s$share1), q(s$share1, 0.1), q(s$share1, 0.9), median(s$share2)))
+}
+# NEW without the reprinted shoes: is the type mix a dataset property?
+tn <- LOC$new[!LOC$new$shoe %in% reprints, ]
+cat(sprintf("NEW without the %d reprinted or uncertain shoes: type 1 %.3f, type 2 %.3f of %d RACs\n",
+            length(reprints), mean(tn$type == 1), mean(tn$type == 2), nrow(tn)))
+tr <- LOC$new[LOC$new$shoe %in% reprints, ]
+cat(sprintf("NEW reprinted or uncertain shoes only: type 1 %.3f, type 2 %.3f of %d RACs\n",
+            mean(tr$type == 1), mean(tr$type == 2), nrow(tr)))
+# the same physical soles in both datasets (the T0 pairs judged same_shoe):
+# does the type mix follow the dataset or the sole?
+vd <- utils::read.csv(file.path(ROOT_PATH, "docs", "qa", "T0", "compare",
+                                paste("overlap_verdicts_t0", T6_SUFFIX, ".csv", sep = "")))
+vd <- vd[vd$verdict == "same_shoe", ]
+pair_types <- do.call(rbind, lapply(seq_len(nrow(vd)), function(k) {
+  o <- LOC$old$type[LOC$old$shoe == vd$old[k]]
+  n <- LOC$new$type[LOC$new$shoe == vd$new[k]]
+  data.frame(new = vd$new[k], old = vd$old[k], racs_old = length(o), racs_new = length(n),
+             type1_old = mean(o == 1), type1_new = mean(n == 1))
+}))
+pt <- pair_types[pair_types$racs_old >= 5 & pair_types$racs_new >= 5, ]
+st <- stats::wilcox.test(pt$type1_new, pt$type1_old, paired = TRUE)
+cat(sprintf(paste("same_shoe pairs with >= 5 RACs in both prints: %d; type-1 share OLD print median %.2f,",
+                  "NEW print median %.2f; NEW higher in %d of %d pairs; paired Wilcoxon p %.3g\n"),
+            nrow(pt), median(pt$type1_old), median(pt$type1_new), sum(pt$type1_new > pt$type1_old),
+            nrow(pt), st$p.value))
+out_csv(pair_types, "rac_types_reprint_pairs")
+# RAC-level evidence (T6 review fixes): on the same pairs, the RACs of the
+# OLD and the NEW print of one sole matched by location (t6_match_racs: the
+# NEW print moved by up to 0.03 units in each direction, in steps of one
+# prototype pixel, mirrored or not; RACs closer than 0.008 units, about 2.4
+# pixels, paired one to one). Same RAC, same type?
+r_match <- 0.008
+shifts <- seq(-0.03, 0.03, by = 1 / px_per_unit)
+t_match <- proc.time()[["elapsed"]]
+MATCH <- lapply(seq_len(nrow(pt)), function(k) {
+  o <- LOC$old[LOC$old$shoe == pt$old[k], ]
+  n <- LOC$new[LOC$new$shoe == pt$new[k], ]
+  m <- t6_match_racs(o, n, r_match, shifts)
+  mm <- m$matched
+  list(racs = data.frame(new = pt$new[k], old = pt$old[k], type_old = o$type[mm$i],
+                         type_new = n$type[mm$j], distance = mm$d),
+       info = data.frame(new = pt$new[k], old = pt$old[k], racs_old = nrow(o), racs_new = nrow(n),
+                         matched = nrow(mm), mirror = m$mirror, dx = m$dx, dy = m$dy,
+                         same_type = mean(o$type[mm$i] == n$type[mm$j]),
+                         type1_old_matched = mean(o$type[mm$i] == 1),
+                         type1_new_matched = mean(n$type[mm$j] == 1),
+                         type1_new_unmatched = if (nrow(n) > nrow(mm)) mean(n$type[-mm$j] == 1) else NA_real_))
+})
+match_racs <- do.call(rbind, lapply(MATCH, function(m) m$racs))
+match_info <- do.call(rbind, lapply(MATCH, function(m) m$info))
+type_levels <- sort(unique(c(LOC$old$type, LOC$new$type)))
+match_tab <- as.data.frame(table(type_old = factor(match_racs$type_old, levels = type_levels),
+                                 type_new = factor(match_racs$type_new, levels = type_levels)),
+                           responseName = "racs")
+match_tab$type_old <- as.integer(as.character(match_tab$type_old))
+match_tab$type_new <- as.integer(as.character(match_tab$type_new))
+cat(sprintf(paste("matched RACs on the %d same_shoe pairs: %d of %d OLD and %d NEW RACs (median share of an OLD print",
+                  "matched %.2f); mirror +1 in %d pairs, -1 in %d; median |dx| %.4f, |dy| %.4f; %.0f s\n"),
+            nrow(match_info), nrow(match_racs), sum(match_info$racs_old), sum(match_info$racs_new),
+            median(match_info$matched / match_info$racs_old), sum(match_info$mirror == 1),
+            sum(match_info$mirror == -1), median(abs(match_info$dx)), median(abs(match_info$dy)),
+            proc.time()[["elapsed"]] - t_match))
+print(xtabs(racs ~ type_old + type_new, match_tab))
+cat(sprintf(paste("matched RACs with the same type on both prints: %.3f; type 2 on OLD -> type 1 on NEW: %d,",
+                  "type 1 on OLD -> type 2 on NEW: %d; type-1 share among the matched RACs: OLD print %.3f,",
+                  "NEW print %.3f; type-1 share of the NEW RACs without an OLD match %.3f\n"),
+            mean(match_racs$type_old == match_racs$type_new),
+            sum(match_racs$type_old == 2 & match_racs$type_new == 1),
+            sum(match_racs$type_old == 1 & match_racs$type_new == 2),
+            mean(match_racs$type_old == 1), mean(match_racs$type_new == 1),
+            weighted.mean(match_info$type1_new_unmatched, match_info$racs_new - match_info$matched, na.rm = TRUE)))
+out_csv(match_tab, "rac_types_matched")
+out_csv(match_info, "rac_types_matched_pairs")
+```
+
+```{r t6_data_figure}
+ecdf_df <- function(v, ds) {
+  v <- sort(v)
+  data.frame(dataset = ds, value = v, p = seq_along(v) / length(v))
+}
+lab_ds <- c(OLD = sprintf("OLD (%d shoes)", n_shoes[["old"]]),
+            NEW = sprintf("NEW (%d shoes)", n_shoes[["new"]]))
+col_ds <- c(OLD = COL[["old"]], NEW = COL[["new"]])
+mk_ecdf <- function(var, xlab, title, log = TRUE) {
+  e <- rbind(ecdf_df(ST[[var]][ST$dataset == "OLD"], "OLD"),
+             ecdf_df(ST[[var]][ST$dataset == "NEW"], "NEW"))
+  e$dataset <- factor(e$dataset, levels = c("OLD", "NEW"))
+  med <- aggregate(value ~ dataset, e, median)
+  p <- ggplot(e, aes(value, p, colour = dataset)) +
+    geom_step(linewidth = 0.7) +
+    geom_point(data = med, aes(value, 0.5), size = 2.2) +
+    scale_colour_manual(values = col_ds, labels = lab_ds) +
+    labs(x = xlab, y = "share of shoes at or below", title = title) +
+    theme_t6()
+  if (log) p <- p + scale_x_log10()
+  p
+}
+p1 <- mk_ecdf("racs", "RACs per shoe (log scale)", "RACs per shoe")
+p2 <- mk_ecdf("px", "contact pixels per shoe, S (log scale)", "Contact surface per shoe")
+p3 <- mk_ecdf("density", "RAC pixels per 1,000 contact pixels (log scale)",
+              "RAC density per shoe")
+types$dataset <- factor(types$dataset, levels = c("OLD", "NEW"))
+p4 <- ggplot(types, aes(factor(type), share, fill = dataset)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.75) +
+  geom_text(aes(label = ifelse(share < 0.01, sprintf("%.1f%%", 100 * share), sprintf("%.0f%%", 100 * share)),
+                colour = dataset),
+            position = position_dodge(width = 0.8), vjust = -0.4, size = 3,
+            show.legend = FALSE) +
+  scale_fill_manual(values = col_ds, labels = lab_ds) +
+  scale_colour_manual(values = c(OLD = INK2, NEW = INK2)) +
+  scale_y_continuous(labels = function(v) paste(100 * v, "%", sep = ""),
+                     expand = expansion(mult = c(0, 0.12))) +
+  labs(x = "RAC type code in the locations file (codebook not in the repository)",
+       y = "share of the dataset's RACs", title = "RAC type") +
+  theme_t6()
+draw_grid <- function(plots, nrow, ncol, title = NULL) {
+  grid::grid.newpage()
+  top <- if (is.null(title)) 0 else 0.05
+  for (k in seq_along(plots)) {
+    r <- (k - 1) %/% ncol
+    cc <- (k - 1) %% ncol
+    vp <- grid::viewport(x = (cc + 0.5) / ncol, y = (1 - top) * (1 - (r + 0.5) / nrow),
+                         width = 1 / ncol, height = (1 - top) / nrow)
+    print(plots[[k]], vp = vp)
+  }
+  if (!is.null(title)) {
+    grid::grid.text(title, x = 0.01, y = 1 - top / 2, just = "left",
+                    gp = grid::gpar(fontsize = 14, fontface = "bold", col = INK))
+  }
+}
+save_fig("data_overview", 12, 8.5, function() {
+  draw_grid(list(p1, p2, p3, p4), 2, 2,
+            "The two datasets: shoes, contact surface, RAC density and RAC type")
+})
+```
+
+## (b) Contours and step-2 distances
+
+```{r t6_contours}
+SM <- list(old = read.csv(paste(P_old$root, P_old$prep$snake_qa, sep = "")),
+           new = read.csv(paste(P_new$root, P_new$prep$snake_qa, sep = "")))
+stopifnot(nrow(SM$old) == n_shoes[["old"]], nrow(SM$new) == n_shoes[["new"]])
+qa_vars <- c("n_contour_px", "coverage", "coverage_fill", "tightness",
+             "rac_coverage", "gap_mean_px", "cut_max_px", "outside_mask_frac")
+contour_summary <- do.call(rbind, lapply(names(SM), function(ds) {
+  do.call(rbind, lapply(qa_vars, function(v) {
+    x <- SM[[ds]][[v]]
+    data.frame(dataset = toupper(ds), metric = v, min = min(x), p1 = q(x, 0.01),
+               p5 = q(x, 0.05), median = median(x), mean = mean(x),
+               p95 = q(x, 0.95), max = max(x))
+  }))
+}))
+step2_summary <- do.call(rbind, lapply(names(D), function(ds) {
+  d <- D[[ds]]
+  do.call(rbind, lapply(c("min_dist", "horiz_dist", "distance_shape", "new_x", "y"), function(v) {
+    do.call(rbind, lapply(c(1, 0), function(cs) {
+      x <- d[[v]][d$n_Acc == cs]
+      data.frame(dataset = toupper(ds), metric = v,
+                 rows = if (cs == 1) "cases" else "controls", min = min(x),
+                 p1 = q(x, 0.01), p5 = q(x, 0.05), median = median(x),
+                 mean = mean(x), p95 = q(x, 0.95), max = max(x))
+    }))
+  }))
+}))
+print(contour_summary, digits = 4, row.names = FALSE)
+print(step2_summary, digits = 4, row.names = FALSE)
+out_csv(rbind(cbind(rows = "shoes", contour_summary), step2_summary[, c("rows", setdiff(names(step2_summary), "rows"))]),
+        "contour_step2_summary")
+```
+
+```{r t6_contour_figure}
+qa_long <- do.call(rbind, lapply(names(SM), function(ds) {
+  do.call(rbind, lapply(c("n_contour_px", "tightness", "gap_mean_px", "coverage_fill"), function(v) {
+    data.frame(dataset = toupper(ds), metric = v, value = SM[[ds]][[v]])
+  }))
+}))
+qa_long$dataset <- factor(qa_long$dataset, levels = c("OLD", "NEW"))
+qa_names <- c(n_contour_px = "contour pixels per shoe",
+              tightness = "tightness: contour area / convex hull of the contact",
+              gap_mean_px = "mean distance from the snake to the contact (px)",
+              coverage_fill = "share of the cleaned contact inside the contour fill (< 0.98 shown at 0.98)")
+qa_long$metric <- factor(qa_names[qa_long$metric], levels = qa_names)
+zoom <- qa_long$metric == qa_names[["coverage_fill"]]
+qa_long$value[zoom] <- pmax(qa_long$value[zoom], 0.98) # shown at 0.98 below it
+pq <- ggplot(qa_long, aes(value, colour = dataset)) +
+  stat_ecdf(geom = "step", linewidth = 0.7) +
+  facet_wrap(~metric, scales = "free_x", ncol = 2) +
+  scale_colour_manual(values = col_ds, labels = lab_ds) +
+  labs(x = NULL, y = "share of shoes at or below",
+       title = "Snake contours (T4 QA tables): OLD committed contour vs NEW contour") +
+  theme_t6()
+s2_long <- do.call(rbind, lapply(names(D), function(ds) {
+  d <- D[[ds]]
+  do.call(rbind, lapply(c("min_dist", "new_x", "y"), function(v) {
+    data.frame(dataset = toupper(ds), rows = ifelse(d$n_Acc == 1, "RAC pixels (cases)", "controls"),
+               metric = v, value = d[[v]])
+  }))
+}))
+s2_names <- c(min_dist = "distance to the own contour (coordinate units)",
+              new_x = "standardized x, new_x (coordinate units)",
+              y = "y (coordinate units; heel < 0 < toe)")
+s2_long$metric <- factor(s2_names[s2_long$metric], levels = s2_names)
+s2_long$dataset <- factor(s2_long$dataset, levels = c("OLD", "NEW"))
+ps2 <- ggplot(s2_long, aes(value, colour = dataset, linetype = rows)) +
+  geom_density(linewidth = 0.6, adjust = 0.6) +
+  facet_wrap(~metric, scales = "free", ncol = 3) +
+  scale_colour_manual(values = col_ds, labels = lab_ds) +
+  scale_linetype_manual(values = c("RAC pixels (cases)" = "solid", controls = "22")) +
+  labs(x = NULL, y = "density",
+       title = sprintf("Step 2: where the case-control rows lie (1 coordinate unit = %g pixels)", px_per_unit)) +
+  theme_t6()
+save_fig("contours_step2", 12, 10, function() {
+  grid::grid.newpage()
+  print(pq, vp = grid::viewport(y = 0.69, height = 0.62))
+  print(ps2, vp = grid::viewport(y = 0.19, height = 0.38))
+})
+```
+
+## (c) The models: sigma^2, fixed effects, equality and all-spatial Wald tests
+
+```{r t6_sigma2}
+sig_row <- function(nm, dataset, offset, shoes) {
+  f <- FIT[[nm]]
+  data.frame(fit = nm, dataset = dataset, offset = offset, shoes = shoes,
+             basis = if (grepl("_ob$|norep|groupB", nm)) "OLD step-3 basis" else "own step-3 basis",
+             n_shoes = length(f$shoes), sigma2 = f$sigma2, theta = f$theta,
+             intercept = unname(f$coef[1]), loglik = f$loglik, nAGQ = f$nAGQ,
+             conv = f$conv)
+}
+sig_rows <- list(
+  list("glmm_old", "OLD", "none", "all"),
+  list("glmm_new", "NEW", "none", "all"),
+  list("glmm_new_ob", "NEW", "none", "all"),
+  list("glmm_norep_new", "NEW", "none", "without reprints"),
+  list("glmm_groupB_new", "NEW", "none", "group B only"),
+  list("off_old", "OLD", "log((px - n)/100)", "all"),
+  list("off_new", "NEW", "log((px - n)/100)", "all"),
+  list("off_norep_new", "NEW", "log((px - n)/100)", "without reprints"))
+sigma2_tab <- do.call(rbind, lapply(Filter(function(r) have(r[[1]]), sig_rows),
+                                    function(r) do.call(sig_row, r)))
+# profile-likelihood 95% intervals (approximate: the intercept re-optimized,
+# the spatial coefficients held at their estimates; theta = sigma)
+sigma2_tab$sigma2_lo <- NA_real_
+sigma2_tab$sigma2_hi <- NA_real_
+for (k in intersect(names(PROF), sigma2_tab$fit)) {
+  sigma2_tab$sigma2_lo[sigma2_tab$fit == k] <- PROF[[k]]$sigma2_lo
+  sigma2_tab$sigma2_hi[sigma2_tab$fit == k] <- PROF[[k]]$sigma2_hi
+}
+# the intercept relation of an offset refit (plan F35, A-044): intercept =
+# no-offset intercept + mean over shoes of log(100 / (px - n)), approximately
+off_check <- function(off, base, ds) {
+  d <- data_of(FIT[[off]], ds)
+  o <- tapply(t6_offset_values(d, CODES[[ds]], PC[[ds]]), d$shoe, mean)
+  pred <- FIT[[base]]$coef[1] - mean(o)
+  data.frame(fit = off, intercept = unname(FIT[[off]]$coef[1]),
+             predicted = unname(pred),
+             max_spatial_change = max(abs(FIT[[off]]$coef[-1] - FIT[[base]]$coef[-1])))
+}
+off_pairs <- list(c("off_old", "glmm_old", "old"), c("off_new", "glmm_new", "new"),
+                  c("off_norep_new", "glmm_norep_new", "new"))
+off_tab <- do.call(rbind, lapply(Filter(function(p) have(p[1], p[2]), off_pairs),
+                                 function(p) off_check(p[1], p[2], p[3])))
+print(sigma2_tab, digits = 6, row.names = FALSE)
+print(off_tab, digits = 6, row.names = FALSE)
+# OLD vs NEW on the log scale, with the SE of log sigma^2 read from the
+# profile interval (half its width / 1.96; the profile is close to symmetric
+# in log sigma^2), so z = difference / sqrt(se_old^2 + se_new^2)
+sig_z <- function(a, b) {
+  if (!all(c(a, b) %in% names(PROF))) return(NULL)
+  se <- function(k) (log(PROF[[k]]$sigma2_hi) - log(PROF[[k]]$sigma2_lo)) / (2 * 1.96)
+  z <- (log(FIT[[b]]$sigma2) - log(FIT[[a]]$sigma2)) / sqrt(se(a)^2 + se(b)^2)
+  data.frame(old = a, new = b, sigma2_old = FIT[[a]]$sigma2, sigma2_new = FIT[[b]]$sigma2,
+             ratio_new_old = FIT[[b]]$sigma2 / FIT[[a]]$sigma2, z_log = z,
+             p_two_sided = 2 * stats::pnorm(-abs(z)))
+}
+sig_cmp <- do.call(rbind, list(sig_z("glmm_old", "glmm_new"), sig_z("off_old", "off_new"),
+                               sig_z("glmm_old", "glmm_norep_new"), sig_z("off_old", "off_norep_new")))
+if (!is.null(sig_cmp)) print(sig_cmp, digits = 4, row.names = FALSE)
+out_csv(merge(sigma2_tab, off_tab, by = "fit", all.x = TRUE, sort = FALSE), "sigma2")
+if (!is.null(sig_cmp)) out_csv(sig_cmp, "sigma2_tests")
+# a model-free check of these z values (T6 review fixes): the moment
+# estimator of plan F82 (t6_sigma2_moment) per dataset, its SE from a
+# whole-shoe bootstrap (OLD and NEW resampled independently), without and
+# with the offset
+PSH <- list(old = t6_per_shoe(D$old, CODES$old, PC$old),
+            new = t6_per_shoe(D$new, CODES$new, PC$new),
+            norep = t6_per_shoe(D$new[!D$new$shoe %in% reprints, ], CODES$new, PC$new))
+B_mom <- 4000
+set.seed(T6_SEEDS$sigma_moment)
+mom_idx <- lapply(PSH, function(s) replicate(B_mom, sample(nrow(s), replace = TRUE)))
+mom_tab <- do.call(rbind, lapply(c(FALSE, TRUE), function(off) {
+  est <- vapply(PSH, function(s) t6_sigma2_moment(s$n, s$nc, s$px, off), 0)
+  bt <- vapply(names(PSH), function(k) {
+    s <- PSH[[k]]
+    apply(mom_idx[[k]], 2, function(i) t6_sigma2_moment(s$n[i], s$nc[i], s$px[i], off))
+  }, numeric(B_mom))
+  se <- apply(log(bt), 2, stats::sd)
+  do.call(rbind, lapply(c("new", "norep"), function(nw) {
+    lr <- log(bt[, nw]) - log(bt[, "old"])
+    z <- (log(est[[nw]]) - log(est[["old"]])) / sqrt(se[[nw]]^2 + se[["old"]]^2)
+    data.frame(offset = if (off) "log((px - n)/100)" else "none",
+               new = if (nw == "new") "NEW (all)" else "NEW without reprints",
+               sigma2_old = est[["old"]], sigma2_new = est[[nw]], ratio_new_old = est[[nw]] / est[["old"]],
+               ratio_lo = exp(stats::quantile(lr, 0.025, names = FALSE)),
+               ratio_hi = exp(stats::quantile(lr, 0.975, names = FALSE)),
+               se_log_old = se[["old"]], se_log_new = se[[nw]], z_log = z, p_two_sided = 2 * stats::pnorm(-abs(z)),
+               B = B_mom)
+  }))
+}))
+print(mom_tab, digits = 4, row.names = FALSE)
+out_csv(mom_tab, "sigma2_moment_bootstrap")
+```
+
+```{r t6_fixef}
+# the common basis: OLD's own step-3 basis; NEW refitted on it (A-112)
+for (nm in intersect(c("glmm_new_ob", "cml_new_ob", "glmm_norep_new", "cml_norep_new",
+                       "glmm_groupB_new", "cml_groupB_new"), names(FIT))) {
+  base <- if (startsWith(nm, "glmm")) FIT$glmm_old else FIT$cml_old
+  stopifnot(identical(base$spec[-1], FIT[[nm]]$spec[-1]),
+            identical(names(base$coef), names(FIT[[nm]]$coef)))
+}
+# the bootstrap SE of a GLMM coefficient where its fit has a bootstrap
+boot_of <- c(glmm_old = "old", glmm_new_ob = "new_ob", glmm_norep_new = "norep")
+se_boot <- function(nm) {
+  k <- boot_of[nm]
+  if (is.na(k) || is.null(BOOT[[k]])) return(rep(NA_real_, length(FIT[[nm]]$coef)))
+  unname(apply(BOOT[[k]]$draws, 2, stats::sd))
+}
+fixef_rows <- function(a, b, model, comparison) {
+  ka <- FIT[[a]]
+  kb <- FIT[[b]]
+  se_a <- sqrt(diag(ka$vcov))
+  se_b <- sqrt(diag(kb$vcov))
+  sb_a <- se_boot(a)
+  sb_b <- se_boot(b)
+  data.frame(model = model, comparison = comparison, term = names(ka$coef),
+             b_old = unname(ka$coef), se_old = unname(se_a),
+             b_new = unname(kb$coef), se_new = unname(se_b),
+             diff = unname(kb$coef - ka$coef),
+             z_diff = unname((kb$coef - ka$coef) / sqrt(se_a^2 + se_b^2)),
+             se_old_boot = sb_a, se_new_boot = sb_b,
+             z_diff_boot = unname((kb$coef - ka$coef) / sqrt(sb_a^2 + sb_b^2)))
+}
+fx_pairs <- list(
+  list("glmm_old", "glmm_new_ob", "GLMM", "NEW (all) on the OLD basis"),
+  list("cml_old", "cml_new_ob", "CML", "NEW (all) on the OLD basis"),
+  list("glmm_old", "glmm_norep_new", "GLMM", "NEW without reprints, OLD basis"),
+  list("cml_old", "cml_norep_new", "CML", "NEW without reprints, OLD basis"),
+  list("glmm_old", "glmm_groupB_new", "GLMM", "NEW group B only, OLD basis"),
+  list("cml_old", "cml_groupB_new", "CML", "NEW group B only, OLD basis"))
+fixef_tab <- do.call(rbind, lapply(Filter(function(p) have(p[[1]], p[[2]]), fx_pairs),
+                                   function(p) do.call(fixef_rows, p)))
+print(fixef_tab[fixef_tab$comparison == "NEW (all) on the OLD basis", ], digits = 4, row.names = FALSE)
+out_csv(fixef_tab, "fixef")
+for (cmp in unique(fixef_tab$comparison)) {
+  for (m in c("GLMM", "CML")) {
+    sel <- fixef_tab$comparison == cmp & fixef_tab$model == m & fixef_tab$term != "(Intercept)"
+    if (!any(sel)) next
+    z <- fixef_tab$z_diff[sel]
+    zb <- fixef_tab$z_diff_boot[sel]
+    cat(sprintf("%s, %s: |z_diff| > 1.96 for %d of %d spatial coefficients, max |z| %.2f%s\n",
+                m, cmp, sum(abs(z) > 1.96), length(z), max(abs(z)),
+                if (all(is.na(zb))) "" else sprintf("; bootstrap SEs: %d of %d, max |z| %.2f",
+                                                    sum(abs(zb) > 1.96), length(zb), max(abs(zb)))))
+  }
+}
+```
+
+```{r t6_wald}
+# equality of the spatial surfaces (all spatial coefficients equal; the
+# GLMM intercept is not part of the shape and is dropped), model-based V
+# (RX for both GLMMs, A-055) with chi^2 df 24
+eq_row <- function(a, b, model, comparison, vcov = "vcov") {
+  r <- equality_wald(FIT[[a]]$coef, FIT[[b]]$coef, FIT[[a]][[vcov]], FIT[[b]][[vcov]])
+  data.frame(model = model, comparison = comparison,
+             variance = if (vcov == "vcov") "model-based (GLMM: RX)" else "model-based (OLD: stored Hessian)",
+             W = r$W, df = r$df, p = r$p, reference = r$reference, B = NA_integer_)
+}
+eq_pairs <- list(
+  list("glmm_old", "glmm_new_ob", "GLMM", "OLD vs NEW (all), OLD basis"),
+  list("glmm_old", "glmm_norep_new", "GLMM", "OLD vs NEW without reprints, OLD basis"),
+  list("glmm_old", "glmm_groupB_new", "GLMM", "OLD vs NEW group B only, OLD basis"),
+  list("cml_old", "cml_new_ob", "CML", "OLD vs NEW (all), OLD basis"),
+  list("cml_old", "cml_norep_new", "CML", "OLD vs NEW without reprints, OLD basis"),
+  list("cml_old", "cml_groupB_new", "CML", "OLD vs NEW group B only, OLD basis"))
+eq_tab <- do.call(rbind, lapply(Filter(function(p) have(p[[1]], p[[2]]), eq_pairs),
+                                function(p) do.call(eq_row, p)))
+# the shoe-bootstrap version (primary, plan T6 and A-045): paired difference
+# draws of the two GLMM bootstraps, W referred to F(24, B - 24)
+eq_boot <- function(ka, kb, comparison) {
+  if (is.null(BOOT[[ka]]) || is.null(BOOT[[kb]])) return(NULL)
+  a <- boot_fit[[ka]]
+  b <- boot_fit[[kb]]
+  Dd <- t6_boot_pair(BOOT[[ka]], BOOT[[kb]], FIT[[a]], FIT[[b]])
+  r <- equality_wald(FIT[[a]]$coef, FIT[[b]]$coef, Dd = Dd)
+  data.frame(model = "GLMM", comparison = comparison,
+             variance = "shoe bootstrap (paired difference draws)",
+             W = r$W, df = r$df, p = r$p, reference = r$reference, B = r$B)
+}
+eq_tab <- rbind(eq_tab, eq_boot("old", "new_ob", "OLD vs NEW (all), OLD basis"),
+                eq_boot("old", "norep", "OLD vs NEW without reprints, OLD basis"))
+# indicative cluster-robust version (A-028: survival has no robust variance
+# for the exact CML, so the Efron approximation with cluster(shoe), on the
+# OLD basis for both datasets)
+efron_cluster <- function(d, spec) {
+  X <- t6_design(spec, d$new_x, d$y)
+  tm <- rep(1, nrow(d))
+  m <- survival::coxph(Surv(tm, d$n_Acc) ~ X + strata(d$shoe) + cluster(d$shoe),
+                       ties = "efron")
+  b <- stats::coef(m)
+  names(b) <- sub("^X", "", names(b))
+  list(coef = b, V_model = m$naive.var, V_robust = m$var)
+}
+spec_old <- FIT$cml_old$spec
+EF <- list(old = efron_cluster(D$old, spec_old),
+           new = efron_cluster(D$new, spec_old),
+           norep = efron_cluster(D$new[!D$new$shoe %in% reprints, ], spec_old))
+ef_row <- function(b, comparison) {
+  rows <- list()
+  for (v in c("V_model", "V_robust")) {
+    r <- equality_wald(EF$old$coef, EF[[b]]$coef, EF$old[[v]], EF[[b]][[v]])
+    rows[[v]] <- data.frame(model = "CML (Efron ties, indicative)", comparison = comparison,
+                            variance = if (v == "V_model") "model-based" else "cluster-robust (shoe)",
+                            W = r$W, df = r$df, p = r$p, reference = r$reference, B = NA_integer_)
+  }
+  do.call(rbind, rows)
+}
+eq_tab <- rbind(eq_tab, ef_row("new", "OLD vs NEW (all), OLD basis"),
+                ef_row("norep", "OLD vs NEW without reprints, OLD basis"))
+# Every test takes Var(b_old - b_new) = V_old + V_new, i.e. independent
+# samples (T6 review fixes). That holds only without the reprints: with
+# them (67 NEW shoes are prints of OLD soles, plan F25; 26 of the 89
+# reprinted or uncertain shoes are in group B) Cov(b_old, b_new) > 0 is
+# ignored, V_old + V_new overstates the variance and the test is
+# conservative. The primary test is the GLMM shoe bootstrap without the
+# reprints.
+eq_tab$samples <- ifelse(grepl("without reprints", eq_tab$comparison),
+                         "independent (no NEW reprint of an OLD sole)",
+                         "shared soles ignored: conservative")
+eq_tab$primary <- eq_tab$model == "GLMM" & grepl("without reprints", eq_tab$comparison) &
+  grepl("bootstrap", eq_tab$variance)
+stopifnot(sum(eq_tab$primary) <= 1)
+ef_se <- do.call(rbind, lapply(names(EF), function(k) {
+  r <- sqrt(diag(EF[[k]]$V_robust)) / sqrt(diag(EF[[k]]$V_model))
+  data.frame(data = k, robust_model_se_median = median(r), min = min(r), max = max(r))
+}))
+print(ef_se, digits = 3, row.names = FALSE)
+print(eq_tab[, c("model", "comparison", "variance", "W", "df", "p", "reference", "samples", "primary")],
+      digits = 4, row.names = FALSE)
+out_csv(eq_tab, "equality_wald")
+
+# (f) the all-spatial Wald test of each dataset (W = b' V^-1 b, df 24)
+allsp <- function(nm, variance = "vcov") {
+  f <- FIT[[nm]]
+  idx <- which(names(f$coef) != "(Intercept)")
+  b <- f$coef[idx]
+  V <- f[[variance]][idx, idx]
+  W <- as.numeric(crossprod(b, solve(V, b)))
+  data.frame(fit = nm, label = f$label,
+             variance = if (variance == "vcov") "RX (GLMM) / model-based (CML)" else "lme4 default (OLD: stored Hessian)",
+             W = W, df = length(b), p = stats::pchisq(W, length(b), lower.tail = FALSE),
+             reference = "chi2", B = NA_integer_, cases = f$n_cases, W_per_case = W / f$n_cases)
+}
+allsp_boot <- function(k) {
+  if (is.null(BOOT[[k]])) return(NULL)
+  nm <- boot_fit[[k]]
+  f <- FIT[[nm]]
+  r <- t6_wald_boot(f$coef, t6_boot_draws(BOOT[[k]], f))
+  data.frame(fit = nm, label = f$label, variance = "shoe bootstrap", W = r$W, df = r$df, p = r$p,
+             reference = r$reference, B = r$B, cases = f$n_cases, W_per_case = r$W / f$n_cases)
+}
+wald_tab <- do.call(rbind, c(list(allsp("glmm_old", "vcov_default")),
+                             lapply(intersect(c("glmm_old", "glmm_new", "glmm_new_ob", "glmm_norep_new",
+                                                "glmm_groupB_new", "cml_old", "cml_new", "cml_new_ob",
+                                                "cml_norep_new", "cml_groupB_new"), names(FIT)), allsp),
+                             lapply(names(BOOT), allsp_boot)))
+committed_w <- c(old = read.csv(rac_path(P_old, "wald_test"))$W, new = read.csv(rac_path(P_new, "wald_test"))$W)
+stopifnot(abs(wald_tab$W[1] - committed_w[["old"]]) < 1e-6 * committed_w[["old"]],
+          abs(wald_tab$W[wald_tab$fit == "glmm_new" & wald_tab$reference == "chi2"] - committed_w[["new"]]) <
+            1e-6 * committed_w[["new"]])
+print(wald_tab, digits = 5, row.names = FALSE)
+out_csv(wald_tab, "wald_all_spatial")
+# bootstrap vs model-based SEs of the spatial coefficients (RX vcov)
+boot_se_tab <- do.call(rbind, lapply(names(BOOT), function(k) {
+  f <- FIT[[boot_fit[[k]]]]
+  r <- (apply(BOOT[[k]]$draws, 2, stats::sd) / sqrt(diag(f$vcov)))[-1]
+  data.frame(bootstrap = k, fit = boot_fit[[k]], B = nrow(BOOT[[k]]$draws),
+             failed = length(BOOT[[k]]$failed), se_ratio_median = median(r),
+             se_ratio_min = min(r), se_ratio_max = max(r))
+}))
+if (!is.null(boot_se_tab)) {
+  print(boot_se_tab, digits = 3, row.names = FALSE)
+  out_csv(boot_se_tab, "bootstrap_se_ratio")
+}
+```
+
+## (d) Maps on the common prototype grid
+
+```{r t6_grid}
+G <- t6_grid(P_old)
+inside <- G$inside
+mask_mat <- G$mask != 0
+rows_in <- range(which(rowSums(mask_mat) > 0))
+cols_in <- range(which(colSums(mask_mat) > 0))
+crop_r <- max(1, rows_in[1] - 6):min(G$nrow, rows_in[2] + 6)
+crop_c <- max(1, cols_in[1] - 6):min(G$ncol, cols_in[2] + 6)
+# calibrated density (RAC pixels per 1,000 contact pixels) of a fit on the
+# grid, with the SE of its log
+cal_of <- function(nm) {
+  ds <- ds_of(nm)
+  t6_calibration(FIT[[nm]], FIT[[nm]]$spec, data_of(FIT[[nm]], ds), CODES[[ds]], PC[[ds]])
+}
+CAL <- list()
+dens_grid <- function(nm) {
+  if (is.null(CAL[[nm]])) CAL[[nm]] <<- cal_of(nm)
+  r <- t6_density(FIT[[nm]], FIT[[nm]]$spec, G$x[inside], G$y[inside], CAL[[nm]])
+  dens <- rep(NA_real_, length(G$x))
+  se <- rep(NA_real_, length(G$x))
+  dens[inside] <- 1000 * r$density
+  se[inside] <- r$se_log
+  list(dens = dens, se_log = se)
+}
+MAPS <- list()
+for (nm in names(FIT)) {
+  if (!isTRUE(FIT[[nm]]$offset_refit) && !grepl("nagq0_", nm)) MAPS[[nm]] <- dens_grid(nm)
+}
+cal_tab <- do.call(rbind, lapply(names(CAL), function(nm) {
+  data.frame(fit = nm, observed_per_1000 = 1000 * CAL[[nm]]$observed_density,
+             map_mean_per_1000 = mean(MAPS[[nm]]$dens[inside]),
+             map_min = min(MAPS[[nm]]$dens[inside]), map_max = max(MAPS[[nm]]$dens[inside]))
+}))
+print(cal_tab, digits = 4, row.names = FALSE)
+# data support of each dataset around each grid pixel: the number of RAC
+# pixels (cases) within a box of 21 x 21 prototype pixels (0.07 units)
+# counts (or weights) of case-control rows on the prototype grid, and their
+# sums over a box of 21 x 21 prototype pixels (0.07 units) around each pixel
+grid_hist <- function(new_x, y, w = rep(1, length(new_x))) {
+  col <- round(new_x * px_per_unit + G$ncol / 2)
+  row <- round(-y * px_per_unit + G$nrow / 2)
+  ok <- col >= 1 & col <= G$ncol & row >= 1 & row <= G$nrow
+  h <- matrix(0, G$nrow, G$ncol)
+  agg <- tapply(w[ok], (col[ok] - 1) * G$nrow + row[ok], sum)
+  h[as.integer(names(agg))] <- agg
+  h
+}
+box21 <- function(h, r = 10) {
+  # integral image: ii[i + 1, j + 1] = sum(h[1:i, 1:j])
+  ii <- rbind(0, cbind(0, t(apply(apply(h, 2, cumsum), 1, cumsum))))
+  r0 <- pmax(1, seq_len(G$nrow) - r)
+  r1 <- pmin(G$nrow, seq_len(G$nrow) + r)
+  c0 <- pmax(1, seq_len(G$ncol) - r)
+  c1 <- pmin(G$ncol, seq_len(G$ncol) + r)
+  ii[r1 + 1, c1 + 1] - ii[r0, c1 + 1] - ii[r1 + 1, c0] + ii[r0, c0]
+}
+support <- function(d) {
+  cc <- d[d$n_Acc == 1, ]
+  box21(grid_hist(cc$new_x, cc$y))
+}
+# the empirical (model-free) RAC density per 1,000 contact pixels in the box:
+# RAC pixels / the contact pixels the controls stand for (each control of
+# shoe i stands for (px_i - n_i) / 100 contact pixels, as in t6_calibration)
+emp_density <- function(d, ds) {
+  s <- t6_shoe_px(d, CODES[[ds]], PC[[ds]])
+  n_ctrl <- stats::ave(1 - d$n_Acc, d$shoe, FUN = sum)
+  w <- (s$px - s$n) / n_ctrl
+  ca <- d$n_Acc == 1
+  num <- box21(grid_hist(d$new_x[ca], d$y[ca]))
+  den <- box21(grid_hist(d$new_x[!ca], d$y[!ca], w[!ca]))
+  out <- 1000 * num / den
+  out[!mask_mat | den <= 0] <- NA
+  list(dens = out, cases = num)
+}
+SUP <- list(old = support(D$old), new = support(D$new))
+sparse_min <- 10
+sparse <- (SUP$old < sparse_min | SUP$new < sparse_min) & mask_mat
+cat(sprintf("mask pixels with fewer than %d RAC pixels of either dataset within the 21 x 21 box: %d of %d (%.1f%%)\n",
+            sparse_min, sum(sparse), sum(mask_mat), 100 * mean(sparse[mask_mat])))
+EMP <- list(old = emp_density(D$old, "old"), new = emp_density(D$new, "new"),
+            norep = emp_density(D$new[!D$new$shoe %in% reprints, ], "new"))
+for (k in names(EMP)) {
+  v <- EMP[[k]]$dens[mask_mat & !sparse]
+  cat(sprintf("empirical density %s (21 x 21 box, supported pixels): median %.3f, p5 %.3f, p95 %.3f per 1,000 contact px\n",
+              k, median(v, na.rm = TRUE), q(v[!is.na(v)], 0.05), q(v[!is.na(v)], 0.95)))
+}
+```
+
+```{r t6_map_helpers}
+as_mat <- function(v) t6_as_matrix(v, G)
+# a figure's title and note in the outer top margin: the note is wrapped to
+# the width of the open device (measured with strwidth), and header_oma()
+# makes the margin as high as the wrapped note needs
+wrap_note <- function(note, cex = 0.72) {
+  room <- 0.985 * par("din")[1]
+  lines <- character(0)
+  cur <- ""
+  for (w in strsplit(note, " ", fixed = TRUE)[[1]]) {
+    cand <- if (nzchar(cur)) paste(cur, w) else w
+    # strwidth multiplies cex by par("cex") (lowered by layout()); mtext's
+    # cex is absolute, so measure at cex / par("cex")
+    if (nzchar(cur) && strwidth(cand, units = "inches", cex = cex / par("cex")) > room) {
+      lines <- c(lines, cur)
+      cur <- w
+    } else {
+      cur <- cand
+    }
+  }
+  c(lines, cur)
+}
+header_oma <- function(note) c(0, 0, 2.3 + 1.1 * length(wrap_note(note)), 0)
+fig_header <- function(title, note) {
+  nl <- wrap_note(note)
+  n <- length(nl)
+  # adj = 0 with at: every line starts at the same left edge (with adj alone,
+  # mtext places the point at that fraction of the string's own width there)
+  mtext(title, outer = TRUE, side = 3, line = 1.1 * n + 0.6, adj = 0, at = 0.008, font = 2, cex = 1.05,
+        col = INK)
+  for (i in seq_len(n)) {
+    mtext(nl[i], outer = TRUE, side = 3, line = 1.1 * (n - i) + 0.3, adj = 0, at = 0.008, cex = 0.72,
+          col = INK2)
+  }
+}
+xs_c <- G$xs[crop_c]
+ys_r <- G$ys[crop_r]
+draw_map <- function(mat, zlim, col, title, sub = NULL, z_contour = NULL,
+                     cuts = FALSE, shade = NULL, axes = FALSE, areas = NULL,
+                     pinned = NULL) {
+  m <- mat[crop_r, crop_c]
+  m[!is.na(m)] <- pmin(pmax(m[!is.na(m)], zlim[1]), zlim[2])
+  par(mar = c(1.2, if (axes) 3.2 else 0.6, 2.6, 0.6))
+  image(x = xs_c, y = rev(ys_r), z = t(m[nrow(m):1, ]), col = col, zlim = zlim,
+        useRaster = TRUE, asp = 1, axes = FALSE, xlab = "", ylab = "")
+  if (!is.null(shade)) {
+    s <- shade[crop_r, crop_c]
+    s[!s] <- NA
+    image(x = xs_c, y = rev(ys_r), z = t(s[nrow(s):1, ]), col = grDevices::adjustcolor("#898781", 0.55),
+          add = TRUE, useRaster = TRUE)
+  }
+  mk <- mask_mat[crop_r, crop_c] * 1
+  contour(x = xs_c, y = rev(ys_r), z = t(mk[nrow(mk):1, ]), levels = 0.5,
+          drawlabels = FALSE, add = TRUE, col = INK2, lwd = 0.8)
+  if (!is.null(pinned)) {
+    # the band next to the K8-pinned edges (dotted): not data there
+    pz <- (pinned & mask_mat)[crop_r, crop_c] * 1
+    contour(x = xs_c, y = rev(ys_r), z = t(pz[nrow(pz):1, ]), levels = 0.5,
+            drawlabels = FALSE, add = TRUE, col = INK, lwd = 0.8, lty = 3)
+  }
+  if (!is.null(z_contour)) {
+    zz <- z_contour[crop_r, crop_c]
+    zz[is.na(zz)] <- 0
+    contour(x = xs_c, y = rev(ys_r), z = t(zz[nrow(zz):1, ]), levels = c(-1.96, 1.96),
+            drawlabels = FALSE, add = TRUE, col = INK, lwd = 0.9, lty = 1)
+  }
+  if (cuts) {
+    for (r in cut_rows) {
+      yy <- G$ys[r]
+      xr <- range(G$xs[mask_mat[r, ]])
+      segments(xr[1], yy, xr[2], yy, col = INK, lty = 3, lwd = 0.8)
+      text(xr[2] + 0.01, yy, r, cex = 0.6, col = INK2, adj = 0)
+    }
+  }
+  if (!is.null(areas)) {
+    am <- areas$mat
+    for (k in sort(unique(am[!is.na(am)]))) {
+      z <- (am == k) * 1
+      z[is.na(z)] <- 0
+      z <- z[crop_r, crop_c]
+      contour(x = xs_c, y = rev(ys_r), z = t(z[nrow(z):1, ]), levels = 0.5,
+              drawlabels = FALSE, add = TRUE, col = INK, lwd = 0.7)
+    }
+    text(areas$cx, areas$cy, areas$k, cex = 0.75, font = 2, col = INK)
+  }
+  if (axes) {
+    axis(2, at = seq(-0.5, 0.5, by = 0.25), las = 1, cex.axis = 0.7, col = INK2, col.axis = INK2)
+    mtext("y (toe up)", side = 2, line = 2.2, cex = 0.6, col = INK2)
+  }
+  title(main = title, cex.main = 0.95, font.main = 2, col.main = INK, line = 1.2)
+  if (!is.null(sub)) mtext(sub, side = 3, line = 0.2, cex = 0.62, col = INK2)
+}
+draw_bar <- function(zlim, col, label, at = NULL, labels = TRUE) {
+  par(mar = c(2.6, 2, 0.6, 2))
+  z <- seq(zlim[1], zlim[2], length.out = length(col))
+  image(x = z, y = 1, z = matrix(z, ncol = 1), col = col, axes = FALSE, xlab = "", ylab = "",
+        useRaster = TRUE)
+  if (is.null(at)) at <- pretty(zlim, 6)
+  at <- at[at >= zlim[1] & at <= zlim[2]]
+  axis(1, at = at, labels = labels, cex.axis = 0.75, col = INK2, col.axis = INK, mgp = c(2, 0.4, 0),
+       tcl = -0.25)
+  mtext(label, side = 1, line = 1.6, cex = 0.62, col = INK)
+  box(col = GRID_COL)
+}
+ratio_at <- log2(c(0.25, 0.35, 0.5, 0.71, 1, 1.41, 2, 2.83, 4))
+ratio_lab <- c("0.25", "0.35", "0.5", "0.71", "1", "1.41", "2", "2.83", "4")
+four_panel <- function(a, b, model_lab, stem, note, se_a = NULL, se_b = NULL,
+                       z_lab = "ratio; black line: pointwise |z| = 1.96", pinned = NULL) {
+  da <- MAPS[[a]]
+  db <- MAPS[[b]]
+  if (!is.null(se_a)) da$se_log <- se_a
+  if (!is.null(se_b)) db$se_log <- se_b
+  zl <- range(c(da$dens, db$dens), na.rm = TRUE)
+  diff <- db$dens - da$dens
+  dl <- max(abs(diff), na.rm = TRUE) * c(-1, 1)
+  lr <- log2(db$dens / da$dens)
+  rl <- max(abs(lr), na.rm = TRUE)
+  rl <- c(-1, 1) * max(rl, 0.6)
+  z <- (log(db$dens) - log(da$dens)) / sqrt(da$se_log^2 + db$se_log^2)
+  save_fig(stem, 13, 7.2, function() {
+    layout(matrix(c(1, 2, 3, 4, 5, 5, 6, 7), 2, byrow = TRUE), heights = c(1, 0.13))
+    par(oma = header_oma(note))
+    draw_map(as_mat(da$dens), zl, SEQ, sprintf("OLD (%d shoes)", length(FIT[[a]]$shoes)),
+             FIT[[a]]$label, cuts = TRUE, axes = TRUE)
+    draw_map(as_mat(db$dens), zl, SEQ, sprintf("NEW (%d shoes)", length(FIT[[b]]$shoes)),
+             FIT[[b]]$label, cuts = TRUE)
+    draw_map(as_mat(diff), dl, DIV, "NEW - OLD", "difference of the densities")
+    draw_map(as_mat(lr), rl, DIV, "NEW / OLD", z_lab, z_contour = as_mat(z), pinned = pinned)
+    draw_bar(zl, SEQ, "RAC pixels per 1,000 contact pixels (both maps on this scale, lowest to highest value)")
+    draw_bar(dl, DIV, "NEW - OLD, per 1,000 contact pixels")
+    draw_bar(rl, DIV, "NEW / OLD (log scale): red = NEW higher, blue = OLD higher",
+             at = ratio_at, labels = ratio_lab[ratio_at >= rl[1] & ratio_at <= rl[2]])
+    fig_header(sprintf("%s: RAC density on the prototype, OLD vs NEW", model_lab), note)
+  })
+  data.frame(stem = stem, old = a, new = b,
+             old_mean = mean(da$dens, na.rm = TRUE), new_mean = mean(db$dens, na.rm = TRUE),
+             ratio_p5 = q(2^lr[inside], 0.05), ratio_median = median(2^lr[inside]),
+             ratio_p95 = q(2^lr[inside], 0.95), ratio_min = min(2^lr[inside]),
+             ratio_max = max(2^lr[inside]),
+             share_z_above = mean(z[inside] > 1.96), share_z_below = mean(z[inside] < -1.96),
+             share_ratio_outside_0.8_1.25 = mean(2^lr[inside] < 0.8 | 2^lr[inside] > 1.25))
+}
+```
+
+```{r t6_maps}
+note_cal <- paste("Each map: the model's spatial surface (random effect 0), scaled so that it reproduces the dataset's",
+                  "observed RAC total over all shoes' contact surfaces (no MEAN_OFFSET, no exp(-sigma^2/2)).",
+                  "Dotted rows: the CI cuts 110, 190, 250. x: new_x, the standardized x of the prototype.",
+                  "The |z| contours are model-based: RACs of a shoe taken as independent (K9) and each dataset's",
+                  "overall level as known, so they enclose too much (shoe-bootstrap version: the common-basis figures).")
+# the |z| contours of the main maps are model-based: RACs independent given
+# the shoe (K9) and the RAC total fixed (the calibration's level is not
+# resampled), so they enclose too much; inference: the bootstrap figures
+# below (T6 review fixes)
+z_model <- "ratio; black line: model-based |z| = 1.96 (too narrow)"
+map_tab <- rbind(
+  four_panel("glmm_old", "glmm_new", "Random effects (GLMM, each dataset on its own step-3 knots)",
+             "intensity_maps_glmm", note_cal, z_lab = z_model),
+  four_panel("cml_old", "cml_new", "Conditional ML (CML, each dataset on its own step-3 knots)",
+             "intensity_maps_cml", note_cal, z_lab = z_model))
+print(map_tab, digits = 3, row.names = FALSE)
+```
+
+```{r t6_maps_boot}
+# the common-basis GLMM maps with shoe-bootstrap SEs of the log density (the
+# model-based SEs assume the RACs of a shoe independent given its random
+# effect, known issue K9). Three kinds per draw (t6_logdens_boot; T6 review
+# fixes): "resampled" recalibrates each draw on its own resampled shoes, so
+# its SD includes the sampling error of the dataset's overall RAC density
+# (for statements about absolute densities, the level included); "fixed"
+# holds the dataset's rows and RAC total fixed and "shape" divides each draw
+# by its own observed density: both are SDs of the shape, the density
+# relative to the dataset's average (for statements about shape). A fourth,
+# "proto", normalises each draw by its own mean over the prototype (a common
+# reference for both datasets; a sensitivity of the shape normalisation).
+pin_width <- 0.03 # units (about 9 prototype pixels) next to the K8-pinned edges
+BSD <- list()
+for (k in names(BOOT)) {
+  nm <- boot_fit[[k]]
+  f <- FIT[[nm]]
+  ds <- ds_of(nm)
+  rows <- t6_cal_rows(f, D[[ds]], CODES[[ds]], PC[[ds]])
+  dr <- t6_boot_draws(BOOT[[k]], f)
+  r <- t6_logdens_boot(f, rows, dr, G$x[inside], G$y[inside], ids = t6_boot_ids(BOOT[[k]]),
+                       kinds = c("fixed", "resampled", "shape"))
+  Xp <- cbind(1, t6_design(f$spec, G$x[inside], G$y[inside]))
+  s1 <- s2 <- numeric(nrow(Xp))
+  for (st in seq(1L, nrow(dr), by = 100L)) {
+    kk <- st:min(nrow(dr), st + 99L)
+    lp <- Xp %*% t(dr[kk, , drop = FALSE])
+    ld <- sweep(lp, 2, log(colMeans(exp(lp))))
+    s1 <- s1 + rowSums(ld)
+    s2 <- s2 + rowSums(ld^2)
+  }
+  r$proto <- list(sd = sqrt(pmax(s2 / nrow(dr) - (s1 / nrow(dr))^2, 0) * nrow(dr) / (nrow(dr) - 1)))
+  BSD[[nm]] <- lapply(r, function(z) {
+    se <- rep(NA_real_, length(G$x))
+    se[inside] <- z$sd
+    se
+  })
+}
+boot_map_se <- do.call(rbind, lapply(names(BSD), function(nm) {
+  b <- lapply(BSD[[nm]], function(v) v[inside])
+  m <- MAPS[[nm]]$se_log[inside]
+  data.frame(fit = nm, sd_log_model_median = median(m), sd_log_boot_fixedN_median = median(b$fixed),
+             sd_log_boot_resampled_median = median(b$resampled), sd_log_boot_shape_median = median(b$shape),
+             fixedN_over_model_median = median(b$fixed / m), fixedN_over_model_p5 = q(b$fixed / m, 0.05),
+             fixedN_over_model_p95 = q(b$fixed / m, 0.95), fixedN_over_model_max = max(b$fixed / m),
+             resampled_over_model_median = median(b$resampled / m),
+             resampled_over_fixedN_median = median(b$resampled / b$fixed),
+             resampled_over_fixedN_p5 = q(b$resampled / b$fixed, 0.05),
+             resampled_over_fixedN_p95 = q(b$resampled / b$fixed, 0.95),
+             shape_over_fixedN_median = median(b$shape / b$fixed),
+             shape_over_fixedN_max_abs_dev = max(abs(b$shape / b$fixed - 1)),
+             proto_over_fixedN_median = median(b$proto / b$fixed))
+}))
+if (!is.null(boot_map_se)) print(boot_map_se, digits = 3, row.names = FALSE)
+PIN <- as_mat(t6_pinned_band(list(FIT$glmm_old$spec), G$x, G$y, width = pin_width))
+note_boot <- paste("NEW refitted on OLD's step-3 knots (the common basis of the coefficient table). Both maps calibrated",
+                   "as in the main maps. Black line: pointwise |z| = 1.96 with shoe-bootstrap SEs: whole shoes resampled,",
+                   "so RACs of one shoe stay together, and each draw recalibrated on its own resampled shoes, so the SEs",
+                   "include the sampling error of each dataset's overall RAC density; not adjusted for multiplicity.",
+                   sprintf("Dotted: within %.2f units of the K8-pinned edges, where the surfaces are pinned (not data).", pin_width))
+boot_maps <- list(c("glmm_old", "glmm_new_ob", "NEW (all shoes)", "intensity_maps_glmm_commonbasis_boot"),
+                  c("glmm_old", "glmm_norep_new", "NEW without the reprinted shoes",
+                    "intensity_maps_glmm_commonbasis_norep_boot"))
+for (bm in boot_maps) {
+  if (!all(bm[1:2] %in% names(BSD))) next
+  map_tab <- rbind(map_tab, four_panel(bm[1], bm[2], sprintf("Random effects on the common basis, %s", bm[3]),
+                                       bm[4], note_boot, se_a = BSD[[bm[1]]]$resampled, se_b = BSD[[bm[2]]]$resampled,
+                                       z_lab = "ratio; black line: |z| = 1.96 (shoe bootstrap, level included)",
+                                       pinned = PIN))
+}
+print(map_tab, digits = 3, row.names = FALSE)
+if (!is.null(boot_map_se)) out_csv(boot_map_se, "bootstrap_map_se")
+# how much of the prototype differs, by quantity and variance, on the whole
+# prototype and away from the K8-pinned edges (T6 review fixes)
+band_in <- t6_pinned_band(list(FIT$glmm_old$spec), G$x[inside], G$y[inside], width = pin_width)
+share_rows <- function(a, b, comparison) {
+  la <- log(MAPS[[a]]$dens[inside])
+  lb <- log(MAPS[[b]]$dens[inside])
+  lvl <- log(CAL[[b]]$observed_density / CAL[[a]]$observed_density)
+  sd2 <- function(kind) BSD[[a]][[kind]][inside]^2 + BSD[[b]][[kind]][inside]^2
+  v <- list(
+    list("absolute (level and shape)", "shoe bootstrap, each draw recalibrated on its resampled shoes",
+         lb - la, sd2("resampled")),
+    list("absolute (level and shape)", "shoe bootstrap, RAC total fixed (superseded: omits the level's sampling error)",
+         lb - la, sd2("fixed")),
+    list("absolute (level and shape)", "model-based, RAC total fixed (as the main figures)",
+         lb - la, MAPS[[a]]$se_log[inside]^2 + MAPS[[b]]$se_log[inside]^2),
+    list("shape: each map / its observed density", "shoe bootstrap, normalisation resampled", lb - la - lvl, sd2("shape")),
+    list("shape: each map / its mean over the prototype", "shoe bootstrap",
+         (lb - log(mean(exp(lb)))) - (la - log(mean(exp(la)))), sd2("proto")))
+  do.call(rbind, lapply(v, function(e) {
+    z <- e[[3]] / sqrt(e[[4]])
+    data.frame(comparison = comparison, quantity = e[[1]], variance = e[[2]],
+               median_ratio = median(exp(e[[3]])), share_higher = mean(z > 1.96), share_lower = mean(z < -1.96),
+               share_higher_off_band = mean(z[!band_in] > 1.96), share_lower_off_band = mean(z[!band_in] < -1.96),
+               higher_in_band = sum(z > 1.96 & band_in) / max(1, sum(z > 1.96)),
+               band_share = mean(band_in), band_width = pin_width)
+  }))
+}
+share_tab <- rbind(share_rows("glmm_old", "glmm_new_ob", "NEW (all) vs OLD, common basis"),
+                   share_rows("glmm_old", "glmm_norep_new", "NEW without reprints vs OLD, common basis"))
+print(share_tab[, -ncol(share_tab)], digits = 3, row.names = FALSE)
+out_csv(share_tab, "map_shares")
+# the shape comparison as a figure: each map divided by its dataset's observed
+# RAC density (1 = the dataset's average), GLMM with shape |z| contours and the
+# same ratio from the data
+shape_note <- paste("Each density divided by its own dataset's observed RAC density (RAC pixels / contact pixels), so the",
+                    "ratio compares shapes, not levels. GLMM: NEW on OLD's step-3 knots; black line: pointwise |z| = 1.96",
+                    "(shoe bootstrap, not adjusted for multiplicity); dotted: the K8-pinned band. Data: 21 x 21-pixel box",
+                    "as in the empirical figure; grey: fewer than 10 RAC pixels of OLD or NEW in the box.")
+shape_pairs <- list(c("glmm_new_ob", "new", "NEW (all)"), c("glmm_norep_new", "norep", "NEW without reprints"))
+SHP <- lapply(shape_pairs, function(sp) {
+  a <- "glmm_old"
+  b <- sp[1]
+  lvl <- log2(CAL[[b]]$observed_density / CAL[[a]]$observed_density)
+  lr <- log2(MAPS[[b]]$dens / MAPS[[a]]$dens) - lvl
+  z <- (lr * log(2)) / sqrt(BSD[[a]]$shape^2 + BSD[[b]]$shape^2)
+  le <- log2(EMP[[sp[2]]]$dens / EMP$old$dens) - lvl
+  le[sparse | !mask_mat] <- NA
+  list(lr = lr, z = z, le = le, lab = sp[3], lvl = lvl)
+})
+rl_s <- c(-1, 1) * min(1, max(sapply(SHP, function(s) max(abs(c(s$lr, s$le)), na.rm = TRUE))))
+save_fig("ratio_maps_commonbasis_shape_boot", 15, 7.4, function() {
+  layout(matrix(c(1, 2, 3, 4, 5, 5, 5, 5), 2, byrow = TRUE), heights = c(1, 0.13))
+  par(oma = header_oma(shape_note))
+  for (k in seq_along(SHP)) {
+    s <- SHP[[k]]
+    draw_map(as_mat(s$lr), rl_s, DIV, sprintf("GLMM: %s / OLD, shape", s$lab),
+             sprintf("levels divided out (NEW / OLD %.3f)", 2^s$lvl), z_contour = as_mat(s$z),
+             pinned = PIN, shade = sparse, axes = k == 1)
+  }
+  for (k in seq_along(SHP)) {
+    s <- SHP[[k]]
+    draw_map(s$le, rl_s, DIV, sprintf("data: %s / OLD, shape", s$lab), "empirical densities, levels divided out",
+             shade = sparse)
+  }
+  draw_bar(rl_s, DIV, "NEW / OLD of the relative densities (log scale): red = NEW relatively higher; beyond 0.5-2 at the end colours",
+           at = ratio_at, labels = ratio_lab[ratio_at >= rl_s[1] - 1e-9 & ratio_at <= rl_s[2] + 1e-9])
+  fig_header("Shape only: OLD vs NEW with each dataset's overall RAC density divided out", shape_note)
+})
+```
+
+```{r t6_maps_empirical}
+# the data behind the maps: the empirical RAC density in a 21 x 21-pixel box
+# (no model, no basis), OLD and NEW on one scale, their ratio, and the GLMM
+# ratio of the main maps beside it; grey where either dataset has fewer than
+# 10 RAC pixels in the box
+emp_fig <- function(new_key, model_new, stem, lab_new) {
+  eo <- EMP$old$dens
+  en <- EMP[[new_key]]$dens
+  sup <- mask_mat & !sparse
+  zl <- q(stats::na.omit(c(eo[sup], en[sup])), c(0.005, 0.995))
+  lr_e <- log2(en / eo)
+  lr_e[!sup] <- NA
+  lr_m <- as_mat(log2(MAPS[[model_new]]$dens / MAPS$glmm_old$dens))
+  rl <- c(-1, 1) * min(2, max(abs(c(lr_e, lr_m[sup])), na.rm = TRUE))
+  emp_note <- paste("Each control stands for (contact pixels - RAC pixels) / 100 of its shoe's contact surface.",
+                    "Box sums smooth the data over 0.07 units; the GLMM maps are smoother still and bound by their",
+                    "spline basis. Both empirical maps on one scale, from the lowest to the highest value of either.")
+  save_fig(stem, 13, 7.2, function() {
+    layout(matrix(c(1, 2, 3, 4, 5, 5, 6, 6), 2, byrow = TRUE), heights = c(1, 0.13))
+    par(oma = header_oma(emp_note))
+    draw_map(eo, zl, SEQ, sprintf("OLD, empirical (%d shoes)", n_shoes[["old"]]),
+             "RAC pixels / contact pixels in the box", axes = TRUE, shade = sparse)
+    draw_map(en, zl, SEQ, sprintf("%s, empirical", lab_new), "RAC pixels / contact pixels in the box",
+             shade = sparse)
+    draw_map(lr_e, rl, DIV, "NEW / OLD, empirical", "grey: fewer than 10 RAC pixels in the box", shade = sparse)
+    draw_map(lr_m, rl, DIV, "NEW / OLD, GLMM maps", sprintf("%s vs %s", FIT$glmm_old$label, FIT[[model_new]]$label),
+             shade = sparse)
+    draw_bar(zl, SEQ, "RAC pixels per 1,000 contact pixels in a box of 21 x 21 prototype pixels (0.07 x 0.07 units); 0.5% clipped at each end")
+    draw_bar(rl, DIV, "NEW / OLD (log scale): red = NEW higher, blue = OLD higher", at = ratio_at,
+             labels = ratio_lab[ratio_at >= rl[1] & ratio_at <= rl[2]])
+    fig_header("The data behind the maps: empirical RAC density on the standardized shoe, without a model",
+               emp_note)
+  })
+  ok <- sup & !is.na(lr_e)
+  data.frame(new = new_key, model = model_new, supported_pixels = sum(ok),
+             emp_ratio_median = median(2^lr_e[ok]), emp_ratio_p5 = q(2^lr_e[ok], 0.05),
+             emp_ratio_p95 = q(2^lr_e[ok], 0.95), model_ratio_median = median(2^lr_m[ok]),
+             cor_log_ratios = stats::cor(lr_e[ok], lr_m[ok]))
+}
+emp_tab <- emp_fig("new", "glmm_new", "empirical_density", sprintf("NEW (%d shoes)", n_shoes[["new"]]))
+if (have("glmm_norep_new")) {
+  emp_tab <- rbind(emp_tab, emp_fig("norep", "glmm_norep_new", "empirical_density_norep",
+                                    sprintf("NEW without reprints (%d shoes)", length(FIT$glmm_norep_new$shoes))))
+}
+print(emp_tab, digits = 3, row.names = FALSE)
+out_csv(emp_tab, "empirical_density")
+```
+
+```{r t6_regions}
+# Model-free check of the regional differences (T6 review fixes): the RAC
+# density (RAC pixels / the contact pixels the rows stand for, as in
+# t6_calibration) in regions of the standardized shoe, NEW / OLD, with a
+# whole-shoe bootstrap (each dataset resampled by shoe, independently; B
+# draws, seed T6_SEEDS$regions): absolute, and relative to each dataset's
+# overall density (shape only). Beside it the ratio the GLMM maps on the
+# common basis imply for the same region (its model-expected RAC pixels over
+# its contact pixels, with each dataset's own contact pixels). rel = new_x /
+# distance_shape is the position across the prototype's half-width (-1 the
+# left edge, 1 the right edge).
+REG <- list(
+  forefoot_centre = list(lab = "forefoot centre (-0.09 < new_x < -0.01, 0.22 < y < 0.38)",
+                         f = function(d) d$new_x > -0.09 & d$new_x < -0.01 & d$y > 0.22 & d$y < 0.38),
+  forefoot_right = list(lab = "forefoot right (new_x > 0.12, y > 0.15)",
+                        f = function(d) d$new_x > 0.12 & d$y > 0.15),
+  forefoot_left = list(lab = "forefoot left (new_x < -0.13, y > 0.15)",
+                       f = function(d) d$new_x < -0.13 & d$y > 0.15),
+  rim_right_15 = list(lab = "forefoot right rim, outer 15% (rel > 0.85, 0.15 < y < 0.42)",
+                      f = function(d) d$y > 0.15 & d$y < 0.42 & d$rel > 0.85),
+  rim_left_15 = list(lab = "forefoot left rim, outer 15% (rel < -0.85, 0.15 < y < 0.42)",
+                     f = function(d) d$y > 0.15 & d$y < 0.42 & d$rel < -0.85),
+  rim_right_25 = list(lab = "forefoot right rim, outer 25% (rel > 0.75, 0.15 < y < 0.42)",
+                      f = function(d) d$y > 0.15 & d$y < 0.42 & d$rel > 0.75),
+  rim_left_25 = list(lab = "forefoot left rim, outer 25% (rel < -0.75, 0.15 < y < 0.42)",
+                     f = function(d) d$y > 0.15 & d$y < 0.42 & d$rel < -0.75),
+  toe_tip = list(lab = "toe tip (y >= 0.42)", f = function(d) d$y >= 0.42),
+  toe_right = list(lab = "right toe (y >= 0.38, new_x > 0)", f = function(d) d$y >= 0.38 & d$new_x > 0),
+  midfoot_top_band = list(lab = "midfoot-top band (-0.05 < y < 0.05)", f = function(d) d$y > -0.05 & d$y < 0.05),
+  midfoot_right_edge = list(lab = "midfoot right edge (rel > 0.75, -0.12 < y < 0.15)",
+                            f = function(d) d$y > -0.12 & d$y < 0.15 & d$rel > 0.75),
+  heel_front_band = list(lab = "heel-front band (-0.18 < y < -0.12)", f = function(d) d$y > -0.18 & d$y < -0.12),
+  heel_bottom = list(lab = "heel bottom (y < -0.35)", f = function(d) d$y < -0.35),
+  heel_bottom_inner = list(lab = "heel bottom, inner (-0.46 < y < -0.35)", f = function(d) d$y < -0.35 & d$y > -0.46),
+  heel_bottom_edge = list(lab = "heel bottom edge (y <= -0.46)", f = function(d) d$y <= -0.46))
+REG_DATA <- list(old = D$old, new = D$new, norep = D$new[!D$new$shoe %in% reprints, ])
+REG_DATA <- lapply(REG_DATA, function(d) {
+  d$rel <- d$new_x / d$distance_shape
+  stopifnot(!anyNA(d$rel), all(abs(d$rel) <= 1 + 1e-9))
+  d
+})
+reg_ds <- c(old = "old", new = "new", norep = "new")
+REG_TAB <- lapply(names(REG_DATA), function(k) {
+  t6_shoe_regions(REG_DATA[[k]], CODES[[reg_ds[[k]]]], PC[[reg_ds[[k]]]], lapply(REG, function(r) r$f))
+})
+names(REG_TAB) <- names(REG_DATA)
+B_reg <- 2000
+set.seed(T6_SEEDS$regions)
+REG_CNT <- lapply(REG_TAB, function(tab) {
+  idx <- replicate(B_reg, sample(nrow(tab), replace = TRUE))
+  t(apply(idx, 2, tabulate, nbins = nrow(tab)))
+})
+rn <- c("all", names(REG))
+REG_EST <- lapply(REG_TAB, function(tab) t6_region_density(tab, rn))
+REG_BOOT <- lapply(names(REG_TAB), function(k) t6_region_density(REG_TAB[[k]], rn, REG_CNT[[k]]))
+names(REG_BOOT) <- names(REG_TAB)
+# the ratio the GLMM maps imply: model-expected RAC pixels per row
+# (w exp(eta + log c), the calibration of the map) summed over the region
+reg_fit <- c(old = "glmm_old", new = "glmm_new_ob", norep = "glmm_norep_new")
+REG_MODEL <- lapply(names(reg_fit), function(k) {
+  nm <- reg_fit[[k]]
+  f <- FIT[[nm]]
+  d <- REG_DATA[[k]][REG_DATA[[k]]$shoe %in% f$shoes, ]
+  rows <- t6_cal_rows(f, d, CODES[[reg_ds[[k]]]], PC[[reg_ds[[k]]]])
+  pred <- rows$w * exp(as.vector(rows$X1 %*% f$coef) + CAL[[nm]]$log_c)
+  stopifnot(abs(sum(pred) - rows$N) < 1e-6 * rows$N)
+  vapply(rn, function(r) {
+    k_r <- if (r == "all") rep(TRUE, nrow(d)) else REG[[r]]$f(d)
+    sum(pred[k_r]) / sum(rows$w[k_r])
+  }, 0)
+})
+names(REG_MODEL) <- names(reg_fit)
+qq <- function(v, p) as.numeric(stats::quantile(v, p, na.rm = TRUE))
+reg_tab <- do.call(rbind, lapply(c("new", "norep"), function(nw) {
+  ro <- REG_BOOT$old
+  rw <- REG_BOOT[[nw]]
+  do.call(rbind, lapply(rn, function(r) {
+    ratio_b <- rw[, r] / ro[, r]
+    shape_b <- (rw[, r] / rw[, "all"]) / (ro[, r] / ro[, "all"])
+    est <- REG_EST[[nw]][, r] / REG_EST$old[, r]
+    lvl <- REG_EST[[nw]][, "all"] / REG_EST$old[, "all"]
+    mod <- REG_MODEL[[nw]][[r]] / REG_MODEL$old[[r]]
+    data.frame(comparison = if (nw == "new") "NEW (all) / OLD" else "NEW without reprints / OLD",
+               region = r, definition = if (r == "all") "the whole standardized shoe" else REG[[r]]$lab,
+               cases_old = sum(REG_TAB$old[[paste(r, "_cases", sep = "")]]),
+               cases_new = sum(REG_TAB[[nw]][[paste(r, "_cases", sep = "")]]),
+               density_old = 1000 * REG_EST$old[, r], density_new = 1000 * REG_EST[[nw]][, r],
+               ratio = est, ratio_lo = qq(ratio_b, 0.025), ratio_hi = qq(ratio_b, 0.975),
+               shape_ratio = est / lvl, shape_lo = qq(shape_b, 0.025), shape_hi = qq(shape_b, 0.975),
+               glmm_ratio = mod, glmm_shape_ratio = mod / (REG_MODEL[[nw]][["all"]] / REG_MODEL$old[["all"]]),
+               B = B_reg, failed_draws = sum(!is.finite(ratio_b)))
+  }))
+}))
+stopifnot(all(reg_tab$failed_draws == 0))
+print(reg_tab[, c("comparison", "region", "cases_old", "cases_new", "ratio", "ratio_lo", "ratio_hi",
+                  "shape_ratio", "shape_lo", "shape_hi", "glmm_ratio", "glmm_shape_ratio")], digits = 3, row.names = FALSE)
+out_csv(reg_tab, "empirical_regions")
+# the level alone: the shoe-bootstrap SD of the log observed RAC density of
+# each dataset (its overall density; the part the fixed-N bands left out)
+lvl_sd <- vapply(REG_BOOT, function(b) stats::sd(log(b[, "all"])), 0)
+cat(sprintf("shoe-bootstrap SD of the log overall RAC density: OLD %.4f, NEW %.4f, NEW without reprints %.4f\n",
+            lvl_sd[["old"]], lvl_sd[["new"]], lvl_sd[["norep"]]))
+fr <- rbind(data.frame(reg_tab[, c("comparison", "region", "definition")], kind = "absolute density",
+                       est = reg_tab$ratio, lo = reg_tab$ratio_lo, hi = reg_tab$ratio_hi, glmm = reg_tab$glmm_ratio),
+            data.frame(reg_tab[, c("comparison", "region", "definition")],
+                       kind = "relative to each dataset's overall density (shape)",
+                       est = reg_tab$shape_ratio, lo = reg_tab$shape_lo, hi = reg_tab$shape_hi,
+                       glmm = reg_tab$glmm_shape_ratio))
+fr$definition <- factor(fr$definition, levels = rev(unique(reg_tab$definition)))
+fr$kind <- factor(fr$kind, levels = unique(fr$kind))
+col_cmp <- c("NEW (all) / OLD" = COL[["new"]], "NEW without reprints / OLD" = COL[["norep"]])
+pr <- ggplot(fr, aes(est, definition, colour = comparison)) +
+  geom_vline(xintercept = 1, colour = INK2, linewidth = 0.4) +
+  geom_errorbar(aes(xmin = lo, xmax = hi), orientation = "y", width = 0.3, linewidth = 0.6,
+                position = position_dodge(width = 0.6)) +
+  geom_point(size = 2.2, position = position_dodge(width = 0.6)) +
+  geom_point(aes(glmm, definition), shape = 5, size = 2, position = position_dodge(width = 0.6),
+             show.legend = FALSE) +
+  facet_wrap(~kind, ncol = 2) +
+  scale_x_log10(breaks = c(0.5, 0.67, 0.8, 1, 1.25, 1.5, 2)) +
+  scale_colour_manual(values = col_cmp) +
+  labs(x = "NEW / OLD RAC density (log scale)", y = NULL,
+       title = "The data by region: NEW / OLD RAC density without a model",
+       subtitle = wrap_txt(paste(sprintf("Dots and bars: the data and 95%% whole-shoe bootstrap intervals (B = %d).", B_reg),
+                                 "Open diamonds: the ratio implied by the GLMM maps on the common basis",
+                                 "(the same region, each dataset's own contact pixels). rel: position across the",
+                                 "prototype's half-width (-1 left edge, 1 right edge)."), 14),
+       caption = wrap_txt(paste("Regions overlap (the rims lie inside the forefoot sides, the inner and edge parts",
+                                "inside the heel bottom). Shape: each density divided by its dataset's overall RAC",
+                                "density, so a common level difference cancels."), 14)) +
+  theme_t6() + theme(axis.text.y = element_text(size = 8))
+save_fig("empirical_regions", 14, 8.5, function() print(pr))
+```
+
+```{r t6_maps_asdrawn}
+# the maps as step 4 draws them (MEAN_OFFSET and exp(-sigma^2/2) of each
+# dataset; known issue K3): their levels are not comparable (plan F81)
+asdrawn <- lapply(c(old = "glmm_old", new = "glmm_new"), function(nm) {
+  ds <- ds_of(nm)
+  f <- FIT[[nm]]
+  t6_step4_map(f, f$spec, G, MEAN_OFFSET[[ds]], f$sigma2_step4)
+})
+zl <- range(unlist(asdrawn), na.rm = TRUE)
+lr_ad <- log2(asdrawn$new / asdrawn$old)
+lr_cal <- log2(as_mat(MAPS$glmm_new$dens) / as_mat(MAPS$glmm_old$dens))
+rl <- c(-1, 1) * max(abs(c(lr_ad, lr_cal)), na.rm = TRUE)
+ad_note <- paste("Left two maps share one scale. The two ratio maps differ only by a constant factor: the shape is",
+                 "the same, the level is not.")
+save_fig("intensity_maps_asdrawn", 13, 7.2, function() {
+  layout(matrix(c(1, 2, 3, 4, 5, 5, 6, 6), 2, byrow = TRUE), heights = c(1, 0.13))
+  par(oma = header_oma(ad_note))
+  draw_map(asdrawn$old, zl, SEQ, "OLD, as step 4 draws it", sprintf("sigma^2 %.3f, MEAN_OFFSET %.3f",
+           FIT$glmm_old$sigma2_step4, MEAN_OFFSET[["old"]]), axes = TRUE)
+  draw_map(asdrawn$new, zl, SEQ, "NEW, as step 4 draws it", sprintf("sigma^2 %.3f, MEAN_OFFSET %.3f",
+           FIT$glmm_new$sigma2_step4, MEAN_OFFSET[["new"]]))
+  draw_map(lr_ad, rl, DIV, "NEW / OLD as drawn", sprintf("median %.2f", median(2^lr_ad, na.rm = TRUE)))
+  draw_map(lr_cal, rl, DIV, "NEW / OLD calibrated", sprintf("median %.2f", median(2^lr_cal, na.rm = TRUE)))
+  draw_bar(zl, SEQ, "step 4's intensity: -log(1 - p) x exp(-sigma^2/2), p from the log-odds + MEAN_OFFSET")
+  draw_bar(rl, DIV, "NEW / OLD (log scale)", at = ratio_at,
+           labels = ratio_lab[ratio_at >= rl[1] & ratio_at <= rl[2]])
+  fig_header("GLMM maps as the pipeline draws them: the levels differ through exp(-sigma^2/2) and MEAN_OFFSET (K3, D-009)",
+             ad_note)
+})
+cat(sprintf("as drawn: map means OLD %.6f, NEW %.6f (ratio %.3f); calibrated means per 1,000 contact px OLD %.3f, NEW %.3f (ratio %.3f)\n",
+            mean(asdrawn$old, na.rm = TRUE), mean(asdrawn$new, na.rm = TRUE),
+            mean(asdrawn$new, na.rm = TRUE) / mean(asdrawn$old, na.rm = TRUE),
+            mean(MAPS$glmm_old$dens, na.rm = TRUE), mean(MAPS$glmm_new$dens, na.rm = TRUE),
+            mean(MAPS$glmm_new$dens, na.rm = TRUE) / mean(MAPS$glmm_old$dens, na.rm = TRUE)))
+cat(sprintf("as-drawn / calibrated ratio map: min %.4f, max %.4f (a constant up to the -log(1 - p) curvature)\n",
+            min(2^(lr_ad - lr_cal), na.rm = TRUE), max(2^(lr_ad - lr_cal), na.rm = TRUE)))
+```
+
+```{r t6_maps_sensitivity}
+variants <- list(
+  list(key = "step3", lab = "own step-3 knots (main)", glmm = c("glmm_old", "glmm_new"), cml = c("cml_old", "cml_new")),
+  list(key = "oldbasis", lab = "common basis: NEW on OLD's knots", glmm = c("glmm_old", "glmm_new_ob"),
+       cml = c("cml_old", "cml_new_ob")),
+  list(key = "full", lab = "full tensor (main effects + interaction)", glmm = c("glmm_full_old", "glmm_full_new"),
+       cml = c("cml_full_old", "cml_full_new")),
+  list(key = "fineY", lab = "finer y knots, each its own", glmm = c("glmm_fineY0_old", "glmm_fineY0_new"),
+       cml = c("cml_fineY_old", "cml_fineY_new")),
+  list(key = "fineYcommon", lab = "finer y knots, common (OLD's)", glmm = c("glmm_fineY0_old", "glmm_fineYold0_new"),
+       cml = c("cml_fineY_old", "cml_fineYold_new")),
+  list(key = "norep", lab = "NEW without the reprinted shoes", glmm = c("glmm_old", "glmm_norep_new"),
+       cml = c("cml_old", "cml_norep_new")),
+  list(key = "groupB", lab = "NEW without group A (group B only)", glmm = c("glmm_old", "glmm_groupB_new"),
+       cml = c("cml_old", "cml_groupB_new")))
+if (!is.null(FIT$glmm_fineY_old) && !is.null(FIT$glmm_fineY_new)) {
+  variants[[4]]$glmm <- c("glmm_fineY_old", "glmm_fineY_new")
+}
+if (!is.null(FIT$glmm_fineY_old) && !is.null(FIT$glmm_fineYold_new)) {
+  variants[[5]]$glmm <- c("glmm_fineY_old", "glmm_fineYold_new")
+}
+# a variant enters a model's figures and tables only when both its fits exist
+# (always, except in a T6_ALLOW_MISSING development run)
+variants_of <- function(model) {
+  ok <- Filter(function(v) have(v[[model]]), variants)
+  gone <- setdiff(vapply(variants, function(v) v$key, ""), vapply(ok, function(v) v$key, ""))
+  if (length(gone)) {
+    # in a run without T6_ALLOW_MISSING every required fit exists, so a
+    # missing variant can only be one of the slow exact CMLs
+    if (allow_missing) {
+      skipped <<- c(skipped, paste(model, "variant", gone))
+    } else {
+      slow_missing <<- c(slow_missing, paste(model, "variant", gone))
+    }
+  }
+  ok
+}
+sens_ratio <- function(model) {
+  lapply(variants_of(model), function(v) {
+    p <- v[[model]]
+    lr <- log2(MAPS[[p[2]]]$dens / MAPS[[p[1]]]$dens)
+    z <- (log(MAPS[[p[2]]]$dens) - log(MAPS[[p[1]]]$dens)) /
+      sqrt(MAPS[[p[1]]]$se_log^2 + MAPS[[p[2]]]$se_log^2)
+    list(lr = lr, z = z, v = v, pair = p)
+  })
+}
+vs_lab <- function(la, lb) {
+  sa <- sub("^OLD ", "", la)
+  sb <- sub("^NEW ", "", lb)
+  if (identical(sa, sb)) paste("OLD vs NEW", sa) else paste(la, "vs", lb)
+}
+sens_fig <- function(model, model_lab) {
+  S <- sens_ratio(model)
+  # ratios beyond 0.5-2 (corners and edges of the richer bases) at the end colours
+  rl <- c(-1, 1) * min(1, max(sapply(S, function(s) max(abs(s$lr), na.rm = TRUE))))
+  sens_note <- paste("Black lines: pointwise |z| = 1.96 (model-based, not adjusted for multiplicity or for the",
+                     "dependence of RACs within a shoe). Grey: fewer than 10 RAC pixels of OLD or NEW within the",
+                     "21 x 21-pixel box. Last panel: the same ratio from the data, without a model.")
+  save_fig(paste("ratio_maps_sensitivity", model, sep = "_"), 15, 9.5, function() {
+    layout(matrix(c(1:8, 9, 9, 9, 9), 3, byrow = TRUE), heights = c(1, 1, 0.12))
+    par(oma = header_oma(sens_note))
+    for (k in seq_along(S)) {
+      s <- S[[k]]
+      draw_map(as_mat(s$lr), rl, DIV, s$v$lab, vs_lab(FIT[[s$pair[1]]]$label, FIT[[s$pair[2]]]$label),
+               z_contour = as_mat(s$z), shade = sparse, axes = k %in% c(1, 5))
+    }
+    missing_lab <- setdiff(vapply(variants, function(v) v$lab, ""), vapply(S, function(s) s$v$lab, ""))
+    for (pad in seq_len(7 - length(S))) {
+      plot.new()
+      if (pad == 1) {
+        text(0.5, 0.5, paste(c("not shown (fit missing):", missing_lab,
+                               if (model == "cml") "the exact CMLs on the finer y basis need 3.5 GB each;" else NULL,
+                               if (model == "cml") "the GLMM figure has the finer-y variants" else NULL),
+                             collapse = "\n"), cex = 0.85, col = INK2)
+      }
+    }
+    le <- log2(EMP$new$dens / EMP$old$dens)
+    le[sparse | !mask_mat] <- NA
+    draw_map(le, rl, DIV, "data: empirical NEW / OLD", "all shoes, RAC pixels / contact pixels in a 21 x 21 box",
+             shade = sparse)
+    draw_bar(rl, DIV, "NEW / OLD (log scale): red = NEW higher, blue = OLD higher; grey: little data; beyond 0.5-2 at the end colours",
+             at = ratio_at, labels = ratio_lab[ratio_at >= rl[1] - 1e-9 & ratio_at <= rl[2] + 1e-9])
+    fig_header(sprintf("%s: the NEW / OLD ratio of the calibrated maps under the plan's sensitivities", model_lab),
+               sens_note)
+  })
+  do.call(rbind, lapply(S, function(s) {
+    r <- 2^s$lr[inside]
+    data.frame(model = model, variant = s$v$key, label = s$v$lab, old_fit = s$pair[1], new_fit = s$pair[2],
+               ratio_p5 = q(r, 0.05), ratio_median = median(r), ratio_p95 = q(r, 0.95),
+               share_z_above = mean(s$z[inside] > 1.96), share_z_below = mean(s$z[inside] < -1.96),
+               share_outside_0.8_1.25 = mean(r < 0.8 | r > 1.25),
+               share_outside_0.8_1.25_supported = mean((r < 0.8 | r > 1.25)[!sparse[mask_mat]]))
+  }))
+}
+sens_tab <- rbind(sens_fig("cml", "Conditional ML (CML)"), sens_fig("glmm", "Random effects (GLMM)"))
+print(sens_tab, digits = 3, row.names = FALSE)
+out_csv(map_tab, "map_ratio_main")
+out_csv(sens_tab, "map_ratio_summary")
+# how far apart are the variants of one dataset (does the basis move the map?)
+vs_tab <- do.call(rbind, lapply(c("old", "new"), function(ds) {
+  base <- paste("cml", ds, sep = "_")
+  alts <- c(full = paste("cml_full", ds, sep = "_"), fineY = paste("cml_fineY", ds, sep = "_"))
+  alts <- alts[alts %in% names(FIT)]
+  do.call(rbind, lapply(names(alts), function(k) {
+    r <- MAPS[[alts[[k]]]]$dens[inside] / MAPS[[base]]$dens[inside]
+    data.frame(dataset = toupper(ds), variant = k, ratio_p5 = q(r, 0.05), median = median(r),
+               ratio_p95 = q(r, 0.95), min = min(r), max = max(r))
+  }))
+}))
+print(vs_tab, digits = 3, row.names = FALSE)
+# how far the Efron approximation of the CML (used for the cluster-robust
+# check) moves the map from the exact CML on the same basis (OLD's step-3
+# knots): calibrated densities over the prototype
+ef_map <- do.call(rbind, lapply(c(old = "cml_old", new = "cml_new_ob"), function(nm) {
+  f <- FIT[[nm]]
+  k <- if (nm == "cml_old") "old" else "new"
+  fe <- f
+  stopifnot(identical(names(EF[[k]]$coef), names(f$coef)))
+  fe$coef <- EF[[k]]$coef
+  ds <- ds_of(nm)
+  ce <- t6_calibration(fe, fe$spec, data_of(fe, ds), CODES[[ds]], PC[[ds]])
+  de <- 1000 * t6_density(fe, fe$spec, G$x[inside], G$y[inside], ce, se = FALSE)$density
+  r <- de / MAPS[[nm]]$dens[inside]
+  data.frame(fit = nm, max_abs_coef_diff = max(abs(fe$coef - f$coef)), efron_over_exact_p5 = q(r, 0.05),
+             median = median(r), p95 = q(r, 0.95), min = min(r), max = max(r))
+}))
+print(ef_map, digits = 3, row.names = FALSE)
+out_csv(ef_map, "efron_vs_exact_cml")
+```
+
+```{r t6_nagq0}
+# what nAGQ = 0 changes (the finer-y GLMMs are fitted with nAGQ = 0 when
+# the nAGQ = 1 fits do not finish): the step-3 basis, both datasets
+nagq_tab <- do.call(rbind, lapply(Filter(function(ds) have(paste("glmm_nagq0", ds, sep = "_")),
+                                          c("old", "new")), function(ds) {
+  a <- FIT[[paste("glmm", ds, sep = "_")]]
+  b <- FIT[[paste("glmm_nagq0", ds, sep = "_")]]
+  ma <- dens_grid(paste("glmm", ds, sep = "_"))$dens[inside]
+  mb <- t6_density(b, b$spec, G$x[inside], G$y[inside],
+                   t6_calibration(b, b$spec, data_of(b, ds), CODES[[ds]], PC[[ds]]), se = FALSE)$density * 1000
+  data.frame(dataset = toupper(ds), sigma2_nagq1 = a$sigma2, sigma2_nagq0 = b$sigma2,
+             max_abs_fixef_diff = max(abs(a$coef - b$coef)),
+             map_ratio_min = min(mb / ma), map_ratio_max = max(mb / ma),
+             se_ratio_median = median(sqrt(diag(b$vcov)) / sqrt(diag(a$vcov))))
+}))
+if (!is.null(nagq_tab)) {
+  print(nagq_tab, digits = 4, row.names = FALSE)
+  out_csv(nagq_tab, "nagq0_check")
+}
+```
+
+## (e) Confidence intervals at the cuts
+
+```{r t6_cuts}
+cut_df <- function(nm, variant, model) {
+  ds <- ds_of(nm)
+  do.call(rbind, lapply(cut_rows, function(r) {
+    cols <- which(mask_mat[r, ])
+    k <- (r - 1) * G$ncol + cols
+    m <- MAPS[[nm]]
+    data.frame(dataset = toupper(ds), fit = nm, variant = variant, model = model, row = r,
+               y = G$ys[r], col = cols, new_x = G$xs[cols], est = m$dens[k],
+               lo = m$dens[k] * exp(-1.96 * m$se_log[k]), hi = m$dens[k] * exp(1.96 * m$se_log[k]))
+  }))
+}
+CUTS <- rbind(
+  do.call(rbind, lapply(variants_of("glmm"), function(v) {
+    rbind(cut_df(v$glmm[1], v$key, "GLMM"), cut_df(v$glmm[2], v$key, "GLMM"))
+  })),
+  do.call(rbind, lapply(variants_of("cml"), function(v) {
+    rbind(cut_df(v$cml[1], v$key, "CML"), cut_df(v$cml[2], v$key, "CML"))
+  })))
+out_csv(CUTS, "ci_cuts")
+row_lab <- function(r) {
+  where <- c("110" = "forefoot", "190" = "midfoot", "250" = "heel front")[[as.character(r)]]
+  sprintf("row %d: y = %.3f (%s)", r, G$ys[r], where)
+}
+CUTS$row_lab <- factor(vapply(CUTS$row, row_lab, ""), levels = vapply(cut_rows, row_lab, ""))
+CUTS$dataset <- factor(CUTS$dataset, levels = c("OLD", "NEW"))
+k8_edges <- data.frame(dataset = c("OLD", "NEW"),
+                       x = c(FIT$glmm_old$spec$bknots_x[1], FIT$glmm_new$spec$bknots_x[1]))
+main <- CUTS[CUTS$variant == "step3", ]
+pc <- ggplot(main[main$model == "GLMM", ], aes(new_x, est, colour = dataset, fill = dataset)) +
+  geom_ribbon(aes(ymin = lo, ymax = hi), alpha = 0.22, colour = NA) +
+  geom_line(linewidth = 0.8) +
+  geom_line(data = main[main$model == "CML", ], aes(new_x, est, colour = dataset),
+            linetype = "22", linewidth = 0.5, inherit.aes = FALSE) +
+  geom_vline(data = k8_edges, aes(xintercept = x, colour = dataset), linetype = "dotted",
+             linewidth = 0.5, show.legend = FALSE) +
+  facet_wrap(~row_lab, ncol = 1, scales = "free_y") +
+  scale_colour_manual(values = col_ds, labels = lab_ds) +
+  scale_fill_manual(values = col_ds, labels = lab_ds) +
+  labs(x = sprintf("standardized x, new_x (coordinate units; 1 unit = %g prototype pixels)", px_per_unit),
+       y = "RAC pixels per 1,000 contact pixels",
+       title = "CI cuts: OLD and NEW on the same axes",
+       subtitle = wrap_txt(paste("GLMM (each dataset on its own step-3 knots): line and model-based 95% band;",
+                                 "dashed: CML. Dotted verticals: the K8 left edge of each dataset (log-odds pinned there)."), 10),
+       caption = wrap_txt(paste("Bands are model-based (RACs independent given the shoe); the shoe bootstrap widens them by",
+                                "about 20-35% (figure ci_cuts_commonbasis_boot). NEW's own step-3 knots are too coarse",
+                                "in y at the heel front (plan F84), which lifts NEW's row 250 here."), 10)) +
+  theme_t6()
+save_fig("ci_cuts", 10, 10, function() print(pc))
+vc <- variants_of("cml")
+pcs <- ggplot(CUTS[CUTS$model == "CML", ], aes(new_x, est, colour = dataset, fill = dataset)) +
+  geom_ribbon(aes(ymin = lo, ymax = hi), alpha = 0.22, colour = NA) +
+  geom_line(linewidth = 0.6) +
+  facet_grid(row_lab ~ factor(variant, levels = vapply(vc, function(v) v$key, "")),
+             scales = "free_y", labeller = labeller(.cols = setNames(vapply(vc, function(v) v$lab, ""),
+                                                                     vapply(vc, function(v) v$key, "")),
+                                                    .rows = label_value)) +
+  scale_colour_manual(values = col_ds, labels = lab_ds) +
+  scale_fill_manual(values = col_ds, labels = lab_ds) +
+  labs(x = "new_x (coordinate units)", y = "RAC pixels per 1,000 contact pixels",
+       title = "CI cuts under the plan's sensitivities (CML, model-based 95% bands)") +
+  theme_t6() + theme(strip.text = element_text(size = 7.5))
+save_fig("ci_cuts_sensitivity", 18, 9, function() print(pcs))
+# where do the bands separate? share of the cut's columns with disjoint bands
+sep_tab <- do.call(rbind, lapply(split(CUTS, list(CUTS$variant, CUTS$model, CUTS$row), drop = TRUE), function(s) {
+  o <- s[s$dataset == "OLD", ]
+  n <- s[s$dataset == "NEW", ]
+  stopifnot(identical(o$col, n$col))
+  data.frame(variant = s$variant[1], model = s$model[1], row = s$row[1], columns = nrow(o),
+             new_above = mean(n$lo > o$hi), new_below = mean(n$hi < o$lo),
+             median_ratio = median(n$est / o$est), max_ratio = max(n$est / o$est),
+             min_ratio = min(n$est / o$est),
+             old_band_halfwidth = median((o$hi - o$lo) / (2 * o$est)),
+             new_band_halfwidth = median((n$hi - n$lo) / (2 * n$est)))
+}))
+sep_tab <- sep_tab[order(sep_tab$model, match(sep_tab$variant, vapply(variants, function(v) v$key, "")), sep_tab$row), ]
+print(sep_tab, digits = 3, row.names = FALSE)
+out_csv(sep_tab, "ci_cuts_summary")
+
+# the cuts on the common basis with shoe-bootstrap bands (95% percentile
+# intervals of the draws; T6 review fixes): for the absolute density each
+# draw is recalibrated on its own resampled shoes (the band includes the
+# sampling error of the dataset's overall RAC density); for the shape each
+# draw is divided by its own observed density and the estimate by the
+# dataset's observed density (relative density, 1 = the dataset's average),
+# beside the model-based band of the same relative density (RAC total
+# fixed, so also a band of the shape); the RAC-total-fixed bootstrap band of
+# the first T6 run is kept in the table for the record
+cut_boot <- function(k) {
+  nm <- boot_fit[[k]]
+  f <- FIT[[nm]]
+  ds <- ds_of(nm)
+  rows <- t6_cal_rows(f, D[[ds]], CODES[[ds]], PC[[ds]])
+  pts <- do.call(rbind, lapply(cut_rows, function(r) data.frame(row = r, col = which(mask_mat[r, ]))))
+  kk <- (pts$row - 1) * G$ncol + pts$col
+  b <- t6_logdens_boot(f, rows, t6_boot_draws(BOOT[[k]], f), G$x[kk], G$y[kk], ids = t6_boot_ids(BOOT[[k]]),
+                       kinds = c("fixed", "resampled", "shape"), quantiles = TRUE)
+  m <- MAPS[[nm]]
+  obs <- 1000 * CAL[[nm]]$observed_density
+  data.frame(series = c(old = "OLD", new_ob = "NEW (all)", norep = "NEW without reprints")[[k]],
+             fit = nm, row = pts$row, col = pts$col, new_x = G$xs[pts$col], est = m$dens[kk],
+             lo_boot = 1000 * exp(b$resampled$q_lo), hi_boot = 1000 * exp(b$resampled$q_hi),
+             se_log_boot = b$resampled$sd,
+             observed_density = obs, rel_est = m$dens[kk] / obs,
+             rel_lo_boot = exp(b$shape$q_lo), rel_hi_boot = exp(b$shape$q_hi), se_log_boot_shape = b$shape$sd,
+             rel_lo_model = m$dens[kk] * exp(-1.96 * m$se_log[kk]) / obs,
+             rel_hi_model = m$dens[kk] * exp(1.96 * m$se_log[kk]) / obs, se_log_model = m$se_log[kk],
+             lo_boot_fixedN = 1000 * exp(b$fixed$q_lo), hi_boot_fixedN = 1000 * exp(b$fixed$q_hi),
+             se_log_boot_fixedN = b$fixed$sd)
+}
+CB <- do.call(rbind, lapply(names(BOOT), cut_boot))
+if (!is.null(CB)) {
+  out_csv(CB, "ci_cuts_bootstrap")
+  CB$row_lab <- factor(vapply(CB$row, row_lab, ""), levels = vapply(cut_rows, row_lab, ""))
+  ser <- c("OLD", "NEW (all)", "NEW without reprints")
+  CB$series <- factor(CB$series, levels = ser)
+  col_ser <- c(COL[["old"]], COL[["new"]], COL[["norep"]])
+  names(col_ser) <- ser
+  b_lab <- paste(unique(vapply(names(BOOT), function(k) nrow(BOOT[[k]]$draws), 0L)), collapse = "/")
+  k8_old <- FIT$glmm_old$spec$bknots_x[1]
+  pb <- ggplot(CB, aes(new_x, est, colour = series, fill = series)) +
+    geom_ribbon(aes(ymin = lo_boot, ymax = hi_boot), alpha = 0.18, colour = NA) +
+    geom_line(linewidth = 0.8) +
+    geom_vline(xintercept = k8_old, colour = INK2, linetype = "dotted", linewidth = 0.5) +
+    facet_wrap(~row_lab, ncol = 1, scales = "free_y") +
+    scale_colour_manual(values = col_ser[levels(droplevels(CB$series))]) +
+    scale_fill_manual(values = col_ser[levels(droplevels(CB$series))]) +
+    labs(x = sprintf("standardized x, new_x (coordinate units; 1 unit = %g prototype pixels)", px_per_unit),
+         y = "RAC pixels per 1,000 contact pixels",
+         title = "CI cuts on the common basis: absolute density, shoe-bootstrap 95% bands",
+         subtitle = wrap_txt(paste("GLMM; NEW refitted on OLD's step-3 knots. Shaded: bootstrap band (whole shoes resampled,",
+                                   sprintf("B = %s), each draw recalibrated on its own resampled shoes, so the band", b_lab),
+                                   "includes the sampling error of each dataset's overall RAC density (level and shape)."), 10),
+         caption = wrap_txt(paste("Overlapping 95% bands of two independent estimates do not mean a non-significant",
+                                  "difference (the pointwise z of the difference is in the text). Dotted vertical: the",
+                                  "K8 left edge (log-odds pinned there). The shape alone: figure ci_cuts_commonbasis_shape_boot."), 10)) +
+    theme_t6()
+  save_fig("ci_cuts_commonbasis_boot", 10, 10, function() print(pb))
+  ps_cut <- ggplot(CB, aes(new_x, rel_est, colour = series, fill = series)) +
+    geom_hline(yintercept = 1, colour = INK2, linewidth = 0.3) +
+    geom_ribbon(aes(ymin = rel_lo_boot, ymax = rel_hi_boot), alpha = 0.18, colour = NA) +
+    geom_line(aes(y = rel_lo_model), linewidth = 0.3, linetype = "22") +
+    geom_line(aes(y = rel_hi_model), linewidth = 0.3, linetype = "22") +
+    geom_line(linewidth = 0.8) +
+    geom_vline(xintercept = k8_old, colour = INK2, linetype = "dotted", linewidth = 0.5) +
+    facet_wrap(~row_lab, ncol = 1, scales = "free_y") +
+    scale_colour_manual(values = col_ser[levels(droplevels(CB$series))]) +
+    scale_fill_manual(values = col_ser[levels(droplevels(CB$series))]) +
+    labs(x = sprintf("standardized x, new_x (coordinate units; 1 unit = %g prototype pixels)", px_per_unit),
+         y = "relative RAC density (1 = the dataset's overall density)",
+         title = "CI cuts on the common basis: shape only, shoe-bootstrap 95% bands",
+         subtitle = wrap_txt(paste("Each density divided by its dataset's observed RAC density, so a level difference",
+                                   sprintf("cancels. Shaded: bootstrap band (B = %s), each draw divided by its own", b_lab),
+                                   "resampled observed density; dashed: the model-based band of the same fit."), 10),
+         caption = wrap_txt(paste("Observed RAC density per 1,000 contact pixels:",
+                                  paste0(paste(sprintf("%s %.3f", levels(droplevels(CB$series)),
+                                                       tapply(CB$observed_density, droplevels(CB$series),
+                                                              function(v) v[1])),
+                                               collapse = ", "), "."),
+                                  "Dotted vertical: the K8 left edge."), 10)) +
+    theme_t6()
+  save_fig("ci_cuts_commonbasis_shape_boot", 10, 10, function() print(ps_cut))
+  cb_tab <- do.call(rbind, lapply(split(CB, list(CB$series, CB$row), drop = TRUE), function(s) {
+    data.frame(series = s$series[1], row = s$row[1], columns = nrow(s),
+               shape_boot_over_model_width_median = median((s$rel_hi_boot - s$rel_lo_boot) /
+                                                             (s$rel_hi_model - s$rel_lo_model)),
+               shape_boot_over_model_width_max = max((s$rel_hi_boot - s$rel_lo_boot) / (s$rel_hi_model - s$rel_lo_model)),
+               level_over_shape_boot_width_median = median((s$hi_boot - s$lo_boot) / s$est /
+                                                             (s$rel_hi_boot - s$rel_lo_boot) * s$rel_est),
+               fixedN_boot_over_model_width_median = median((s$hi_boot_fixedN - s$lo_boot_fixedN) /
+                                                              (s$rel_hi_model - s$rel_lo_model) / s$observed_density))
+  }))
+  sep_boot <- do.call(rbind, lapply(intersect(c("NEW (all)", "NEW without reprints"), CB$series), function(sr) {
+    do.call(rbind, lapply(cut_rows, function(r) {
+      o <- CB[CB$series == "OLD" & CB$row == r, ]
+      n <- CB[CB$series == sr & CB$row == r, ]
+      stopifnot(identical(o$col, n$col))
+      z_lvl <- (log(n$est) - log(o$est)) / sqrt(n$se_log_boot^2 + o$se_log_boot^2)
+      z_shp <- (log(n$rel_est) - log(o$rel_est)) / sqrt(n$se_log_boot_shape^2 + o$se_log_boot_shape^2)
+      data.frame(new = sr, row = r,
+                 level_bands_new_above = mean(n$lo_boot > o$hi_boot), level_bands_new_below = mean(n$hi_boot < o$lo_boot),
+                 level_z_above = mean(z_lvl > 1.96), level_z_below = mean(z_lvl < -1.96),
+                 shape_bands_new_above = mean(n$rel_lo_boot > o$rel_hi_boot),
+                 shape_bands_new_below = mean(n$rel_hi_boot < o$rel_lo_boot),
+                 shape_z_above = mean(z_shp > 1.96), shape_z_below = mean(z_shp < -1.96),
+                 fixedN_bands_new_above = mean(n$lo_boot_fixedN > o$hi_boot_fixedN),
+                 fixedN_bands_new_below = mean(n$hi_boot_fixedN < o$lo_boot_fixedN),
+                 model_bands_new_above = mean(n$rel_lo_model * n$observed_density > o$rel_hi_model * o$observed_density),
+                 model_bands_new_below = mean(n$rel_hi_model * n$observed_density < o$rel_lo_model * o$observed_density),
+                 median_ratio = median(n$est / o$est), median_shape_ratio = median(n$rel_est / o$rel_est))
+    }))
+  }))
+  print(cb_tab, digits = 3, row.names = FALSE)
+  if (!is.null(sep_boot)) {
+    print(sep_boot, digits = 3, row.names = FALSE)
+    cb_tab <- merge(cb_tab, sep_boot, by.x = c("series", "row"), by.y = c("new", "row"), all.x = TRUE)
+  }
+  out_csv(cb_tab, "ci_cuts_bootstrap_summary")
+  # at OLD's forefoot peak (the column of row 110 nearest to OLD's maximum)
+  o110 <- CB[CB$series == "OLD" & CB$row == 110, ]
+  jpk <- which.max(o110$est)
+  for (sr in levels(droplevels(CB$series))) {
+    s <- CB[CB$series == sr & CB$row == 110, ][jpk, ]
+    zl <- (log(s$est) - log(o110$est[jpk])) / sqrt(s$se_log_boot^2 + o110$se_log_boot[jpk]^2)
+    zs <- (log(s$rel_est) - log(o110$rel_est[jpk])) / sqrt(s$se_log_boot_shape^2 + o110$se_log_boot_shape[jpk]^2)
+    cat(sprintf(paste("row 110 at OLD's peak, new_x %.4f, %s: %.2f [%.2f, %.2f] per 1,000 contact px (fixed N [%.2f, %.2f]);",
+                      "relative %.3f [%.3f, %.3f]; vs OLD z %.2f (absolute), %.2f (shape)\n"),
+                s$new_x, sr, s$est, s$lo_boot, s$hi_boot, s$lo_boot_fixedN, s$hi_boot_fixedN, s$rel_est,
+                s$rel_lo_boot, s$rel_hi_boot, zl, zs))
+  }
+}
+```
+
+## Naomi's 14 areas: within- and between-area ratios
+
+```{r t6_areas}
+AREA <- t6_area_of_grid(G, mirror = TRUE)
+AREA_M <- t6_area_of_grid(G, mirror = FALSE)
+AREA[!inside] <- NA
+AREA_M[!inside] <- NA
+stopifnot(identical(sort(unique(AREA[inside])), 1:14), identical(sort(unique(AREA_M[inside])), 1:14))
+# the meeting's numbers (scratch within_region.R): the committed OLD GLMM,
+# -log(1 - p) with p from the log-odds + MEAN_OFFSET, areas applied to x
+# without the mirror
+f <- FIT$glmm_old
+lam <- -log(1 - plogis(t6_eta(f, f$spec, G$x, G$y, mean_offset = MEAN_OFFSET[["old"]])))
+lam[!inside] <- NA
+meet <- t6_area_stats(lam, AREA_M)
+cat(sprintf("meeting reproduction (no mirror): between %.3f; within p90/p10 max %.3f (areas %s); max/min max %.3f (areas %s)\n",
+            max(meet$mean) / min(meet$mean), max(meet$ratio_p90_p10),
+            paste(meet$area[order(-meet$ratio_p90_p10)][1:2], collapse = ", "),
+            max(meet$ratio_max_min), paste(meet$area[order(-meet$ratio_max_min)][1:2], collapse = ", ")))
+area_point <- function(nm, area) {
+  s <- t6_area_stats(MAPS[[nm]]$dens, area)
+  s$between <- max(s$mean) / min(s$mean)
+  s
+}
+# the ratios over draws of the coefficients: model-based N(b, V) draws
+# (B = 1,000, the OLD profile's seed set here, so the first four fits get the
+# draws of the first T6 run) or, where a fit has one, its shoe-bootstrap
+# draws (T6 review fixes: the map SEs are 1.2-1.35 times larger under the
+# bootstrap). The ratios are scale-free, so the calibration level does not
+# enter.
+set.seed(P_old$r$seed)
+area_draws_model <- function(nm, B = 1000) {
+  f <- FIT[[nm]]
+  if (f$feature == "CML_MODEL") {
+    b <- c(0, f$coef)
+    V <- rbind(0, cbind(0, f$vcov))
+  } else {
+    b <- f$coef
+    V <- f$vcov
+  }
+  R <- chol(V + diag(1e-12, nrow(V)))
+  t(vapply(seq_len(B), function(k) b + as.vector(crossprod(R, stats::rnorm(length(b)))), numeric(length(b))))
+}
+area_sim <- function(nm, area, draws) {
+  f <- FIT[[nm]]
+  ok <- inside & !is.na(area)
+  X1 <- cbind(1, t6_design(f$spec, G$x[ok], G$y[ok]))
+  stopifnot(ncol(draws) == ncol(X1))
+  a <- area[ok]
+  idx <- split(seq_along(a), a)
+  out <- vector("list", nrow(draws))
+  for (k in seq_len(nrow(draws))) {
+    lam <- exp(as.vector(X1 %*% draws[k, ]))
+    mu <- vapply(idx, function(i) mean(lam[i]), 0)
+    qq <- vapply(idx, function(i) {
+      v <- stats::quantile(lam[i], c(0.1, 0.9), names = FALSE)
+      c(v[2] / v[1], max(lam[i]) / min(lam[i]))
+    }, c(0, 0))
+    out[[k]] <- c(between = max(mu) / min(mu), mu / mean(lam), qq[1, ], qq[2, ])
+  }
+  do.call(rbind, out)
+}
+# the fits by basis; the shoe bootstraps that exist for them
+area_fits <- c(glmm_old = "step-3 (OLD's own = common basis)", glmm_new = "step-3, NEW's own knots",
+               cml_old = "step-3 (OLD's own = common basis)", cml_new = "step-3, NEW's own knots",
+               glmm_new_ob = "step-3, common basis (OLD's knots)", glmm_norep_new = "step-3, common basis (OLD's knots)",
+               glmm_full_old = "full tensor (no K8 pin), own knots", glmm_full_new = "full tensor (no K8 pin), own knots",
+               glmm_fineY0_old = "finer y (nAGQ 0), own knots", glmm_fineY0_new = "finer y (nAGQ 0), own knots")
+area_fits <- area_fits[names(area_fits) %in% names(MAPS)]
+area_boot <- list(glmm_old = BOOT$old, glmm_new_ob = BOOT$new_ob, glmm_norep_new = BOOT$norep,
+                  glmm_full_old = BOOT_FULL$old, glmm_full_new = BOOT_FULL$new)
+area_boot <- area_boot[!vapply(area_boot, is.null, TRUE) & names(area_boot) %in% names(area_fits)]
+model_first <- intersect(c("glmm_old", "glmm_new", "cml_old", "cml_new"), names(area_fits))
+model_sims <- c(model_first, intersect(c("glmm_full_old", "glmm_full_new", "glmm_fineY0_old", "glmm_fineY0_new",
+                                         "glmm_new_ob", "glmm_norep_new"), names(area_fits)))
+t_area <- proc.time()[["elapsed"]]
+SIM <- list()
+for (nm in model_sims) SIM[[paste(nm, "model", sep = "|")]] <- area_sim(nm, AREA, area_draws_model(nm))
+for (nm in names(area_boot)) {
+  SIM[[paste(nm, "bootstrap", sep = "|")]] <- area_sim(nm, AREA, t6_boot_draws(area_boot[[nm]], FIT[[nm]]))
+}
+cat(sprintf("area simulations: %d fit x method combinations, %.0f s\n", length(SIM), proc.time()[["elapsed"]] - t_area))
+area_rows <- function(nm, method) {
+  s <- area_point(nm, AREA)
+  sim <- SIM[[paste(nm, method, sep = "|")]]
+  K <- nrow(s)
+  ci <- function(j) apply(sim[, j, drop = FALSE], 2, stats::quantile, c(0.025, 0.975))
+  rel <- ci(1 + seq_len(K))
+  wit <- ci(1 + K + seq_len(K))
+  mm <- ci(1 + 2 * K + seq_len(K))
+  bt <- stats::quantile(sim[, 1], c(0.025, 0.975))
+  wmax <- stats::quantile(apply(sim[, 1 + K + seq_len(K), drop = FALSE], 1, max), c(0.025, 0.975))
+  data.frame(fit = nm, dataset = toupper(ds_of(nm)), model = FIT[[nm]]$feature, basis = area_fits[[nm]],
+             interval = if (method == "bootstrap") "shoe bootstrap" else "model-based N(b, V)", draws = nrow(sim),
+             s, rel_mean = s$mean / mean(MAPS[[nm]]$dens[inside]),
+             rel_mean_lo = rel[1, ], rel_mean_hi = rel[2, ],
+             ratio_p90_p10_lo = wit[1, ], ratio_p90_p10_hi = wit[2, ],
+             ratio_max_min_lo = mm[1, ], ratio_max_min_hi = mm[2, ],
+             between_lo = bt[[1]], between_hi = bt[[2]],
+             within_p90_p10_max_lo = wmax[[1]], within_p90_p10_max_hi = wmax[[2]])
+}
+area_all <- do.call(rbind, lapply(names(SIM), function(key) {
+  p <- strsplit(key, "|", fixed = TRUE)[[1]]
+  area_rows(p[1], p[2])
+}))
+# per fit the preferred intervals: the shoe bootstrap where it exists
+area_tab <- area_all[area_all$interval == "shoe bootstrap" |
+                       !area_all$fit %in% area_all$fit[area_all$interval == "shoe bootstrap"], ]
+print(area_tab[area_tab$fit %in% c("glmm_full_old", "glmm_full_new"),
+               c("fit", "area", "pixels", "rel_mean", "rel_mean_lo", "rel_mean_hi",
+                 "ratio_p90_p10", "ratio_p90_p10_lo", "ratio_p90_p10_hi", "ratio_max_min")],
+      digits = 3, row.names = FALSE)
+meet_rows <- cbind(fit = "glmm_old_meeting", dataset = "OLD", model = "NEW_X_NS_XY",
+                   basis = "step-3 (committed OLD GLMM, as the meeting script)", interval = NA, draws = NA,
+                   meet, between = max(meet$mean) / min(meet$mean),
+                   rel_mean = meet$mean / mean(lam, na.rm = TRUE), rel_mean_lo = NA, rel_mean_hi = NA,
+                   ratio_p90_p10_lo = NA, ratio_p90_p10_hi = NA, ratio_max_min_lo = NA,
+                   ratio_max_min_hi = NA, between_lo = NA, between_hi = NA,
+                   within_p90_p10_max_lo = NA, within_p90_p10_max_hi = NA)
+out_csv(rbind(cbind(variant = "mirrored (correct)", area_all),
+              cbind(variant = "not mirrored (meeting script)", meet_rows)), "areas14")
+ab <- do.call(rbind, lapply(split(area_all, list(area_all$fit, area_all$interval), drop = TRUE), function(s) {
+  data.frame(fit = s$fit[1], dataset = s$dataset[1], model = s$model[1], basis = s$basis[1],
+             interval = s$interval[1], draws = s$draws[1],
+             between = s$between[1], between_lo = s$between_lo[1], between_hi = s$between_hi[1],
+             between_areas = paste(s$area[which.max(s$mean)], s$area[which.min(s$mean)], sep = "/"),
+             within_p90_p10_max = max(s$ratio_p90_p10),
+             within_p90_p10_max_lo = s$within_p90_p10_max_lo[1], within_p90_p10_max_hi = s$within_p90_p10_max_hi[1],
+             within_p90_p10_max_areas = paste(s$area[order(-s$ratio_p90_p10)][1:2], collapse = ","),
+             within_max_min_max = max(s$ratio_max_min),
+             within_max_min_areas = paste(s$area[order(-s$ratio_max_min)][1:2], collapse = ","),
+             areas_within_p90_p10_ge_between = sum(s$ratio_p90_p10 >= s$between[1]))
+}))
+ab <- ab[order(match(ab$fit, names(area_fits)), ab$interval), ]
+print(ab, digits = 3, row.names = FALSE)
+out_csv(ab, "areas14_summary")
+```
+
+```{r t6_area_figure}
+area_cent <- function(a) {
+  k <- sort(unique(a[!is.na(a)]))
+  list(k = k, cx = vapply(k, function(j) mean(G$x[which(a == j)]), 0),
+       cy = vapply(k, function(j) mean(G$y[which(a == j)]), 0), mat = as_mat(a))
+}
+AC <- area_cent(AREA)
+# the figure shows the full-tensor maps (no K8 pin) with their shoe-bootstrap
+# intervals (T6 review fixes); every basis is in areas14_summary
+fig_fits <- c(OLD = "glmm_full_old", NEW = "glmm_full_new")
+if (!all(fig_fits %in% area_tab$fit)) fig_fits <- c(OLD = "glmm_old", NEW = "glmm_new")
+fig_int <- unique(area_tab$interval[area_tab$fit %in% fig_fits])
+zl <- range(c(MAPS[[fig_fits[["OLD"]]]]$dens, MAPS[[fig_fits[["NEW"]]]]$dens), na.rm = TRUE)
+dot_panel <- function(var, lo, hi, xlab, title, log = FALSE, ref = NULL) {
+  par(mar = c(3.6, 3.2, 2.6, 0.8))
+  s <- area_tab[area_tab$fit %in% fig_fits, ]
+  rng <- range(c(s[[lo]], s[[hi]], s[[var]], ref), na.rm = TRUE)
+  plot(NA, xlim = rng, ylim = c(0.5, 14.5), yaxt = "n", xlab = "", ylab = "", log = if (log) "x" else "",
+       bty = "n", col.axis = INK2, cex.axis = 0.75)
+  abline(h = 1:14, col = GRID_COL, lwd = 0.5)
+  if (!is.null(ref)) abline(v = ref, col = INK2, lty = 2)
+  for (ds in c("OLD", "NEW")) {
+    t <- s[s$fit == fig_fits[[ds]], ]
+    off <- if (ds == "OLD") 0.14 else -0.14
+    segments(t[[lo]], t$area + off, t[[hi]], t$area + off, col = col_ds[[ds]], lwd = 1.6)
+    points(t[[var]], t$area + off, pch = 19, col = col_ds[[ds]], cex = 0.9)
+  }
+  axis(2, at = 1:14, labels = 1:14, las = 1, cex.axis = 0.75, col.axis = INK)
+  mtext("area", side = 2, line = 2.2, cex = 0.65, col = INK2)
+  mtext(xlab, side = 1, line = 2.3, cex = 0.65, col = INK)
+  title(main = title, cex.main = 0.95, col.main = INK, line = 1.2)
+  legend("bottomright", legend = c(lab_ds[["OLD"]], lab_ds[["NEW"]]), col = col_ds, pch = 19, lwd = 1.6,
+         bty = "n", cex = 0.7, text.col = INK)
+}
+ab_fig <- ab[ab$fit %in% fig_fits & ab$interval %in% fig_int, ]
+area_note <- paste("Areas from the 2022 rules applied to -new_x (the step-1 frame mirrors x, plan F7). Maps: the GLMM",
+                   sprintf("full tensors (%s; no K8 pin), each on its own step-3 knots. Intervals: 95%%, %s (1,000 draws).",
+                           paste(fig_fits, collapse = ", "), paste(fig_int, collapse = " / ")),
+                   sprintf("Between areas (highest / lowest area mean): OLD %.2f [%.2f, %.2f], NEW %.2f [%.2f, %.2f].",
+                           ab_fig$between[ab_fig$dataset == "OLD"], ab_fig$between_lo[ab_fig$dataset == "OLD"],
+                           ab_fig$between_hi[ab_fig$dataset == "OLD"], ab_fig$between[ab_fig$dataset == "NEW"],
+                           ab_fig$between_lo[ab_fig$dataset == "NEW"], ab_fig$between_hi[ab_fig$dataset == "NEW"]),
+                   "The magnitudes depend on the spline basis (table areas14_summary). Both maps on one scale.")
+save_fig("areas14", 15, 7.6, function() {
+  layout(matrix(c(1, 2, 3, 4, 5, 5, 6, 7), 2, byrow = TRUE), heights = c(1, 0.12), widths = c(1, 1, 1.25, 1.25))
+  par(oma = header_oma(area_note))
+  draw_map(as_mat(MAPS[[fig_fits[["OLD"]]]]$dens), zl, SEQ, "OLD map, the 14 areas", FIT[[fig_fits[["OLD"]]]]$label,
+           axes = TRUE, areas = AC)
+  draw_map(as_mat(MAPS[[fig_fits[["NEW"]]]]$dens), zl, SEQ, "NEW map, the 14 areas", FIT[[fig_fits[["NEW"]]]]$label,
+           areas = AC)
+  dot_panel("rel_mean", "rel_mean_lo", "rel_mean_hi", "area mean / the map's mean over the prototype",
+            "Between areas: mean density", ref = 1)
+  dot_panel("ratio_p90_p10", "ratio_p90_p10_lo", "ratio_p90_p10_hi", "90th / 10th percentile of the density in the area",
+            "Within each area: p90 / p10", ref = NULL)
+  draw_bar(zl, SEQ, "RAC pixels per 1,000 contact pixels (both maps)")
+  plot.new()
+  plot.new()
+  fig_header("Naomi's 14 areas (2022) on the prototype: how much the intensity varies between and within the areas",
+             area_note)
+})
+```
+
+## (g) Random - CML for both datasets
+
+```{r t6_random_cml}
+rc <- lapply(c(old = "old", new = "new"), function(ds) {
+  a <- MAPS[[paste("glmm", ds, sep = "_")]]$dens
+  b <- MAPS[[paste("cml", ds, sep = "_")]]$dens
+  100 * (a - b) / b
+})
+rl <- c(-1, 1) * max(abs(unlist(rc)), na.rm = TRUE)
+rc_note <- paste("Calibrated maps on each dataset's own step-3 knots. Both maps of a dataset are scaled to the same",
+                 "observed RAC total, so the difference is one of shape only.")
+save_fig("random_cml_difference", 8, 7.2, function() {
+  layout(matrix(c(1, 2, 3, 3), 2, byrow = TRUE), heights = c(1, 0.13))
+  par(oma = header_oma(rc_note))
+  draw_map(as_mat(rc$old), rl, DIV, "OLD", sprintf("range %.1f%% to %.1f%%", min(rc$old, na.rm = TRUE),
+                                                    max(rc$old, na.rm = TRUE)), axes = TRUE)
+  draw_map(as_mat(rc$new), rl, DIV, "NEW", sprintf("range %.1f%% to %.1f%%", min(rc$new, na.rm = TRUE),
+                                                    max(rc$new, na.rm = TRUE)))
+  draw_bar(rl, DIV, "(Random - CML) / CML, % (red = Random higher)")
+  fig_header("Random (GLMM) vs CML within each dataset", rc_note)
+})
+rc_tab <- do.call(rbind, lapply(names(rc), function(ds) {
+  v <- rc[[ds]][inside]
+  data.frame(dataset = toupper(ds), min_pct = min(v), p5_pct = q(v, 0.05), median_pct = median(v),
+             p95_pct = q(v, 0.95), max_pct = max(v))
+}))
+print(rc_tab, digits = 3, row.names = FALSE)
+out_csv(rc_tab, "random_cml")
+```
+
+```{r t6_fixef_sigma_figures}
+fx <- fixef_tab[fixef_tab$term != "(Intercept)", ]
+fx$term <- factor(fx$term, levels = unique(fx$term))
+fx$comparison <- factor(fx$comparison, levels = unique(fx$comparison))
+pf <- ggplot(fx, aes(term, z_diff, colour = comparison, shape = comparison)) +
+  annotate("rect", xmin = -Inf, xmax = Inf, ymin = -1.96, ymax = 1.96, fill = "#f0efec") +
+  geom_hline(yintercept = 0, colour = INK2, linewidth = 0.3) +
+  geom_point(size = 2.2, position = position_dodge(width = 0.55)) +
+  facet_wrap(~model, ncol = 1) +
+  scale_colour_manual(values = c(COL[["new"]], COL[["norep"]], COL[["groupB"]])[seq_along(levels(fx$comparison))]) +
+  scale_shape_manual(values = c(19, 17, 15)[seq_along(levels(fx$comparison))]) +
+  labs(x = "spline coefficient of the common (OLD) step-3 basis: x<j>:y<i>, new_x varying fastest",
+       y = "z of NEW - OLD",
+       title = "Fixed effects on the common basis: NEW minus OLD, in standard errors",
+       subtitle = wrap_txt(paste("Grey band: |z| < 1.96 (model-based SEs). Single spline coefficients are not interpretable",
+                                 "on their own; the equality Wald tests use all 24 jointly."), 11)) +
+  theme_t6() + theme(axis.text.x = element_text(angle = 60, hjust = 1, size = 7))
+save_fig("fixef_zdiff", 11, 7.5, function() print(pf))
+sg <- sigma2_tab
+sg$who <- ifelse(sg$dataset == "OLD", "OLD", ifelse(sg$shoes == "all", ifelse(grepl("_ob$", sg$fit), "NEW (OLD basis)", "NEW"),
+                                                    paste("NEW", sg$shoes)))
+sg$what <- ifelse(sg$offset == "none", "no offset: spread of RAC counts", "offset: spread of RAC density")
+ps <- ggplot(sg, aes(sigma2, who, colour = who)) +
+  geom_errorbar(aes(xmin = sigma2_lo, xmax = sigma2_hi), orientation = "y", width = 0.18, linewidth = 0.6,
+                na.rm = TRUE) +
+  geom_point(size = 3) +
+  geom_text(aes(label = sprintf("%.3f", sigma2)), nudge_y = 0.32, size = 3, colour = INK2) +
+  facet_wrap(~what, ncol = 2) +
+  scale_colour_manual(values = c(OLD = COL[["old"]], NEW = COL[["new"]], "NEW (OLD basis)" = COL[["new"]],
+                                 "NEW without reprints" = COL[["norep"]], "NEW group B only" = COL[["groupB"]]),
+                      guide = "none") +
+  labs(x = "sigma^2, the between-shoe variance of the random intercept (log-odds scale)", y = NULL,
+       title = "sigma^2: OLD vs NEW, without and with the offset log((px - n)/100)",
+       subtitle = wrap_txt(paste("Only the offset refits measure the spread of the RAC density per contact pixel (plan F82,",
+                                 "A-115). Bars: approximate profile-likelihood 95% intervals."), 10),
+       caption = wrap_txt(paste("The profile moves sigma with the intercept re-optimized and the spatial coefficients held",
+                                "at their estimates (Laplace deviance of glmer, as in the fits)."), 10)) +
+  theme_t6()
+save_fig("sigma2", 10, 4.8, function() print(ps))
+if (length(skipped)) {
+  cat("DEVELOPMENT RUN (T6_ALLOW_MISSING=1): skipped because a fit is missing:\n",
+      paste(" ", unique(skipped), collapse = "\n"), "\n")
+} else {
+  cat("every required fit present\n")
+}
+if (length(slow_missing)) {
+  cat("not included (the slow exact CMLs on the finer y basis are not fitted yet):\n",
+      paste(" ", unique(slow_missing), collapse = "\n"), "\n")
+} else {
+  cat("the exact CMLs on the finer y basis are included\n")
+}
+cat(sprintf("T6 Rmd: %.0f s\n", proc.time()[["elapsed"]] - t_start))
+sessionInfo()
+```
