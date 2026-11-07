@@ -1884,3 +1884,56 @@ Decisions A-113 to A-118; corrections appended to A-108 (14 of 631 records, not 
 **Next.** T5 step 3b (shoe bootstrap and Efron-cluster variances on both datasets), then T6 with the A-114/A-116 additions.
 
 **Blockers.** None.
+
+## 2026-11-07 02:40, T5-newmodel review fixes review (reviewer:statistician)
+
+**Verdict: changes required** (statistics lens). The numbers are right. Both new probes rerun at `2f49373` reproduce every figure in results sections 3 and 4, and the residual CSV is byte-identical. The OLD-reprint replication holds at shoe level, so the design heterogeneity of A-114 is real. But A-114 names the wrong cause for the NEW map and cut-250 misfit, and the plan now tells T7 to word a rejection as "not model failure". Both go into T6-T8 and the paper. OLD is untouched: the three checksum lists pass, and `4cc6ffe..HEAD` changes no OLD output, raw file, Rmd, config or contour code.
+
+**Verified** (my scripts are in `<scratch>/rv_t5b_stat/`; the machine was under load 20 from another review's gate):
+- `t5_gof.R` and `t5_inference.R` reproduce every number. I looked at both band figures, and their descriptions are right. In my reading, group A's RAC density goes dense, then near zero, then dense again, all within about 0.2 in y. Block 10 contains lattice soles whose tread runs through the band (447, 446), so the id split is a rough stand-in for design.
+- Convergence evidence, the robust Efron W (329.0 and 234.4), the offset sign log((px - n)/100) and the exp(+sigma^2/2) calibration are all correct.
+- `test_new_outputs.R` ALL PASS (85 s) and `test_compare.R` ALL PASS (86 s); the work tree is unchanged.
+
+**Findings.**
+1. **Major. The NEW heel-front misfit comes mainly from the y resolution of the step-3 basis, not from "one pooled surface for all shoes".**
+   - I fitted the Efron CML with a nested finer y basis: the step-3 y knots plus 10 quantile knots, the same boundary knots, as a full tensor with 84 columns.
+   - In-sample on NEW: LR 271.3 on 50 df against the 3x5 full tensor, and AIC lower by 171. The band O/E goes from 0.64 to 0.92, cut 250 from 0.79 to 1.04, and the peak window from 0.64 to 0.91.
+   - Out of sample (5-fold cross-validation by shoe): the held-out log score is +43.1 against the step-3 basis. The held-out O/E is 0.92 in the band and 1.04 at cut 250.
+   - Group B fitted alone on the step-3 basis is still overpredicted in the band (0.87).
+   - On the K8 surface, both groups are overpredicted in the band (A 0.32, B 0.88). So "the pooled surface sits between the two groups" is false there.
+   - The docs' "a richer basis does not remove it / one smooth surface cannot follow it" rests on the 5 x 9 basis alone.
+   - On OLD, the finer basis loses out of sample (-11.9), so the step-3 basis is adequate there.
+   - What stands: under the finer pooled fit, held out, group A is at 0.46 and group B at 1.25. That is a real failure of the common-surface assumption.
+   - Fix:
+     - Correct A-114, F77-F79, correction 2 of the T5 results ("Cause: ... a sole-design effect"), results section 3 (readings G and H, "What this means") and the LOG.
+     - Add a finer-y-knot sensitivity to T6's maps and CI cuts. The full tensor alone keeps cut 250 at 0.81.
+     - Add the same sensitivity to T7's list.
+     - Give this to meeting issue 8.4 (the knots are not justified) for Naomi and Micha.
+2. **Major. T7 is told to word a band rejection "as a design effect, not as model failure" (T7 step 4, A-114 (4), the section 9 guard).**
+   - That is a false choice. An intensity that depends on design is exactly the failure of the model's one-surface assumption (R1 point 4), and finding 1 adds a basis component.
+   - Group A was selected on NEW's own band data. So T6's "with/without group A" and T7's residuals by group are circular in the band: descriptive only.
+   - The confirmatory evidence is the OLD prints of the reprints, plus a design classification made without looking at the RACs (meeting question 6).
+   - That replication cannot separate RAC formation (little wear) from detection, for example RACs under-marked inside moulded logos or hatched shanks. Name the second possibility beside the wear reading.
+   - Fix: rewrite those three passages so that the conclusions stay within what the data support.
+3. **Minor. The "x 0.57" deflation of the K8 cost is not a valid robust test.**
+   - It takes the robust-to-model ratio from the 24-coefficient hypothesis and applies it to a 10-coefficient one. The direct cluster-robust Wald of the 10 main effects gives:
+     - OLD: 32.47 (p 3.4e-4; generalized design effects mean 1.23, range 0.71-2.00; Rao-Scott 31.7).
+     - NEW: 87.98 (p 1.4e-14; mean 1.07; Rao-Scott 88.9).
+   - So A-116, F80, results 4.3, the LOG and the report ("OLD 22.3, p 0.014, not far beyond") are wrong. The original review's "both far beyond" was right.
+   - Fix: use the direct robust Wald in `t5_inference.R` and the docs.
+4. **Minor. The sigma^2 wording.**
+   - The committed no-offset sigma^2 (0.756 / 0.960) tracks log n_i (cor 0.99). It is the spread of RAC counts, that is, density x contact area.
+   - Only the offset refit's 0.641 is a spread of RAC density per contact pixel.
+   - Fix the wording in A-115 (3), F82, the D-008 update, correction 6 and T6 (c).
+5. **Minor. Uncertainty.**
+   - F78, F79 and A-114 quote binomial z (-12.4, -5.4, -4.6) with no caveat. Group A's z is also post hoc.
+   - My shoe-bootstrap intervals keep every conclusion:
+     - cut 250 O/E 0.80 [0.70, 0.91];
+     - its right peak 0.70 [0.55, 0.85];
+     - peak window 0.65 [0.52, 0.78];
+     - band: A 0.32 [0.22, 0.43], B 0.88 [0.77, 1.00];
+     - band density ratio: OLD reprints 0.16 [0.06, 0.31] (7 RAC px on 6 shoes, 33.7 expected), the other 319 OLD shoes 0.94 [0.73, 1.17].
+   - "Group B ... as OLD's 154" compares two datasets at different power (5,881 vs 13,249 cases).
+   - Fix: report these intervals next to the z values.
+
+**Not verified:** the OLD gates (another review was running them) and the 34-minute NEW rerun.
