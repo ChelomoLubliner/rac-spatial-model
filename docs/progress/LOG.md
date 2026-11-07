@@ -2065,3 +2065,79 @@ Decisions A-119 to A-121 and D-015 (new); corrections appended to A-113, A-115, 
 **Next.** T5 step 3b (shoe bootstrap and cluster-robust variances on both datasets), then T6 with the A-114/A-116/A-119/A-120 additions (full-tensor and finer-y maps and CI cuts, the offset refits as the density pair of sigma^2, descriptive group splits).
 
 **Blockers.** None.
+
+## 2026-11-07 11:05, T7-validation review (reviewer:statistician)
+
+**Verdict: changes required** (statistics lens). The computations are right, and the primary test holds: named analysis 1 stands (the OLD surface does not transfer to NEW; X^2 298 against a null maximum of 170, p_boot 0.0005). But three statements that go into the paper are not supported as written:
+- the significance pattern of the model comparison (R1 point 1);
+- the mechanism of the pair result, and its claim to allow for shoe-specific patterns (the editor's independence demand);
+- the claim that the misfit is "small by Cohen's convention" (R1 point 6).
+
+OLD is untouched: no tracked file is modified, and the Tier A and `old_added_t7` checksums pass in the work tree.
+
+**Verified.** Scripts and outputs are in `<scratch>/t7rev/`. I used the committed CSVs, the knit's bootstrap cache (`logs/validation/new/part2_boot_new.rds`) and the cached NEW pixel table.
+- Recomputed from `part2_cells_new.csv` and the provisional set:
+  - X^2 on Naomi's areas: 297.75 (GLMM) and 169.66 (2022 model).
+  - X^2 on K = 10 / 15 / 20: GLMM 176.3 / 205.5 / 235.3; 2022 model 126.8 / 149.3 / 163.4.
+  - w_net 0.135, and the T7-7 interval 0.071-0.196 from the replicates.
+- Log scores recomputed by a second route (per-RAC theta and `part2_design`, not `part2_eval`):
+  - Per shoe they agree to 1e-11.
+  - GLMM -9.215785, 2022 model -9.215788, uniform -9.227053, as reported.
+  - The near-zero RAC-weighted difference is not an artefact: random halves of the shoes give -0.0029 to +0.0046 per RAC.
+- The code matches section 9: the pair test (FFT expectation, unordered pairs, Monte Carlo p), the conditional-multinomial regional fit, the r'' centring and phi0. E0 49.0 is about (phi 1.74 + phi_par 2.00) x 13, as expected.
+- T7-7 (switched after the results were seen) is defensible. I inverted the test along the observed misfit direction, with the 2,000 centred two-sample replicates as the noise. This gives w_net [0.082, 0.184] on the areas and [0.050, 0.155] on K = 15. That is close to the bias-shifted percentile interval and far from the basic one (0-0.178).
+
+**Findings.**
+1. **Major. The model-comparison intervals (named analysis 2, Delta X^2) are not centred on their point estimates, so the reported significance pattern comes from the interval method.**
+   - Each two-sample replicate scores a model refitted on an OLD resample, which adds a second layer of OLD estimation noise that the point estimate does not have.
+   - Mean of the replicates of LS_GLMM - LS_2022 (RAC-weighted): -0.0013, against the point +0.000003 (0.39 bootstrap SD).
+   - The Delta X^2 replicates exceed the point by 7.5 (K = 10), 15.3 (K = 15) and 16.6 (K = 20).
+   - "Significant on the 20-cell grid and on every grid with all 631 shoes":
+     - centred on the point, primary K = 20 is [-10.5, 172], and all-shoe K = 10 and 15 are [-1.4, 225] and [-2.0, 236];
+     - with T7-7's own rule (minus 2 (E0_C - E0_R)), every primary grid interval includes 0;
+     - with the published fitted surfaces held fixed (NEW-only, the same 2,000 resamples), every grid excludes 0: K = 10 [11.4, 91.7], K = 15 [8.6, 110.1], K = 20 [20.3, 128.1].
+   - Shoe-weighted GLMM - 2022:
+     - reported as [-0.0015, +0.0134], "includes 0";
+     - NEW-only [+0.0019, +0.0131] and basic [+0.0018, +0.0166]: for the fitted surfaces the GLMM is ahead per shoe, by about half its OLD in-sample lead (0.0076 of 0.0148);
+     - over all 631 shoes by thirds of n: +0.012 (1-16 RACs), +0.0025, -0.0028 (34-281 RACs). The RAC-weighted tie comes from the heavily marked shoes.
+   - GLMM - uniform, RAC-weighted:
+     - reported as [-0.0019, +0.0179] (4.9% of replicates below 0), while the text says both models beat uniform;
+     - NEW-only [+0.0038, +0.0181].
+   - "Excludes a GLMM advantage above 0.5% and a 2022 advantage above 0.8%": this asymmetry is the bias, not the data (NEW-only [-0.0056, +0.0049]).
+   - Fix:
+     - Name the estimand. For the published surfaces (what an examiner would use), use NEW-only intervals. For the model classes, centre the replicates (or apply the T7-7 rule) consistently.
+     - Then reword R1 point 1: per RAC, a tie; per shoe, the continuous surface ahead by about 0.8%; on grid cells, the 2022 surfaces fit better, which is not significant once OLD estimation noise is allowed for.
+2. **Major. Named analysis 3 is worded beyond its own calibration.**
+   - The summary says "37% more frequent ... even after allowing for shoe-specific patterns". The slow calibration shows that null 2 does not allow for them: scenario C rejects 0.69 at sd 0.3 and 1.00 at sd 0.5 and 0.8.
+   - The claim "not like smooth differences between shoes" has three problems:
+     - The toys have no hard core, but the data do (same pixel 0.35). Heterogeneity plus a 2-px inhibition would also show no excess below 2 px.
+     - In the 8-16 px band, NEW is 1.04 [0.97, 1.12], an interval that contains the sd-0.5 toy's 1.10.
+     - OLD shows 1.13 [1.06, 1.21] in that band and an excess at (0, 2]: 1.26 [1.06, 1.51]. So "inhibition below about 2 px" holds for NEW only.
+   - The defensible part: the steep decay (NEW 1.54 at 2-4 px down to 1.04 at 8-16) argues against 40-px heterogeneity as the main driver.
+   - Paper item (3), "RACs within a shoe are not independent at short range", asserts a mechanism. What the data support: RACs of a shoe are not independent draws from the common surface, or from its heterogeneity-adjusted version. Contagion, fine-scale inhomogeneity and shoe-specific intensity are not separated. The forensic consequence (no product of single-RAC probabilities) holds under all three.
+   - Fix: reword the summary and item (3), and state the null-2 failure in the summary. Before using the distance profile as evidence, add a toy with heterogeneity plus a 2-px hard core.
+3. **Major. "Small by Cohen's convention" has no benchmark.**
+   - Uniform placement on the contact surface (no spatial model) gives X^2 489.7 on Naomi's areas (w 0.19), and 360-379 on the grids.
+   - Of that, the OLD GLMM removes 39% on the areas (38-44% on the grids), and the 2022 model removes 65% (57-59%).
+   - Calibration slope (per shoe, pi proportional to exp(alpha eta); conditional multinomial):
+     - pixel level: alpha 0.681 [0.546, 0.806] (NEW-only shoe bootstrap, B = 200);
+     - cell level on the areas: GLMM 0.70 [0.55, 0.84], 2022 model 0.83 [0.68, 0.96];
+     - OLD estimation noise alone would give about 0.95 [0.81, 1.13] (pooled cells, from the 2,000 OLD draws).
+   - So the misfit is mostly the OLD contrasts being about 30% too strong on NEW, beyond what estimation noise explains. Example: the heel areas 1 and 10 lie below uniform on NEW (O/E_uniform 0.79 and 0.93), and the GLMM predicts them lower still (0.73 and 0.77).
+   - Fix: add the uniform benchmark and the calibration slope to named analysis 1 and the summary. Describe the misfit as an attenuation of the OLD contrasts (organized toe to heel), not as small.
+4. **Minor. Shoes are treated as independent units (A-038 not run).**
+   - I ran a block bootstrap over consecutive NEW ids, as a proxy for one-wearer pairs and design batches.
+   - It raises the NEW-only phi on the areas from 1.74 to 1.92 (blocks of 2) and 2.20 (blocks of 4), and the SD of Delta X^2 by 10-27%.
+   - K = 15 NEW-only goes from [8.6, 110.1] to [-1.6, 122.3] with blocks of 4.
+   - The primary p is unaffected: the null q95 goes from 41 to 57, against 298.
+   - Fix: report this proxy until T3 freezes the pair list, and keep marginal claims conditional on it.
+5. **Minor. The two-sample bootstrap's size is shown on a cell-level toy only.** The plan's real-structure calibration (GLMM surrogate chain on the pixel tables) was not run. This does not threaten named analysis 1, which has a 6-fold margin, but the log-score intervals rest on that chain. Keep it open.
+6. **Minor. The Nelder-Mead point for Naomi needs context.**
+   - Her Nelder-Mead fit is 1.6 log-likelihood units below the optimum, on 13 parameters.
+   - That is well inside the sampling uncertainty (a 95% joint region spans about 11 units).
+   - "Not at the optimum" is true but immaterial for her Table 1. Say so when telling her.
+7. **Minor. "The location effect is weak (about 1% over uniform)".**
+   - The per-RAC log score is a KL-type quantity, small even for real contrasts: intensities of 1 and 2 on equal areas gain only 0.057 nats.
+   - Report it as a geometric-mean likelihood ratio, and as a share of the OLD in-sample gain (0.011 of 0.026 nats, 44%), not as the size of the location effect.
+
+**Not verified:** the OLD gates and the fast suite (other lenses); the slow calibration runs (I read their outputs but did not rerun them).
