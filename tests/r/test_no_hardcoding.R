@@ -4,11 +4,12 @@
 #
 # Scans the R and Rmd files of statistical_model/, tools/ (since the T5
 # review fixes, A-118) and tests/ (tracked and new, not ignored; the profile
-# file statistical_model/R/profile.R is not scanned). Comments are removed first (# outside a string; in an Rmd only
-# the code chunks are code). Forbidden everywhere: the dataset numbers 307,
-# 395, 387, 386, 255, 367, 631, 126 and the OLD pixel scale 150, 300 as
-# whole tokens, the profile constants (allcont >= <n>, the snake init,
-# set.seed(313), N_CONTROLS <- <n>) and the legacy relative paths ../data/,
+# file statistical_model/R/profile.R is not scanned). Comments are removed
+# first (# outside a string; in an Rmd only the code chunks are code).
+# Forbidden everywhere: the dataset numbers 307, 395, 387, 386, 255, 367,
+# 631, 126 and the OLD pixel scale 150, 300 as whole tokens, the profile
+# constants (allcont >= <n>, the snake init, set.seed(313),
+# N_CONTROLS <- <n>) and the legacy relative paths ../data/,
 # ../images/. In statistical_model/ and tools/ (the pipeline code, as the
 # Python scan treats tools/) also: any set.seed(<number>) and string
 # literals that name a data or output location (processed_data,

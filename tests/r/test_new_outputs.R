@@ -9,8 +9,9 @@
 #    by step 1's own aspix) gives exactly shoe_pixel_counts_new.csv; every
 #    control lies on S and on no RAC pixel, every case on a RAC pixel;
 #    all_cont_new.csv is the set of pixels in contact on >= r.stamp_threshold
-#    shoes (A-110: the sweep removes nothing on NEW); the NEW CSVs have LF
-#    line endings only.
+#    shoes (A-110: the sweep removes nothing on NEW). A check of its own:
+#    the seven NEW CSVs of steps 1, 2 and 5 exist and have LF line endings
+#    only.
 # 2. Step 2: dataCC_distance_new.csv keeps (n_Acc, x, y, shoe) of
 #    dataCC_new.csv; min_dist, horiz_dist, distance_shape, new_x are finite;
 #    horiz_dist >= min_dist; every distance_shape value is a per-row half
@@ -40,15 +41,19 @@
 # 5. Steps 4-6: the 8 NEW PDFs exist and are PDFs, and their PNG twins
 #    (tools/figures_png.R, A-111) exist in docs/qa/T5/new/. Existence only:
 #    a stale or swapped figure passes (plan T8's tests/e2e/test_new_rerun.sh
-#    re-renders and compares them).
+#    will re-render and compare them; until then, rerun
+#    docs/qa/T5/probes/t5_new_rerun.sh --oldbasis --png after any change of
+#    a NEW model).
 # 6. No collision: every tracked or new file in the NEW output folders of
 #    T5 has a stem ending in the NEW suffix, and the OLD output folders hold
 #    only the OLD files (Tier A, the write-once lists
 #    tests/baseline/old_added_*.sha256 of the tasks that add OLD files,
 #    README files).
 # Every check runs even when an earlier one fails (each prints PASS or FAIL
-# with its reason, so a stale chain shows every stale output at once); the
-# script exits 1 if any failed. Writes only below tempdir().
+# with its reason, so a stale chain shows every stale output at once): a
+# check that needs a CSV which is missing or unreadable FAILs with that
+# reason (second T5 review fixes, A-113 corrected). The script exits 1 if
+# any failed. Writes only below tempdir().
 #
 # Run from anywhere:  Rscript tests/r/test_new_outputs.R
 suppressMessages({
@@ -136,6 +141,7 @@ fails_of <- function(flags) {
 }
 
 # --- 1. step 1 ---------------------------------------------------------------
+dataCC <- NULL     # set by check "step 1" when dataCC_new.csv can be read
 check("step 1", {
   dataCC <- read.csv(rac_path(P, "dataCC"), header = TRUE)
   codes <- read.csv(rac_path(P, "shoe_codes"), header = TRUE)
@@ -194,36 +200,54 @@ check("step 1", {
             all(on_s), identical(on_rac, dataCC$n_Acc == 1),
             sum(dataCC$n_Acc) == n_cases,
             nrow(dataCC) == n_cases + n_shoes * P$r$n_controls)
-  for (key in c("dataCC", "pixel_counts", "all_cont", "shoe_codes",
-                "dataCC_distance_temp", "dataCC_distance", "wald_test")) {
-    b <- readBin(rac_path(P, key), "raw", file.size(rac_path(P, key)))
-    stopifnot(identical(P$r$eol[[key]], "\n"), !any(b == as.raw(13)))
-  }
   rm(raw, bytes, sum_raw)
   invisible(gc())
   sprintf(paste("step 1: %d shoes, %d controls each, %d cases (the",
                 "distinct RAC pixels), %d rows; S recomputed from the raw",
                 "records, the erase list, the stamp mask (>= %d shoes,",
                 "no pixel swept) and the RAC pixels = the pixel counts;",
-                "every control on S and on no RAC pixel; LF only"),
+                "every control on S and on no RAC pixel"),
           n_shoes, P$r$n_controls, n_cases, nrow(dataCC),
           P$r$stamp_threshold)
 })
+check("LF line endings", {
+  keys <- c("dataCC", "pixel_counts", "all_cont", "shoe_codes",
+            "dataCC_distance_temp", "dataCC_distance", "wald_test")
+  paths <- vapply(keys, rac_path, "", P = P)
+  if (!all(file.exists(paths))) {
+    stop("missing: ", paste(basename(paths[!file.exists(paths)]),
+                            collapse = ", "))
+  }
+  for (key in keys) {
+    b <- readBin(paths[[key]], "raw", file.size(paths[[key]]))
+    stopifnot(identical(P$r$eol[[key]], "\n"), !any(b == as.raw(13)))
+  }
+  sprintf("LF line endings: the %d NEW CSVs of steps 1, 2 and 5 have LF only",
+          length(keys))
+})
 
 # --- 2. step 2 ---------------------------------------------------------------
+# dist_csv: the committed step-2 CSV, set by check "step 2" when it can be
+# read (the step-3 checks compare the models with it)
+dist_csv <- NULL
 check("step 2", {
-  dist <- read.csv(rac_path(P, "dataCC_distance"), header = TRUE)
-  stopifnot(identical(names(dist), c("n_Acc", "x", "y", "shoe",
-                                     "row_number", "min_dist", "horiz_dist",
-                                     "distance_shape", "new_x")),
-            identical(dist[c("n_Acc", "x", "y", "shoe")], dataCC),
-            identical(dist$row_number, seq_len(nrow(dataCC))))
-  for (v in c("min_dist", "horiz_dist", "distance_shape", "new_x")) {
-    stopifnot(all(is.finite(dist[[v]])))
+  dist_csv <- read.csv(rac_path(P, "dataCC_distance"), header = TRUE)
+  if (!is.data.frame(dataCC)) {
+    stop("step-1 CSV unavailable: ", basename(rac_path(P, "dataCC")),
+         " could not be read (see the step 1 check)", call. = FALSE)
   }
-  stopifnot(all(dist$horiz_dist >= dist$min_dist),
-            all(dist$distance_shape > 0),
-            all(abs(dist$new_x) <= dist$distance_shape))
+  stopifnot(identical(names(dist_csv), c("n_Acc", "x", "y", "shoe",
+                                         "row_number", "min_dist",
+                                         "horiz_dist", "distance_shape",
+                                         "new_x")),
+            identical(dist_csv[c("n_Acc", "x", "y", "shoe")], dataCC),
+            identical(dist_csv$row_number, seq_len(nrow(dataCC))))
+  for (v in c("min_dist", "horiz_dist", "distance_shape", "new_x")) {
+    stopifnot(all(is.finite(dist_csv[[v]])))
+  }
+  stopifnot(all(dist_csv$horiz_dist >= dist_csv$min_dist),
+            all(dist_csv$distance_shape > 0),
+            all(abs(dist_csv$new_x) <= dist_csv$distance_shape))
   # the prototype's per-row half-widths in its own frame (step 2's chunk)
   proto <- t(as.matrix(imager::load.image(rac_path(P, "prototype_contour"))))
   Wp <- P$prototype$col_shoe
@@ -237,7 +261,7 @@ check("step 2", {
   widths <- data.frame(x = xp[proto == 1], y = yp[proto == 1]) %>%
     group_by(y) %>% summarise(min_x = abs(min(x)), max_x = max(x))
   half <- csv_round_trip(data.frame(v = c(widths$min_x, widths$max_x)))$v
-  stopifnot(all(dist$distance_shape %in% half))
+  stopifnot(all(dist_csv$distance_shape %in% half))
   n_rec <- file.size(rac_path(P, "contour")) / (W * H + 2)
   stopifnot(n_rec == n_shoes)
   # step 2 for every shoe, from the committed contour (record k = code k)
@@ -267,8 +291,8 @@ check("step 2", {
   if (!all(same)) {
     back <- read.csv(rac_path(P_tmp, "dataCC_distance"), header = TRUE)
     v <- c("min_dist", "horiz_dist", "distance_shape", "new_x")
-    stale <- if (identical(dim(back), dim(dist))) {
-      unique(dist$shoe[rowSums(back[v] != dist[v]) > 0])
+    stale <- if (identical(dim(back), dim(dist_csv))) {
+      unique(dist_csv$shoe[rowSums(back[v] != dist_csv[v]) > 0])
     } else {
       NA
     }
@@ -287,21 +311,44 @@ check("step 2", {
                 "frame; %d contour records; step 2 recomputed for all %d",
                 "shoes (%d rows, %.1f s) from the committed contour writes",
                 "both step-2 CSVs byte for byte (new_x in [%.4f, %.4f])"),
-          n_rec, n_rec, nrow(nd), secs, min(dist$new_x), max(dist$new_x))
+          n_rec, n_rec, nrow(nd), secs, min(dist_csv$new_x),
+          max(dist_csv$new_x))
 })
 
 # --- 3. step 3 and the OLD-basis refits ----------------------------------------
-b_new <- basis_knots(dist)
-b_old <- basis_knots(read.csv(rac_path(P_old, "dataCC_distance"),
-                              header = TRUE))
+# Each check below compares a model with the step-2 CSV, on the knots of
+# that CSV or of the OLD step-2 CSV. A missing or unreadable CSV (what a
+# runner that deletes a step's outputs leaves after a failed step 2) makes
+# each of them FAIL with that reason, and the script goes on.
+step2_csv <- function() {
+  if (!is.data.frame(dist_csv)) {
+    stop("step-2 CSV unavailable: ", basename(rac_path(P, "dataCC_distance")),
+         " could not be read (see the step 2 check)", call. = FALSE)
+  }
+  dist_csv
+}
+old_csv <- tryCatch(suppressWarnings(read.csv(rac_path(P_old,
+                                                       "dataCC_distance"),
+                                              header = TRUE)),
+                    error = function(e) conditionMessage(e))
+old_basis <- function() {
+  if (!is.data.frame(old_csv)) {
+    stop("OLD step-2 CSV unavailable: ",
+         basename(rac_path(P_old, "dataCC_distance")), " could not be read (",
+         old_csv, ")", call. = FALSE)
+  }
+  basis_knots(old_csv)
+}
 check("step 3 GLMM", {
+  csv <- step2_csv()
+  b_new <- basis_knots(csv)
   glmm <- readRDS(rac_model_path(P, "NEW_X_NS_XY"))
   stopifnot(inherits(glmm, "glmerMod"), glmm@optinfo$conv$opt == 0,
             is.null(glmm@optinfo$conv$lme4$messages),
             length(fixef(glmm)) == 25, ngrps(glmm) == n_shoes,
-            nobs(glmm) == nrow(dist))
+            nobs(glmm) == nrow(csv))
   bad <- fails_of(c(basis = identical(basis_of(glmm), b_new),
-                    glmm_vs_csv(glmm, dist, b_new)))
+                    glmm_vs_csv(glmm, csv, b_new)))
   if (!is.null(bad)) {
     stop("the step-3 GLMM was not fitted on dataCC_distance_new.csv (",
          bad, " differ): rerun NEW steps 3-6")
@@ -313,11 +360,13 @@ check("step 3 GLMM", {
           ngrps(glmm), nobs(glmm), as.numeric(VarCorr(glmm)$shoe))
 })
 check("step 3 CML", {
+  csv <- step2_csv()
+  b_new <- basis_knots(csv)
   cml <- readRDS(rac_model_path(P, "CML_MODEL"))
   stopifnot(inherits(cml, "coxph"), length(coef(cml)) == 24,
             all(is.finite(coef(cml))))
   bad <- fails_of(c(basis = identical(basis_of(cml), b_new),
-                    cml_vs_csv(cml, dist, b_new)))
+                    cml_vs_csv(cml, csv, b_new)))
   if (!is.null(bad)) {
     stop("the step-3 CML was not fitted on dataCC_distance_new.csv (",
          bad, " differ): rerun NEW steps 3-6")
@@ -330,16 +379,18 @@ check("step 3 CML", {
 })
 for (f in c("NEW_X_NS_XY", "CML_MODEL")) {
   check(paste("OLD-basis", f), {
+    csv <- step2_csv()
+    b_old <- old_basis()
     path <- rac_model_path(P, paste(f, "_oldbasis", sep = ""))
     stopifnot(file.exists(path))
     m <- readRDS(path)
     stopifnot(identical(basis_of(m), b_old))
     if (f == "NEW_X_NS_XY") {
       stopifnot(m@optinfo$conv$opt == 0, length(fixef(m)) == 25)
-      flags <- glmm_vs_csv(m, dist, b_old)
+      flags <- glmm_vs_csv(m, csv, b_old)
     } else {
       stopifnot(length(coef(m)) == 24, all(is.finite(coef(m))))
-      flags <- cml_vs_csv(m, dist, b_old)
+      flags <- cml_vs_csv(m, csv, b_old)
     }
     bad <- fails_of(flags)
     if (!is.null(bad)) {
@@ -356,16 +407,18 @@ check("negative control", {
   # the comparisons above must reject a CSV that differs from the fitted
   # one: one shoe's new_x moved by a pixel, a case and a control of one
   # shoe swapped, one row moved to another shoe
-  k <- which(dist$shoe == max(dist$shoe))
-  moved <- dist
+  csv <- step2_csv()
+  b_new <- basis_knots(csv)
+  k <- which(csv$shoe == max(csv$shoe))
+  moved <- csv
   moved$new_x[k] <- moved$new_x[k] +
     P$coords$rel_Y_cord / P$coords$rel_col_shoe
-  swapped <- dist
-  j <- c(k[which(dist$n_Acc[k] == 1)[1]], k[which(dist$n_Acc[k] == 0)[1]])
+  swapped <- csv
+  j <- c(k[which(csv$n_Acc[k] == 1)[1]], k[which(csv$n_Acc[k] == 0)[1]])
   swapped$n_Acc[j] <- swapped$n_Acc[rev(j)]
-  regrouped <- dist
-  regrouped$shoe[k[1]] <- dist$shoe[1]
-  stopifnot(length(j) == 2, !anyNA(j), dist$shoe[1] != dist$shoe[k[1]])
+  regrouped <- csv
+  regrouped$shoe[k[1]] <- csv$shoe[1]
+  stopifnot(length(j) == 2, !anyNA(j), csv$shoe[1] != csv$shoe[k[1]])
   glmm <- readRDS(rac_model_path(P, "NEW_X_NS_XY"))
   cml <- readRDS(rac_model_path(P, "CML_MODEL"))
   for (d in list(moved, swapped, regrouped)) {
@@ -396,7 +449,8 @@ check("step 5", {
   sprintf("step 5: wald_test_new.csv W = %.4f, df %d, vcov %s = the W of the committed GLMM",
           wt$W, wt$df, wt$vcov)
 })
-rm(list = intersect(c("glmm", "cml", "m"), ls()))
+rm(list = intersect(c("glmm", "cml", "m", "csv", "moved", "swapped",
+                      "regrouped"), ls()))
 invisible(gc())
 
 # --- 5. figures -----------------------------------------------------------------
@@ -414,7 +468,10 @@ check("steps 4-6 figures", {
                         as.raw(c(0x89, 0x50, 0x4e, 0x47))))
   }
   sprintf(paste("steps 4-6: the %d NEW PDFs and their PNG twins exist",
-                "(existence only; a stale figure is not detected here)"),
+                "(existence only; a stale figure is not detected here:",
+                "after a change of a NEW model rerun",
+                "docs/qa/T5/probes/t5_new_rerun.sh --oldbasis --png until",
+                "T8's e2e test compares them)"),
           length(stems))
 })
 
