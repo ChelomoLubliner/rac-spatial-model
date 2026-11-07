@@ -405,7 +405,7 @@ As planned: T8's `tests/e2e/test_new_rerun.sh` re-renders steps 4-6, redraws the
 Kept as recorded in A-117: the kernel pin stops another thread count or kernel, not another platform; a venv-wind NEW step 0 would rewrite 14 of 631 contour records in place, which `git status`, `tests/rebuild_new.sh` and (when step 2 changes) `tests/r/test_new_outputs.R` reveal. Shlomo may still ask for a `sys.platform` pin with an override for `docs/qa/T4/probes/t4_win_new_step0.sh`. The usage of `t5_stamp_figure.py` now lists the scratch route (`tests/rebuild_new.sh --keep`) first, because an in-place NEW step 0 is the risky one (section 8.4).
 
 ### 8.3 The fast suite's budget (A-121)
-The suite took 6 min 40 s on the idle machine at `1a330ed` and 7 min 17 s here with one core busy (section 9.1); it was already over "< 5 min" at T5 (5 min 47 s to 6 min 15 s). Moving `test_compare.R`'s `Random()` equivalence (30-75 s) to a slow tier alone would not bring it under 5 minutes, and that check guards `fit_common_basis()`, on which T6 builds; so the documented budget follows the measured time instead: about 7 min idle, with 10 min idle as the ceiling beyond which a test moves to a slow tier (plan section 4.5, `docs/tests/README.md`).
+The suite took 6 min 40 s on the idle machine at `1a330ed` and 6 min 54 s here at the final commit (7 min 17 s earlier with one core busy; section 9.1); it was already over "< 5 min" at T5 (5 min 47 s to 6 min 15 s). Moving `test_compare.R`'s `Random()` equivalence (30-75 s) to a slow tier alone would not bring it under 5 minutes, and that check guards `fit_common_basis()`, on which T6 builds; so the documented budget follows the measured time instead: about 7 min idle, with 10 min idle as the ceiling beyond which a test moves to a slow tier (plan section 4.5, `docs/tests/README.md`).
 
 ### 8.4 Nits
 - `docs/tests/T5-review-fixes-results.md` section 7: "the robust W of 4.2" is now "the robust W of section 4.2".
@@ -462,6 +462,46 @@ sys	0m51.498s
 exit 0
 ```
 ALL PASS: 184 Python tests (3 skipped live checks), 17 R scripts, flake8 88 files, shellcheck 17 files, the work tree unchanged by the tests; 7 min 17 s with one core busy.
+
+Rerun at the final docs commit `e93c706` on the idle machine (no other job running; the only later commit adds these lines to the documents, which no test reads):
+```bash
+time bash tests/run_all.sh        # at e93c706
+```
+```
+[... 447 lines omitted: as above (Ran 184 tests in 106.174s, OK (skipped=3); flake8: 88 files; shellcheck: 17 files) ...]
+== summary
+PASS         0s  sha256 committed_79247d8 (Tier A, 24 files)
+PASS         1s  sha256 old_baseline (11 OLD artifacts)
+PASS         0s  sha256 old_added_t2 (the 2 OLD files T2 added)
+PASS       140s  python unittest discover tests/python
+PASS         5s  Rscript tests/r/test_baseline_committed.R
+PASS        36s  Rscript tests/r/test_compare.R
+PASS        21s  Rscript tests/r/test_compare_glmm_fits.R
+PASS         4s  Rscript tests/r/test_compare_models.R
+PASS        45s  Rscript tests/r/test_distances_vectorized.R
+PASS        17s  Rscript tests/r/test_figures_png.R
+PASS        28s  Rscript tests/r/test_new_outputs.R
+PASS         2s  Rscript tests/r/test_no_hardcoding.R
+PASS         3s  Rscript tests/r/test_old_regression.R
+PASS        33s  Rscript tests/r/test_output_guards.R
+PASS         1s  Rscript tests/r/test_pixel_mapping.R
+PASS         1s  Rscript tests/r/test_profile.R
+PASS        49s  Rscript tests/r/test_profile_sentinels.R
+PASS         8s  Rscript tests/r/test_run_manifest.R
+PASS         2s  Rscript tests/r/test_step5_variant.R
+PASS         8s  Rscript tests/r/test_sticker_masks.R
+PASS         4s  Rscript tests/r/test_wald.R
+PASS         1s  flake8 (all Python files)
+PASS         5s  shellcheck (all shell scripts)
+PASS         0s  work tree unchanged by the tests (no file created or modified)
+ALL PASS
+
+real	6m53.703s
+user	6m5.226s
+sys	0m47.349s
+exit 0
+```
+ALL PASS at the final commit, 6 min 54 s on the idle machine.
 
 ### 9.2 OLD regression
 Steps 1-6, then step 0 (the gate compares them in separate runs, A-081), from the clean clone:
@@ -599,7 +639,7 @@ No OLD output, raw data file, profile value, contour code, Rmd or `statistical_m
 | `t5_boot.R` / `t5_inference.R` | 19 s / 34 s |
 | `test_new_outputs.R`: the scenarios in a clean clone | 10.6-32.2 s each; M2's step-2 rerun 30 s |
 | `regress_old.sh --steps 1-6` / `--steps 0` (clean clone of `3bab0a6`) | 11 min 56 s / 13 min 43 s |
-| `run_all.sh` | 7 min 17 s early (one core busy) |
+| `run_all.sh` | 6 min 54 s at `e93c706`, idle; 7 min 17 s early (one core busy) |
 
 **Open points.**
 - T5 step 3b (shoe bootstrap and cluster-robust variances on both datasets) is still to do.

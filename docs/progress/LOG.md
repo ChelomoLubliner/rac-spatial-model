@@ -2046,14 +2046,14 @@ Decisions A-119 to A-121 and D-015 (new); corrections appended to A-113, A-115, 
 **Tests and gates.**
 - `tests/r/test_new_outputs.R` (fixed): ALL PASS in the work tree (31.2 s, loaded) and in a fresh clone of `3bab0a6` (31.9 s); the missing-file scenarios and M1, M2 as above.
 - `tests/r/test_no_hardcoding.R`: ALL PASS (36 R/Rmd files).
-- `bash tests/run_all.sh`: ALL PASS early (code at `3bab0a6`, docs uncommitted; 184 Python tests with 3 skipped, 17 R scripts, flake8 88 files, shellcheck 17, work tree unchanged), 7 min 17 s with one core busy.
+- `bash tests/run_all.sh`: ALL PASS early (code at `3bab0a6`, docs uncommitted; 184 Python tests with 3 skipped, 17 R scripts, flake8 88 files, shellcheck 17, work tree unchanged), 7 min 17 s with one core busy; again at the final docs commit `e93c706` on the idle machine: ALL PASS, 6 min 54 s (the commit after it adds only these lines).
 
 **OLD regression: identical.**
 - `regress_old.sh --steps 1-6 --keep`, from a clean clone of the final code commit `3bab0a6` (`git status` empty; the run folder's `source.txt` records `head=3bab0a6`): ALL PASS (the five step-1/2 CSVs = Tier A byte for byte, `shoe_codes.csv` = `old_added_t2`, GLMM and CML `identical()` to Tier B in all 22 fields, 8 normalized PDFs = Tier B, Wald W 427.7804472165 = Tier B, both live R checks), 11 min 56 s.
 - `regress_old.sh --steps 0`, same clone: ALL PASS (16 threads, Haswell; contour = Tier B `e18d50df...`; 1,556 intermediates = Tier B; live snake check), 13 min 43 s.
 - The Tier A, `old_baseline` and `old_added_t2` checksums pass in the work tree; `git diff a6011ca 3bab0a6` touches only the two test files. No OLD output, raw file, profile value, contour code, Rmd or `statistical_model/R` file changed.
 
-**Timings** (idle machine unless noted): `t5_basis_y.R` 2 min 32 s (2:31 to 3:34 in earlier runs); `t5_boot.R` 19 s; `t5_inference.R` 34 s; `test_new_outputs.R` 31-32 s; the missing-file scenarios 10.6-30.1 s each; the GLMM refit on the finer basis stopped after 2 h 26 min; OLD gates 11 min 56 s (steps 1-6) and 13 min 43 s (step 0, load about 17); fast suite 7 min 17 s early.
+**Timings** (idle machine unless noted): `t5_basis_y.R` 2 min 32 s (2:31 to 3:34 in earlier runs); `t5_boot.R` 19 s; `t5_inference.R` 34 s; `test_new_outputs.R` 31-32 s; the missing-file scenarios 10.6-30.1 s each; the GLMM refit on the finer basis stopped after 2 h 26 min; OLD gates 11 min 56 s (steps 1-6) and 13 min 43 s (step 0, load about 17); fast suite 7 min 17 s early, 6 min 54 s at `e93c706` (idle).
 
 **Side effects outside the repo.** Only `<scratch>/t5fix2/` (probe outputs, a scenario clone, the gate clone and its run folders). The thesis repo was not touched. Process note: the background GLMM refit was stopped with `kill` on its R process (exit 143, nothing written); a cleanup command of mine then killed my own waiting loops and, because its `pgrep` pattern also matched its own command line, its own shell (exit 144). No file was affected (`git status` showed only my intended edits).
 
