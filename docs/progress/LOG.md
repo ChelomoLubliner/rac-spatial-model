@@ -1937,3 +1937,47 @@ Decisions A-113 to A-118; corrections appended to A-108 (14 of 631 records, not 
    - Fix: report these intervals next to the z values.
 
 **Not verified:** the OLD gates (another review was running them) and the 34-minute NEW rerun.
+
+## 2026-11-07 02:45, T5-newmodel review fixes review (reviewer:engineer)
+
+**Verdict: approve** (engineering lens). The four majors are fixed in the code, not only in the docs. I reproduced the new stale-output guard with my own mutants on a record the implementer did not use. Every pasted probe output I reran matches, nothing OLD changed, and the namespace stays clean. Two minor findings and three nits remain; none blocks.
+
+**Verified by re-running** (`<scratch>/rv_t5b_eng/`, clean clones of `2f49373`; load about 20 from the parallel reviews):
+- `bash tests/run_all.sh`: ALL PASS (184 Python tests, 3 skipped; 17 R scripts; flake8 88 files; shellcheck 17; work tree unchanged), 13 min 21 s under load.
+- `test_new_outputs.R` ALL PASS (31 s); `test_compare.R` ALL PASS (70 s). Without its marker, `test_no_hardcoding.R` flags `tools/figures_png.R:60`; it also flags a new `tools/` file that hard-codes an output path.
+- **Own mutants** on record 148 (a named T4 fallback; the implementer used 591):
+  - M1, the whole record shifted one column (1,280 bytes): exit 1, `FAIL step 2 ... (first: 148)`, and the other 9 checks still run and pass.
+  - M2, M1 with NEW step 2 rerun (101 rows of shoe 148 change, max |d new_x| 0.0034): step 2 passes. Step-3 GLMM and CML fail (basis, X), and so do both OLD-basis refits (X), each failure naming the command to rerun.
+  - A failing run writes nothing in the work tree: no file is newer than a marker, because `rac_path()` builds every path from `P$root`.
+- **Test design:**
+  - The test's step 2 follows step 2's own flow: `compute_distances()` returns the round-tripped temp CSV that the Rmd re-reads.
+  - No assertion of the T5 version was lost (AST diff). The 9 that disappeared moved into the flags of `glmm_vs_csv()`/`cml_vs_csv()` or gave way to the byte comparison.
+  - `Random()` in `test_compare.R` resolves `model_out` lexically to a tempfile, so it cannot overwrite a committed model.
+- **Probes, in a clean clone:**
+  - `t5_gof.R` writes `residual_cells_old_vs_new.csv` byte-identical, and all 130 pasted output lines match verbatim except the 3 timing lines.
+  - `t5_inference.R` matches verbatim except its timing. `t5_band_figure.py` draws both PNGs byte-identical.
+  - The report's headline numbers match: robust W 329.0/580.9 and 234.4/394.2, K8 LR 94.64/39.04, 7 and 8 of 10 bands, calibration 0.394/0.484 and 1.028/1.029, gradient 0.0237.
+- **Gate evidence** (the implementer's kept scratch folders): both OLD gates and the NEW rerun ran at `8de60f5`, after every code commit. Their logs end ALL PASS and ALL SAME; both refits are SAME as bytes and `identical()` in every field.
+- **Repo:**
+  - The Tier A, `old_baseline` and `old_added_t2` checksums pass.
+  - `4cc6ffe..HEAD` touches only docs, tests, README, a comment in `figures_png.R`, and `compare.R`, which only `tools/fit_oldbasis_new.R` and the tests use.
+  - Every new QA file is `new/..._new` or `compare/..._old_vs_new`.
+  - No CR in any changed file, and no attribution lines.
+  - A-117's claim about `rebuild_new.sh` holds (line 201).
+- **Looked at** `heel_front_band_old_vs_new.png` and `heel_front_band_shoes_new.png`: both render and show what A-114 describes.
+
+**Findings:**
+1. **Minor. "Every check runs even after a failure" is not unconditional** (test header, A-113 (4), `docs/tests/README.md`).
+   - `tests/r/test_new_outputs.R:294-296` compute `b_new`/`b_old` at top level, outside `check()`.
+   - With `dataCC_distance_new.csv` missing, which is what a runner that deletes a step's outputs leaves after a failed step 2: steps 1 and 2 FAIL. The script then aborts with `Error in data$new_x : object of type 'closure' is not subsettable`, because `dist` falls back to `stats::dist`, and the 8 later checks never run. Exit is 1, so this is not a false pass.
+   - Fix: set `dist <- NULL` before step 2, compute the knots inside a check, and skip the dependent checks with a clear message; rename `dist`.
+2. **Minor. The fast suite is over its documented budget.**
+   - `docs/tests/README.md:15` and plan line 278 say "< 5 min". The implementer measured 6 min 40 s idle at `1a330ed`.
+   - The suite was already over before these fixes; they add about 1 min.
+   - Fix: update the budget, or move `test_compare.R`'s `Random()` equivalence (36-75 s) to the slow tier.
+3. **Nits.**
+   - `T5-review-fixes-results.md` section 7 says "the robust W of 4.2"; it should be "of section 4.2".
+   - The usage of `t5_stamp_figure.py` lists an in-place NEW step 0 first. List the `rebuild_new.sh --keep` copy first, because of A-117's platform risk.
+   - The header line 7 of `test_no_hardcoding.R` is overlong.
+
+**Not verified:** the OLD gates themselves (I relied on the checksums, the diff and the kept run folders), the 34-minute NEW rerun, `t5_sigma2.R --offset-refit`, and the statistical judgements (other lenses).
