@@ -10,6 +10,24 @@ Every number below is taken from the result documents, which cite their sources 
 
 ---
 
+## 0. What happened (how the work was done)
+
+| Date | Step | What was done |
+|---|---|---|
+| 11-05 | Setup | Found the new data (`naomi_fast`, 631 shoes); copied it byte-identical to `data/new_shoes/`; plan written (`docs/plans/`) |
+| 11-05 | Rule | Every new file is namespaced (`new/` folder, `_new` suffix); after every step the OLD pipeline must reproduce the committed results exactly |
+| 11-06 | T1–T3 | Pipeline made dataset-aware (`RAC_DATASET=old\|new`); the coordinate scale (×2) and pixel mapping calibrated from the data |
+| 11-06 | T4 | Snake adapted to 255 × 367; visual QA three times on sheets of every shoe (ellipse, first snake, prototype, stickers erased) |
+| 11-06 | T5 | Full model (case-control, distances, GLMM, CML, Wald) run on the new shoes |
+| 11-07 | T6 | Old vs new comparison, with a statistics review and fixes |
+| 11-07 | T7 | Part 2 goodness of fit; the test was corrected to a two-sample shoe bootstrap after review |
+| 11-08 | Stop | The run hit the weekly usage limit before the last re-knit and final reviews; the work was saved as is (`7e8d44d`) |
+| 11-08 | Finish | Re-knit of T7 to fill the last intervals; this report |
+
+Each step had independent reviewers (statistician, code, visual QA); their verdicts and every decision are in `docs/progress/LOG.md` and `docs/decisions.md`.
+
+**Still to do:** a final review of the whole branch, and the open questions in section 8.
+
 ## 1. What was asked (meeting of 2026-11-05)
 
 - **Part 1:** run the complete model on the new dataset, with the same standardization as for the old shoes, and adapt the snake.
