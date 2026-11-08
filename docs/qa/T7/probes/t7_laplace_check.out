@@ -1,0 +1,15 @@
+checked resamples: 1,2,3,4,5,6,7,8; Laplace conv codes 0,0,0,0,0,0,0,0; seconds per Laplace refit 1298,2051,969,806,661,627,661,640
+theta (sd of the shoe effect): committed 0.9797; Laplace refits 1.0121, 1.0122, 0.9126, 0.9186, 0.9449, 0.9651, 0.9331, 0.9950
+|surrogate deviation - Laplace deviation| / bootstrap SD, 24 spatial coefficients x 8 resamples: median 0.004, p90 0.008, max 0.012
+correlation of the two deviations (spatial coefficients): 1.0000
+ratio of their spreads (sd surrogate / sd Laplace deviations): 0.996
+     b max_abs_diff max_abs_shift_laplace max_abs_shift_surrogate
+[1,] 1         0.61                 96.30                   95.83
+[2,] 2         1.09                139.17                  138.07
+[3,] 3         0.74                 83.86                   83.62
+[4,] 4         0.99                129.44                  128.45
+[5,] 5         0.73                128.50                  127.77
+[6,] 6         0.85                102.91                  102.05
+[7,] 7         2.20                329.99                  327.79
+[8,] 8         0.78                114.56                  113.85
+Naomi's areas, all NEW shoes (N = 20013): the surrogate's expected counts differ from the Laplace refit's by at most 2.20 RACs per area, while the draws move them by up to 329.99 (Laplace) and 327.79 (surrogate)

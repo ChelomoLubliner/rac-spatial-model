@@ -1,0 +1,1615 @@
+---
+title: "Part 2: out-of-sample validation of the OLD-fitted models on the NEW shoes"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Plan T7 and section 9; meeting 4, Part 2 (Micha's request). Every number of
+`docs/results/validation.md` comes from this file. Run from
+`statistical_model/` (both datasets are read through their profiles;
+`RAC_DATASET` is not used):
+
+    Rscript tools/part2_old_draws.R --B 2000 --workers 4   # once, about 30 min
+    cd statistical_model && Rscript -e 'rmarkdown::render("validation_8.Rmd",
+      output_dir = "../logs/knit/validation")'
+
+`RAC_WORKERS` (default 4) sets the parallel workers, `RAC_PART2_B` (default
+2000) the bootstrap size. The pair test, the bootstrap replicates and the
+pixel-level slope dilution are cached in `logs/validation/` (not tracked)
+under a key with the md5 of the inputs of both datasets, the OLD draws, the
+shoe set, the grid cuts, `R/validation.R` (and `R/pairs.R` for the pair
+test) and B. The key does not cover the code of this file: after editing the
+`pairs`, `bootstrap` or `pixel_slope` chunk, delete
+`logs/validation/new/part2_pairs_new.rds`, `part2_boot_new.rds` or
+`part2_pixel_slope_new.rds`. A fresh clone has no cache and recomputes
+everything (about 1-2 h on 3 workers). Results do not depend on the number
+of workers.
+
+T7 review fixes (statistics review, 2026-11-07; decisions T7-13 to T7-17 in
+`docs/results/validation.md`): every interval of a model comparison is
+reported for two estimands, the published fitted surfaces (NEW-only shoe
+bootstrap, fits held fixed) and the model classes (two-sample bootstrap,
+OLD estimation noise included), both centred on the point estimate
+(`part2_shift_ci()`; the raw two-sample percentile interval of the first run
+is kept beside them); the uniform benchmark and the calibration slope
+(section 6b); the consecutive-id block bootstrap (section 7b, the A-038
+proxy).
+
+```{r inputs}
+suppressMessages({
+  library(splines)
+  library(lme4)
+  library(survival)
+  library(dplyr)
+})
+ROOT_PATH <- paste(dirname(getwd()), "/", sep = "")
+for (f in c("profile.R", "io.R", "distances.R", "compare.R", "validation.R")) {
+  source(paste(ROOT_PATH, "statistical_model/R/", f, sep = ""))
+}
+P_old <- rac_profile("old", root = ROOT_PATH)
+P_new <- rac_profile("new", root = ROOT_PATH)
+WORKERS <- as.integer(rac_env("RAC_WORKERS", "4"))
+B <- as.integer(rac_env("RAC_PART2_B", "2000"))
+t_start <- proc.time()[["elapsed"]]
+
+glmm_old <- readRDS(rac_model_path(P_old, "NEW_X_NS_XY"))
+cml_old <- readRDS(rac_model_path(P_old, "CML_MODEL"))
+basis <- part2_basis(glmm_old)
+stopifnot(identical(basis, part2_basis(cml_old)))
+beta_old <- fixef(glmm_old)
+cml_coef <- coef(cml_old)
+pc_old <- read.csv(rac_path(P_old, "pixel_counts"))
+MEAN_OFFSET_OLD <- mean(log(P_old$r$n_controls / pc_old$pixel_count))
+cat(sprintf("OLD MEAN_OFFSET %.9f\n", MEAN_OFFSET_OLD))
+fmt <- function(df) {
+  num <- vapply(df, is.numeric, TRUE)
+  df[num] <- lapply(df[num], signif, 4)
+  df
+}
+```
+
+## 1. Pixel tables
+
+Every contact pixel of every analysis shoe of both datasets (step-1 S, its
+RAC count, x, y and `new_x` with the step-2 arithmetic). Checks: the pixels
+per shoe equal the step-1 pixel counts, the RACs per shoe equal the
+locations, and on every case-control row of the step-2 CSV the table's
+`new_x` and `horiz_dist` are `identical()` to the CSV's.
+
+```{r pixels}
+px <- list(old = part2_pixel_table_cached(P_old),
+           new = part2_pixel_table_cached(P_new))
+prof <- list(old = P_old, new = P_new)
+shoe_ids <- lapply(px, function(p) as.integer(attr(p, "shoes")))
+for (ds in names(px)) {
+  P <- prof[[ds]]
+  p <- px[[ds]]
+  pc <- read.csv(rac_path(P, "pixel_counts"))
+  n_code <- length(attr(p, "shoes"))
+  stopifnot(identical(as.numeric(tabulate(p$code, n_code)),
+                      as.numeric(pc$pixel_count)),
+            identical(as.integer(as.vector(tapply(p$N, p$code, sum))),
+                      as.integer(attr(p, "n_rac"))))
+  d <- read.csv(rac_path(P, "dataCC_distance"))
+  per_px <- P$coords$rel_Y_cord / P$coords$rel_col_shoe
+  dcol <- round(d$x / per_px + P$col_shoe / 2)
+  drow <- round(-d$y / per_px + P$row_shoe / 2)
+  key_p <- (p$code - 1) * P$col_shoe * P$row_shoe +
+    (p$col - 1) * P$row_shoe + p$row
+  key_d <- (d$shoe - 1) * P$col_shoe * P$row_shoe + (dcol - 1) * P$row_shoe +
+    drow
+  m <- match(key_d, key_p)
+  stopifnot(!anyNA(m), identical(p$x[m], d$x), identical(p$y[m], d$y),
+            identical(p$new_x[m], d$new_x),
+            identical(p$horiz_dist[m], d$horiz_dist),
+            all((p$N[m] > 0) == (d$n_Acc == 1)))
+  cat(sprintf(paste("%s: %d contact pixels of %d shoes, %d RACs; %d",
+                    "case-control rows: x, y, new_x, horiz_dist identical();",
+                    "%d pixels with the min_dist fallback\n"),
+              ds, nrow(p), n_code, sum(p$N), nrow(d), sum(p$fallback)))
+}
+rm(d, key_p, key_d, m)
+```
+
+## 2. The frozen definitions (OLD only) and the provisional shoe set
+
+Written by `part2_definitions()` and `part2_shoe_set()` before any NEW
+Part 2 number (2026-11-07 06:44 IST; checksums in
+`docs/tests/T7-results.md`); here they are recomputed and must be equal.
+
+```{r definitions}
+cuts <- read.csv(part2_path(P_old, "part2_grid_cuts"))
+theta_tab <- read.csv(part2_path(P_old, "part2_regional_theta"),
+                      stringsAsFactors = FALSE)
+shoe_set <- read.csv(part2_path(P_new, "part2_shoe_set_provisional"),
+                     stringsAsFactors = FALSE)
+stopifnot(identical(part2_freeze(part2_csv_round_trip(part2_shoe_set(P_new, P_old)),
+                                 part2_path(P_new, "part2_shoe_set_provisional")),
+                    "checked"))
+re_cuts <- local({
+  parts <- lapply(2:4, function(n_x) {
+    ck <- grid_cuts_from_old(px$old$new_x, px$old$y, 5, n_x)
+    for (j in 1:3) {
+      nm <- paste("x_cut", j, sep = "_")
+      if (is.null(ck[[nm]])) ck[[nm]] <- NA_real_
+    }
+    ck
+  })
+  part2_csv_round_trip(do.call(rbind, parts))
+})
+stopifnot(isTRUE(all.equal(re_cuts, cuts, tolerance = 0)))
+cols <- part2_partition_cols(cuts)
+prep <- list(old = part2_prepare(px$old, basis, cuts, length(attr(px$old, "shoes"))),
+             new = part2_prepare(px$new, basis, cuts, length(attr(px$new, "shoes"))))
+areas <- c(r2022 = "aR", r_newx = "a14", r_grid15 = "g15")
+area_tab <- function(pr, col) {
+  list(O = part2_agg(pr, pr$groups$O, col), S = part2_agg(pr, pr$groups$S, col))
+}
+reg_old <- lapply(areas, function(a) area_tab(prep$old, a))
+reg_new <- lapply(areas, function(a) area_tab(prep$new, a))
+theta <- lapply(reg_old, function(rt) regional_fit(rt$O, rt$S))
+for (r in names(areas)) {
+  fz <- theta_tab$theta[theta_tab$model == r]
+  stopifnot(isTRUE(all.equal(part2_round_trip(unname(theta[[r]])), fz,
+                             tolerance = 0)))
+}
+print(cuts)
+print(theta_tab[, c("model", "area", "theta", "theta_rel", "glm_rel",
+                    "naomi_cml_rel", "O_old", "S_old")], digits = 6)
+cat(sprintf("regional fit vs Poisson GLM: max rel diff %.2e; vs Naomi's funLogCMLlambda (optim): %.2e\n",
+            max(abs(theta_tab$theta_rel / theta_tab$glm_rel - 1)),
+            max(abs(theta_tab$theta_rel / theta_tab$naomi_cml_rel - 1))))
+```
+
+Shoe sets of the NEW analysis (provisional; see the decisions in
+`docs/results/validation.md`):
+
+```{r sets}
+set_cols <- c(primary = "include_primary", all = "in_all",
+              same_only = "in_same_only", quality_off = "in_quality_off",
+              quality_raw = "in_quality_raw",
+              excl_candidates = "in_excl_candidates")
+stopifnot(identical(shoe_set$shoe, shoe_ids$new))
+sets <- lapply(set_cols, function(cn) which(shoe_set[[cn]]))
+set_table <- data.frame(set = names(sets), shoes = lengths(sets),
+                        racs = vapply(sets, function(u) sum(prep$new$n[u]), 0))
+print(set_table)
+print(table(shoe_set$overlap_decision, shoe_set$quality_flag))
+q_old <- read.csv(paste(P_old$root, P_old$prep$shoe_contact, sep = ""))
+old_sets <- list(old_all = seq_len(prep$old$n_code),
+                 old_quality = which(!(q_old$n_rac[q_old$n_rac > 0] >= 10 &
+                   q_old$best_shift_rate[q_old$n_rac > 0] < shoe_set$quality_q[1])))
+cat("OLD in-sample sets:", lengths(old_sets), "shoes\n")
+```
+
+## 3. Point estimates
+
+Expected cell counts of every model, normalized per shoe to its RAC total
+(D-003). GLMM: p = plogis(eta + OLD MEAN_OFFSET), random effect 0. CML:
+w = exp(eta) (no intercept). Regional: theta of the 2022 model (r2022:
+Naomi's areas on (-x, y)), and the sensitivity fits r_newx (areas on
+(-new_x, y)) and r_grid15 (the 15-cell grid).
+
+```{r point}
+models <- c("glmm", "cml", names(areas))
+cont_spec <- list(glmm = list(link = "logit", offset = MEAN_OFFSET_OLD),
+                  cml = list(link = "log", offset = 0))
+sak <- lapply(c(old = "old", new = "new"), function(ds)
+  lapply(areas, function(a) setNames(lapply(cols, function(cl)
+    part2_sak(prep[[ds]], a, cl)), cols)))
+expected <- function(ds, model, par) {
+  pr <- prep[[ds]]
+  if (model %in% names(cont_spec)) {
+    sp <- cont_spec[[model]]
+    ev <- part2_eval(pr, par, sp$link, sp$offset)
+    E <- lapply(cols, function(cl)
+      normalize_expected(part2_agg(pr, ev$Eg, cl), pr$n))
+    ls <- part2_ls_model(ev, pr$n)
+  } else {
+    E <- lapply(cols, function(cl)
+      regional_expected(par, sak[[ds]][[model]][[cl]], pr$n))
+    rt <- if (ds == "old") reg_old[[model]] else reg_new[[model]]
+    ls <- part2_ls_regional(par, rt$O, rt$S)
+  }
+  names(E) <- cols
+  list(E = E, ls = ls)
+}
+par0 <- c(list(glmm = part2_coef_parts(beta_old),
+               cml = part2_coef_parts(cml_coef)), theta)
+obsO <- lapply(c(old = "old", new = "new"), function(ds)
+  setNames(lapply(cols, function(cl)
+    part2_agg(prep[[ds]], prep[[ds]]$groups$O, cl)), cols))
+EX <- lapply(c(old = "old", new = "new"), function(ds)
+  setNames(lapply(models, function(md) expected(ds, md, par0[[md]])), models))
+ls_unif <- lapply(c(old = "old", new = "new"), function(ds)
+  part2_ls_uniform(prep[[ds]]$n, prep[[ds]]$S_shoe))
+# the gain over uniform placement that each model expects for itself (its
+# KL divergence from uniform, per shoe): the benchmark of the observed
+# log-score gain (section 7; T7 review fix, minor finding 7)
+kl_self <- lapply(c(old = "old", new = "new"), function(ds) {
+  pr <- prep[[ds]]
+  out <- list()
+  for (md in names(cont_spec)) {
+    sp <- cont_spec[[md]]
+    eta <- part2_eta(pr$Bx, pr$By_img, pr$row, par0[[md]])
+    lp <- if (sp$link == "logit") stats::plogis(eta + sp$offset, log.p = TRUE) else eta
+    out[[md]] <- part2_kl_uniform(lp, pr$code, pr$n_code)
+  }
+  rt <- if (ds == "old") reg_old$r2022 else reg_new$r2022
+  num <- t(t(rt$S) * theta$r2022)
+  pa <- num / rowSums(num)
+  lr <- ifelse(rt$S > 0, log(pa * rowSums(rt$S) / pmax(rt$S, 1)), 0)
+  out$r2022 <- rowSums(pa * lr)
+  out
+})
+band_of <- function(cl) {
+  if (cl == "a14") naomi_area_band(seq_len(14)) else {
+    K <- prep$new$K[[cl]]
+    grid_band(seq_len(K), K / length(unique(cuts$band)))
+  }
+}
+nbr_of <- function(cl) {
+  if (cl == "a14") return(NULL)
+  K <- prep$new$K[[cl]]
+  nx <- K / length(unique(cuts$band))
+  lapply(seq_len(K), function(k) {
+    b <- grid_band(k, nx)
+    j <- (k - 1) %% nx + 1
+    k + c(if (j > 1) -1, if (j < nx) 1)
+  })
+}
+OB <- lapply(sets, function(u) setNames(lapply(models, function(md)
+  setNames(lapply(cols, function(cl)
+    part2_obs_stats(obsO$new[[cl]][u, , drop = FALSE],
+                    EX$new[[md]]$E[[cl]][u, , drop = FALSE],
+                    band_of(cl), nbr_of(cl))), cols)), models))
+merged <- do.call(rbind, lapply(names(OB), function(s)
+  do.call(rbind, lapply(models, function(md) do.call(rbind, lapply(cols,
+    function(cl) data.frame(set = s, model = md, partition = cl,
+                            K = OB[[s]][[md]][[cl]]$K,
+                            K_merged = OB[[s]][[md]][[cl]]$K_merged)))))))
+cat("cells merged (E < 5) in", sum(merged$K_merged < merged$K), "of",
+    nrow(merged), "analyses\n")
+# the shoe resamples of every set (shared by every model, the pair test and
+# the OLD in-sample dispersion)
+W <- lapply(sets, function(u) part2_weights(length(u), B, PART2_SEEDS$boot))
+W_old <- lapply(old_sets, function(u) part2_weights(length(u), B,
+                                                    PART2_SEEDS$boot))
+# uniform placement on each shoe's contact surface (no spatial model; the
+# benchmark of section 6b), shoes x cells per partition
+EU_all <- setNames(lapply(cols, function(cl) part2_uniform_expected(
+  part2_agg(prep$new, prep$new$groups$S, cl), prep$new$S_shoe, prep$new$n)),
+  cols)
+# the 2022 model at its own resolution (its areas on the shoe's own
+# coordinates, aR): the pixel-level comparison of section 6b
+EU_aR <- part2_uniform_expected(reg_new$r2022$S, prep$new$S_shoe, prep$new$n)
+regional_aR <- function(th) normalize_expected(t(t(reg_new$r2022$S) * th),
+                                               prep$new$n)
+E_aR0 <- regional_aR(theta$r2022)
+# consecutive-id blocks of the primary set (section 7b, the A-038 proxy)
+BLOCK_SIZES <- c(blk2 = 2L, blk4 = 4L)
+Wblk <- lapply(BLOCK_SIZES, function(bs) part2_weights(
+  length(sets$primary), B, PART2_SEEDS$boot,
+  groups = part2_block_groups(shoe_ids$new[sets$primary], bs)))
+# what the cached results depend on (section 4 and 5 caches)
+base_key <- c(unlist(lapply(prof, part2_inputs_md5)),
+              shoe_set = unname(tools::md5sum(part2_path(P_new, "part2_shoe_set_provisional"))),
+              cuts = unname(tools::md5sum(part2_path(P_old, "part2_grid_cuts"))),
+              code = unname(tools::md5sum(paste(ROOT_PATH, "statistical_model/R/validation.R", sep = ""))),
+              B = B)
+```
+
+## 4. Within-shoe dependence: pair counts by distance (named primary analysis 3)
+
+Unordered RAC pairs of one shoe by the distance of their pixels, pooled over
+shoes, against independent placement (A-026, A-046). Null 1: the OLD GLMM
+surface normalized over the shoe's contact pixels. Null 2: the 1:1 mixture
+with the shoe's own RACs smoothed by a Gaussian of sd 24 px (absorbs
+shoe-specific patterns on scales >= 24 px). Monte Carlo p from 999
+simulations (seed `PART2_SEEDS$pairs`), envelopes 2.5%-97.5%, shoe-bootstrap
+intervals with the shoe resamples of the bootstrap (section 5). Primary: the band (2, 8] px
+against null 2. An excess there is small-scale clustering relative to the
+fitted intensity and to its heterogeneity-adjusted version, whatever its
+mechanism: contagion (one damage event making several RACs) and
+inhomogeneity on scales below 24 px cannot be separated with these data.
+
+```{r pairs}
+source(paste(ROOT_PATH, "statistical_model/R/pairs.R", sep = ""))
+pair_input <- function(ds, codes) {
+  pr <- prep[[ds]]
+  p <- px[[ds]]
+  pv <- stats::plogis(part2_eta(pr$Bx, pr$By_img, pr$row, par0$glmm) +
+                        MEAN_OFFSET_OLD)
+  by_code <- split(seq_len(nrow(p)), p$code)
+  lapply(codes, function(k) {
+    i <- by_code[[k]]
+    r <- i[p$N[i] > 0]
+    g <- gauss_smooth_at(p$row[i], p$col[i], p$row[r], p$col[r], p$N[r], PAIR_H)
+    pc <- pv[i] / sum(pv[i])
+    list(row = p$row[i], col = p$col[i], N = p$N[i], pi1 = pc,
+         pi2 = 0.5 * pc + 0.5 * g / sum(g))
+  })
+}
+pair_run <- function(ds, codes, Wb) {
+  sh <- pair_input(ds, codes)
+  P <- prof[[ds]]
+  kern <- pair_kernels(P$row_shoe, P$col_shoe)
+  out <- NULL
+  raw <- list()
+  for (nl in c("null1", "null2")) {
+    shn <- lapply(sh, function(s) list(row = s$row, col = s$col, N = s$N,
+                                       pi = if (nl == "null1") s$pi1 else s$pi2))
+    res <- pair_test_shoes(shn, PAIR_SIMS, PART2_SEEDS$pairs, kern,
+                           P$row_shoe, P$col_shoe)
+    raw[[nl]] <- res
+    out <- rbind(out, pair_summary(res, Wb, nl))
+  }
+  list(table = out, raw = raw)
+}
+pair_key <- c(base_key, pairs = unname(tools::md5sum(paste(ROOT_PATH,
+  "statistical_model/R/pairs.R", sep = ""))))
+pair_cache <- part2_cache_path(P_new, "part2_pairs")
+PR <- NULL
+if (file.exists(pair_cache)) {
+  cached <- readRDS(pair_cache)
+  if (identical(cached$key, pair_key)) PR <- cached$PR
+}
+if (is.null(PR)) {
+  t0 <- proc.time()[["elapsed"]]
+  jobs <- list(primary = list("new", sets$primary, W$primary),
+               all = list("new", sets$all, W$all),
+               old_all = list("old", old_sets$old_all, W_old$old_all))
+  PR <- lapply(jobs, function(j) pair_run(j[[1]], j[[2]], j[[3]]))
+  bad <- !vapply(PR, is.list, TRUE)
+  if (any(bad)) stop("pair test failed: ", paste(PR[bad], collapse = "; "))
+  rac_ensure_dir(pair_cache)
+  saveRDS(list(key = pair_key, PR = PR,
+               seconds = proc.time()[["elapsed"]] - t0), pair_cache)
+  cat(sprintf("pair test: %.0f s\n", proc.time()[["elapsed"]] - t0))
+}
+pair_tab <- do.call(rbind, lapply(names(PR), function(s)
+  cbind(set = s, PR[[s]]$table)))
+rownames(pair_tab) <- NULL
+print(fmt(pair_tab), row.names = FALSE)
+pa3 <- pair_tab[pair_tab$set == "primary" & pair_tab$null == "null2" &
+                  pair_tab$band == "(2,8]" & pair_tab$weight == "pairs", ]
+cat(sprintf(paste("Named primary analysis 3: (2, 8] px vs null 2: observed %d,",
+                  "expected %.1f, ratio %.3f [shoe bootstrap %.3f, %.3f],",
+                  "Monte Carlo p %.4f\n"), as.integer(pa3$obs), pa3$expected,
+            pa3$ratio, pa3$ci_lo, pa3$ci_hi, pa3$p_mc))
+```
+
+## 5. The two-sample shoe bootstrap (plan section 9, A-043)
+
+Replicate b pairs OLD draw b (`tools/part2_old_draws.R`: the OLD GLMM
+refitted on an OLD shoe resample, centred on the committed fit; the 2022
+theta refitted on the same OLD resample; the CML moved by the same
+spatial deviation, an approximation stated in the results) with one
+resample of the NEW shoes of each set (seed `PART2_SEEDS$boot`, shared by
+every model).
+
+```{r bootstrap}
+draws_path <- part2_path(P_old, "old_glmm_draws", "rds")
+draws <- readRDS(draws_path)
+stopifnot(identical(colnames(draws$draws), names(beta_old)),
+          length(draws$failed) == 0)
+B_old <- nrow(draws$draws)
+m_old <- prep$old$n_code
+# the forked workers copy every page of the parent that R's garbage collector
+# touches, so the parent drops what they do not need (the pixel tables and
+# the OLD pixel arrays; reloaded from the cache after the bootstrap)
+px <- NULL
+prep$old <- prep$old[c("n_code", "K", "cols", "groups", "n", "S_shoe")]
+invisible(gc())
+detail_sets <- c("primary", "all")
+replicate_one <- function(b) {
+  bo <- (b - 1) %% B_old + 1
+  beta_b <- draws$draws[bo, ]
+  wo <- tabulate(draws$ids[bo, ], nbins = m_old)
+  par <- list(glmm = part2_coef_parts(beta_b),
+              cml = part2_coef_parts(cml_coef + (beta_b[-1] - beta_old[-1])))
+  for (r in names(areas)) par[[r]] <- regional_fit(reg_old[[r]]$O,
+                                                   reg_old[[r]]$S, w = wo)
+  ex <- lapply(models, function(md) expected("new", md, par[[md]]))
+  names(ex) <- models
+  out <- numeric(0)
+  for (s in names(sets)) {
+    u <- sets[[s]]
+    w <- W[[s]][b, ]
+    for (md in models) {
+      for (cl in cols) {
+        ob <- OB[[s]][[md]][[cl]]
+        r <- part2_boot_one(ob, ex[[md]]$E[[cl]][u, , drop = FALSE] %*% ob$map,
+                            w)
+        pre <- paste(s, md, cl, sep = "|")
+        out[paste(pre, c("X2_two", "X2_new", "X2_unc"), sep = "|")] <-
+          c(r$X2_two, r$X2_new, r$X2_unc)
+        if (s %in% detail_sets) {
+          kk <- seq_along(r$D_two)
+          out[paste(pre, "D_two", kk, sep = "|")] <- r$D_two
+          out[paste(pre, "O_unc", kk, sep = "|")] <- r$O_unc
+          out[paste(pre, "E_unc", kk, sep = "|")] <- r$E_unc
+        }
+      }
+      lsm <- ex[[md]]$ls[u]
+      out[paste(s, md, c("LS_rac", "LS_shoe"), sep = "|")] <-
+        c(sum(w * lsm) / sum(w * prep$new$n[u]),
+          sum(w * lsm / prep$new$n[u]) / sum(w))
+    }
+    lsu <- ls_unif$new[u]
+    out[paste(s, "unif", c("LS_rac", "LS_shoe"), sep = "|")] <-
+      c(sum(w * lsu) / sum(w * prep$new$n[u]),
+        sum(w * lsu / prep$new$n[u]) / sum(w))
+  }
+  # T7 review fixes (appended after the first run's statistics, which stay
+  # unchanged). (1) The calibration slope a correct OLD surface would show
+  # through OLD estimation noise alone (section 6b): the true counts
+  # E~(beta_old) of every shoe of the set against the draw's E~(beta*_b),
+  # no NEW resampling.
+  for (s in detail_sets) {
+    u <- sets[[s]]
+    for (md in c("glmm", "r2022")) {
+      for (cl in cols) {
+        ob <- OB[[s]][[md]][[cl]]
+        out[paste(s, md, cl, "alpha_dil", sep = "|")] <- part2_calib_slope(
+          ob$Em, ex[[md]]$E[[cl]][u, , drop = FALSE] %*% ob$map,
+          EU_all[[cl]][u, , drop = FALSE] %*% ob$map)$alpha
+      }
+    }
+    out[paste(s, "r2022", "aR", "alpha_dil", sep = "|")] <- part2_calib_slope(
+      E_aR0[u, , drop = FALSE],
+      regional_aR(par$r2022)[u, , drop = FALSE], EU_aR[u, , drop = FALSE])$alpha
+  }
+  # (2) the consecutive-id block bootstrap of the primary set (section 7b):
+  # the same OLD draw, the NEW blocks resampled
+  u <- sets$primary
+  for (bn in names(Wblk)) {
+    w <- Wblk[[bn]][b, ]
+    sb <- paste("primary", bn, sep = "_")
+    for (md in c("glmm", "r2022")) {
+      for (cl in cols) {
+        ob <- OB$primary[[md]][[cl]]
+        r <- part2_boot_one(ob, ex[[md]]$E[[cl]][u, , drop = FALSE] %*% ob$map,
+                            w)
+        out[paste(sb, md, cl, c("X2_two", "X2_new", "X2_unc"), sep = "|")] <-
+          c(r$X2_two, r$X2_new, r$X2_unc)
+      }
+    }
+    for (md in c("glmm", "r2022", "unif")) {
+      lsm <- if (md == "unif") ls_unif$new[u] else ex[[md]]$ls[u]
+      out[paste(sb, md, c("LS_rac", "LS_shoe"), sep = "|")] <-
+        c(sum(w * lsm) / sum(w * prep$new$n[u]),
+          sum(w * lsm / prep$new$n[u]) / sum(w))
+    }
+  }
+  out
+}
+boot_key <- c(base_key, draws = unname(tools::md5sum(draws_path)))
+boot_cache <- part2_cache_path(P_new, "part2_boot")
+R <- NULL
+if (file.exists(boot_cache)) {
+  cached <- readRDS(boot_cache)
+  if (identical(cached$key, boot_key)) R <- cached$R
+}
+if (is.null(R)) {
+  t0 <- proc.time()[["elapsed"]]
+  blocks <- split(seq_len(B), cut(seq_len(B), WORKERS, labels = FALSE))
+  res <- parallel::mclapply(blocks, function(bs) do.call(rbind, lapply(bs,
+    replicate_one)), mc.cores = WORKERS, mc.preschedule = TRUE)
+  bad <- !vapply(res, is.matrix, TRUE)
+  if (any(bad)) stop("bootstrap workers failed: ", paste(res[bad], collapse = "; "))
+  R <- do.call(rbind, res)
+  rac_ensure_dir(boot_cache)
+  saveRDS(list(key = boot_key, R = R, seconds = proc.time()[["elapsed"]] - t0,
+               workers = WORKERS), boot_cache)
+  cat(sprintf("bootstrap: B = %d in %.0f s (%d workers)\n", B,
+              proc.time()[["elapsed"]] - t0, WORKERS))
+} else {
+  cat(sprintf("bootstrap: B = %d read from the cache (%.0f s when computed, %d workers)\n",
+              B, cached$seconds, cached$workers))
+}
+rc <- function(...) R[, paste(..., sep = "|")]
+```
+
+## 6. Goodness of fit: every analysis
+
+```{r tests}
+tests <- do.call(rbind, lapply(names(sets), function(s) do.call(rbind,
+  lapply(models, function(md) do.call(rbind, lapply(cols, function(cl) {
+    ob <- OB[[s]][[md]][[cl]]
+    x2t <- rc(s, md, cl, "X2_two")
+    x2n <- rc(s, md, cl, "X2_new")
+    x2u <- rc(s, md, cl, "X2_unc")
+    dfm <- ob$K_merged - 1
+    E0 <- mean(x2t)
+    es <- effect_sizes(ob$X2, E0, dfm, ob$N)
+    ci <- part2_effect_ci_pct(E0, x2u, dfm, ob$N)
+    cb <- part2_effect_ci(ob$X2, E0, x2u, dfm, ob$N)
+    phi <- mean(x2n) / dfm
+    data.frame(set = s, model = md, partition = cl, shoes = length(sets[[s]]),
+               N = ob$N, K = ob$K, K_merged = ob$K_merged, df = dfm,
+               X2 = ob$X2, p_chisq_fixed = ob$p_chisq, E0_two = E0,
+               p_boot_two = (1 + sum(x2t >= ob$X2)) / (B + 1),
+               X2_two_q95 = unname(quantile(x2t, 0.95)),
+               phi = phi, phi0 = ob$phi0, phi_over_phi0 = phi / ob$phi0,
+               p_boot_new = (1 + sum(x2n >= ob$X2)) / (B + 1),
+               disp_two = E0 / dfm, w = es$w, w_net = es$w_net,
+               w_net_lo = ci$w_net_lo, w_net_hi = ci$w_net_hi,
+               rmsea = es$rmsea, rmsea_lo = ci$rmsea_lo,
+               rmsea_hi = ci$rmsea_hi, w_net_lo_basic = cb$w_net_lo,
+               w_net_hi_basic = cb$w_net_hi)
+  }))))))
+print(fmt(tests[tests$set == "primary", ]), row.names = FALSE)
+```
+
+Named primary analysis 1 (A-030, A-043): Naomi's 14 areas on (-new_x, y),
+the OLD GLMM, the two-sample bootstrap p, primary set, Cramer's w net of the
+noise floor.
+
+```{r primary1}
+pa1 <- tests[tests$set == "primary" & tests$model == "glmm" &
+               tests$partition == "a14", ]
+print(t(fmt(pa1)))
+```
+
+Parameter-corrected pooled test (secondary; valid under independence only):
+W = D' (Sigma_mult + G V G')^+ D, with V the model-based covariance of the
+OLD fit (GLMM: its stored Hessian vcov, K11; CML: its vcov) or the
+covariance of the OLD bootstrap draws; phi_par = tr(diag(1/E) G V G') / (K' - 1).
+
+```{r wald_param}
+V_mod <- as.matrix(vcov(glmm_old))
+V_boot <- stats::cov(draws$draws)
+V_cml <- as.matrix(vcov(cml_old))
+wald_rows <- list()
+for (s in c("primary", "all")) {
+  for (cl in cols) {
+    for (md in c("glmm", "cml")) {
+      ob <- OB[[s]][[md]][[cl]]
+      if (md == "glmm") {
+        G <- part2_gradient(prep$new, par0$glmm, cl, sets[[s]],
+                            MEAN_OFFSET_OLD, "logit")
+        Vs <- list(model = V_mod, boot = V_boot)
+      } else {
+        G <- part2_gradient(prep$new, par0$cml, cl, sets[[s]], 0, "log")[, -1]
+        Vs <- list(model = V_cml)
+      }
+      Gm <- t(ob$map) %*% G
+      for (vn in names(Vs)) {
+        GVG <- Gm %*% Vs[[vn]] %*% t(Gm)
+        wp <- wald_param(ob$D, ob$Sigma, GVG)
+        wm <- wald_param(ob$D, ob$Sigma, 0)
+        wald_rows[[length(wald_rows) + 1]] <- data.frame(
+          set = s, model = md, partition = cl, V = vn, W_param = wp$W,
+          df = wp$df, p_param = wp$p, W_mult_only = wm$W, p_mult_only = wm$p,
+          phi_par = sum(diag(GVG) / ob$E) / (ob$K_merged - 1),
+          ratio_param_mult_median = median(diag(GVG) / diag(ob$Sigma)))
+      }
+    }
+  }
+}
+wald_tab <- do.call(rbind, wald_rows)
+print(fmt(wald_tab), row.names = FALSE)
+```
+
+Per-cell observed/expected (the primary and the all-shoe sets): O/E with the
+percentile interval of the uncentred two-sample replicates, the Pearson
+residual, and the residual standardized by its two-sample bootstrap SD
+(z_boot, which carries the OLD estimation error, dependence and
+heterogeneity), and the per-cell dispersion var(D*)/E.
+
+```{r cells}
+cell_tab <- do.call(rbind, lapply(detail_sets, function(s) do.call(rbind,
+  lapply(models, function(md) do.call(rbind, lapply(cols, function(cl) {
+    ob <- OB[[s]][[md]][[cl]]
+    kk <- seq_len(ob$K_merged)
+    Dt <- sapply(kk, function(k) rc(s, md, cl, "D_two", k))
+    Ou <- sapply(kk, function(k) rc(s, md, cl, "O_unc", k))
+    Eu <- sapply(kk, function(k) rc(s, md, cl, "E_unc", k))
+    ratio <- Ou / Eu
+    members <- vapply(kk, function(k) paste(which(ob$group == k),
+                                            collapse = "+"), "")
+    data.frame(set = s, model = md, partition = cl, cell = kk,
+               cells = members, O = ob$O, E = ob$E, OE = ob$O / ob$E,
+               OE_lo = apply(ratio, 2, quantile, 0.025),
+               OE_hi = apply(ratio, 2, quantile, 0.975),
+               pearson = ob$D / sqrt(ob$E), sd_boot = apply(Dt, 2, sd),
+               z_boot = ob$D / apply(Dt, 2, sd),
+               disp_cell = apply(Dt, 2, var) / ob$E)
+  }))))))
+print(fmt(cell_tab[cell_tab$set == "primary" & cell_tab$model %in%
+                     c("glmm", "r2022") & cell_tab$partition %in%
+                     c("a14", "g15"), ]), row.names = FALSE)
+```
+
+## 6b. The spatial signal on NEW: the uniform benchmark and the calibration slope
+
+T7 review fix (finding 3; decision T7-15). Uniform placement on each
+shoe's contact surface (E_ik = n_i S_ik / S_i, no spatial model) is the
+benchmark: its X^2 measures how far NEW departs from "anywhere on the
+contact surface", and the share of it that a model removes says how much of
+that spatial signal the model reproduces (net: both statistics minus their
+noise floors; the uniform floor is NEW-only, since uniform has no estimated
+parameter). The calibration slope alpha (`part2_calib_slope()`, conditional
+on each shoe's RAC total) says whether a model's contrasts against uniform
+hold on NEW (alpha = 1), are too strong (alpha < 1) or too weak (alpha >
+1). It is reported with its NEW-only interval (the published surface held
+fixed), with the value a correct OLD surface would show through OLD
+estimation noise alone (the dilution alpha_dil of the 2,000 OLD draws:
+E~(beta_old) as the counts, E~(beta*_b) as the model; computed in the
+bootstrap), and with a one-sided p against the null alpha_dil_b + (alpha*_b
+- mean alpha*) (the dilution of OLD draw b plus the NEW resampling deviation
+of resample b, the pairing of the two-sample bootstrap). X2_recal is the
+model's X^2 after its contrasts are recalibrated by alpha: how much of the
+misfit the attenuation explains.
+
+```{r benchmark}
+bench_rows <- list()
+slope_rep <- list()
+for (s in names(sets)) {
+  u <- sets[[s]]
+  for (cl in cols) {
+    obU <- part2_obs_stats(obsO$new[[cl]][u, , drop = FALSE],
+                           EU_all[[cl]][u, , drop = FALSE], band_of(cl),
+                           nbr_of(cl))
+    E0U <- mean(vapply(seq_len(B), function(b)
+      part2_boot_one(obU, obU$Em, W[[s]][b, ])$X2_new, 0))
+    for (md in c("glmm", "cml", "r2022")) {
+      ob <- OB[[s]][[md]][[cl]]
+      tt <- tests[tests$set == s & tests$model == md & tests$partition == cl, ]
+      EUm <- EU_all[[cl]][u, , drop = FALSE] %*% ob$map
+      fit <- part2_calib_slope(ob$Om, ob$Em, EUm)
+      a_new <- vapply(seq_len(B), function(b) part2_calib_slope(
+        ob$Om, ob$Em, EUm, w = W[[s]][b, ], start = fit$alpha)$alpha, 0)
+      slope_rep[[paste(s, md, cl, sep = "|")]] <- a_new
+      ci <- part2_shift_ci(a_new, fit$alpha)
+      X2_recal <- pearson_pooled(ob$O, colSums(fit$fitted))$X2
+      row <- data.frame(set = s, partition = cl, model = md, N = ob$N,
+                        X2_unif = obU$X2, E0_unif = E0U,
+                        w_unif = sqrt(obU$X2 / obU$N), X2 = tt$X2,
+                        E0 = tt$E0_two, share_removed = 1 - tt$X2 / obU$X2,
+                        share_removed_net = 1 - (tt$X2 - tt$E0_two) /
+                          (obU$X2 - E0U),
+                        alpha = fit$alpha, alpha_se_indep = fit$se,
+                        alpha_lo_new = ci$lo, alpha_hi_new = ci$hi,
+                        alpha_sd_new = ci$sd, X2_recal = X2_recal,
+                        recal_share = 1 - X2_recal / tt$X2,
+                        dil_mean = NA_real_, dil_lo = NA_real_,
+                        dil_hi = NA_real_, null_mean = NA_real_,
+                        null_lo = NA_real_, null_hi = NA_real_,
+                        p_slope = NA_real_)
+      if (s %in% detail_sets && md != "cml") {
+        dil <- rc(s, md, cl, "alpha_dil")
+        nul <- dil + (a_new - mean(a_new))
+        row$dil_mean <- mean(dil)
+        row$dil_lo <- stats::quantile(dil, 0.025, names = FALSE)
+        row$dil_hi <- stats::quantile(dil, 0.975, names = FALSE)
+        row$null_mean <- mean(nul)
+        row$null_lo <- stats::quantile(nul, 0.025, names = FALSE)
+        row$null_hi <- stats::quantile(nul, 0.975, names = FALSE)
+        row$p_slope <- (1 + sum(nul <= fit$alpha)) / (B + 1)
+      }
+      bench_rows[[length(bench_rows) + 1]] <- row
+    }
+  }
+}
+bench_tab <- do.call(rbind, bench_rows)
+rownames(bench_tab) <- NULL
+print(fmt(bench_tab[bench_tab$set %in% detail_sets, ]), row.names = FALSE)
+b1 <- bench_tab[bench_tab$set == "primary" & bench_tab$partition == "a14", ]
+cat(sprintf(paste("Naomi's areas, primary set: uniform X^2 %.1f (w %.3f, floor",
+                  "%.1f); the OLD GLMM removes %.0f%% of it (%.0f%% net of",
+                  "the floors), the 2022 model %.0f%% (%.0f%%); calibration",
+                  "slope GLMM %.3f [%.3f, %.3f] (OLD noise alone %.3f [%.3f,",
+                  "%.3f], p %.4f), 2022 %.3f [%.3f, %.3f]\n"),
+            b1$X2_unif[1], b1$w_unif[1], b1$E0_unif[1],
+            100 * b1$share_removed[b1$model == "glmm"],
+            100 * b1$share_removed_net[b1$model == "glmm"],
+            100 * b1$share_removed[b1$model == "r2022"],
+            100 * b1$share_removed_net[b1$model == "r2022"],
+            b1$alpha[b1$model == "glmm"], b1$alpha_lo_new[b1$model == "glmm"],
+            b1$alpha_hi_new[b1$model == "glmm"], b1$dil_mean[b1$model == "glmm"],
+            b1$dil_lo[b1$model == "glmm"], b1$dil_hi[b1$model == "glmm"],
+            b1$p_slope[b1$model == "glmm"], b1$alpha[b1$model == "r2022"],
+            b1$alpha_lo_new[b1$model == "r2022"],
+            b1$alpha_hi_new[b1$model == "r2022"]))
+# per-area pooled contrasts against uniform (primary set), for the reading
+# and the calibration figure
+contrast_tab <- do.call(rbind, lapply(c("a14", "g15"), function(cl) {
+  u <- sets$primary
+  EUp <- colSums(EU_all[[cl]][u, , drop = FALSE])
+  do.call(rbind, lapply(c("glmm", "r2022"), function(md) {
+    ob <- OB$primary[[md]][[cl]]
+    data.frame(partition = cl, model = md, cell = seq_len(ob$K_merged),
+               O = ob$O, E = ob$E, E_unif = as.vector(EUp %*% ob$map),
+               O_over_unif = ob$O / as.vector(EUp %*% ob$map),
+               E_over_unif = ob$E / as.vector(EUp %*% ob$map),
+               OE = ob$O / ob$E)
+  }))
+}))
+print(fmt(contrast_tab[contrast_tab$partition == "a14", ]), row.names = FALSE)
+```
+
+## 6c. The calibration slope at the pixel level
+
+The same slope with each shoe's own pixels: P_ij(alpha) proportional to
+p_ij^alpha over the shoe's contact pixels (the OLD GLMM), so alpha = 1 is
+exactly the model's pixel probability of the log score. The 2022 model's
+pixel probabilities are constant within its areas on the shoe's own
+coordinates (aR), so its pixel-level slope is its slope on aR. NEW-only
+intervals from the B resamples (`part2_pixel_slope_boot()` on a grid of
+alpha); the GLMM's OLD-noise dilution from the first `RAC_PART2_PIXEL_DRAWS`
+(default 500) OLD draws on the primary set (each a pass over 4.4 million
+pixels; cached), the 2022 model's from all draws (bootstrap).
+
+```{r pixel_slope}
+PIXEL_DRAWS <- min(as.integer(rac_env("RAC_PART2_PIXEL_DRAWS", "500")), B_old)
+SLOPE_GRID <- seq(0, 1.5, by = 0.01)
+lp_glmm <- stats::plogis(part2_eta(prep$new$Bx, prep$new$By_img, prep$new$row,
+                                   par0$glmm) + MEAN_OFFSET_OLD, log.p = TRUE)
+s_obs <- part2_shoe_sums(prep$new$rac_N * lp_glmm[prep$new$rac],
+                         prep$new$rac_code, prep$new$n_code)
+pix_rows <- list()
+for (s in detail_sets) {
+  u <- sets[[s]]
+  w0 <- numeric(prep$new$n_code)
+  w0[u] <- 1
+  fit <- part2_pixel_slope(lp_glmm, prep$new$code, s_obs, prep$new$n, w = w0)
+  gr <- part2_pixel_slope_grid(lp_glmm, prep$new$code, s_obs, prep$new$n, u,
+                               SLOPE_GRID)
+  a_new <- part2_pixel_slope_boot(gr, W[[s]])
+  # the grid solution reproduces the exact Newton fit on the full set
+  a_chk <- part2_pixel_slope_boot(gr, matrix(1, 1, length(u)))
+  stopifnot(abs(a_chk - fit$alpha) < 1e-5)
+  slope_rep[[paste(s, "glmm", "pixel", sep = "|")]] <- a_new
+  ci <- part2_shift_ci(a_new, fit$alpha)
+  pix_rows[[length(pix_rows) + 1]] <- data.frame(
+    set = s, model = "glmm", level = "pixel", alpha = fit$alpha,
+    alpha_se_indep = fit$se, alpha_lo_new = ci$lo, alpha_hi_new = ci$hi,
+    alpha_sd_new = ci$sd, grid_check = a_chk - fit$alpha)
+  # the 2022 model at its own resolution
+  fr <- part2_calib_slope(reg_new$r2022$O[u, , drop = FALSE],
+                          E_aR0[u, , drop = FALSE], EU_aR[u, , drop = FALSE])
+  ar <- vapply(seq_len(B), function(b) part2_calib_slope(
+    reg_new$r2022$O[u, , drop = FALSE], E_aR0[u, , drop = FALSE],
+    EU_aR[u, , drop = FALSE], w = W[[s]][b, ], start = fr$alpha)$alpha, 0)
+  slope_rep[[paste(s, "r2022", "pixel", sep = "|")]] <- ar
+  cr <- part2_shift_ci(ar, fr$alpha)
+  pix_rows[[length(pix_rows) + 1]] <- data.frame(
+    set = s, model = "r2022", level = "pixel (its areas aR)", alpha = fr$alpha,
+    alpha_se_indep = fr$se, alpha_lo_new = cr$lo, alpha_hi_new = cr$hi,
+    alpha_sd_new = cr$sd, grid_check = NA_real_)
+}
+pix_tab <- do.call(rbind, pix_rows)
+# the OLD-noise dilution of the GLMM's pixel-level slope (primary set)
+pix_key <- c(boot_key, pixel_draws = PIXEL_DRAWS)
+pix_cache <- part2_cache_path(P_new, "part2_pixel_slope")
+dil_pix <- NULL
+if (file.exists(pix_cache)) {
+  cached <- readRDS(pix_cache)
+  if (identical(cached$key, pix_key)) dil_pix <- cached$dil
+}
+if (is.null(dil_pix)) {
+  t0 <- proc.time()[["elapsed"]]
+  u <- sets$primary
+  inU <- prep$new$code %in% u
+  codeU <- prep$new$code[inU]
+  BxU <- prep$new$Bx[inU, , drop = FALSE]
+  rowU <- prep$new$row[inU]
+  lpU <- lp_glmm[inU]
+  # the true surface's fractional counts q_ij = n_i pi_ij(beta_old)
+  qU <- exp(lpU) / part2_shoe_sums(exp(lpU), codeU, prep$new$n_code)[codeU] *
+    prep$new$n[codeU]
+  wU <- numeric(prep$new$n_code)
+  wU[u] <- 1
+  one <- function(bo) {
+    lpb <- stats::plogis(part2_eta(BxU, prep$new$By_img, rowU,
+                                   part2_coef_parts(draws$draws[bo, ])) +
+                           MEAN_OFFSET_OLD, log.p = TRUE)
+    part2_pixel_slope(lpb, codeU, part2_shoe_sums(qU * lpb, codeU,
+                                                  prep$new$n_code),
+                      prep$new$n, w = wU)$alpha
+  }
+  res <- parallel::mclapply(seq_len(PIXEL_DRAWS), one, mc.cores = WORKERS)
+  bad <- !vapply(res, is.numeric, TRUE)
+  if (any(bad)) stop("pixel slope workers failed: ", paste(res[bad], collapse = "; "))
+  dil_pix <- unlist(res)
+  rm(BxU, rowU, lpU, qU, codeU, inU)
+  rac_ensure_dir(pix_cache)
+  saveRDS(list(key = pix_key, dil = dil_pix,
+               seconds = proc.time()[["elapsed"]] - t0, workers = WORKERS),
+          pix_cache)
+  cat(sprintf("pixel-level dilution: %d OLD draws in %.0f s (%d workers)\n",
+              PIXEL_DRAWS, proc.time()[["elapsed"]] - t0, WORKERS))
+} else {
+  cat(sprintf("pixel-level dilution: %d OLD draws read from the cache (%.0f s when computed)\n",
+              PIXEL_DRAWS, cached$seconds))
+}
+add_null <- function(tab, s, md, dil) {
+  k <- which(tab$set == s & tab$model == md)
+  a_new <- slope_rep[[paste(s, md, "pixel", sep = "|")]][seq_along(dil)]
+  nul <- dil + (a_new - mean(a_new))
+  tab$dil_draws[k] <- length(dil)
+  tab$dil_mean[k] <- mean(dil)
+  tab$dil_lo[k] <- stats::quantile(dil, 0.025, names = FALSE)
+  tab$dil_hi[k] <- stats::quantile(dil, 0.975, names = FALSE)
+  tab$null_mean[k] <- mean(nul)
+  tab$null_lo[k] <- stats::quantile(nul, 0.025, names = FALSE)
+  tab$null_hi[k] <- stats::quantile(nul, 0.975, names = FALSE)
+  tab$p_slope[k] <- (1 + sum(nul <= tab$alpha[k])) / (length(nul) + 1)
+  tab
+}
+pix_tab[c("dil_draws", "dil_mean", "dil_lo", "dil_hi", "null_mean", "null_lo",
+          "null_hi", "p_slope")] <- NA_real_
+pix_tab <- add_null(pix_tab, "primary", "glmm", dil_pix)
+for (s in detail_sets) {
+  pix_tab <- add_null(pix_tab, s, "r2022", rc(s, "r2022", "aR", "alpha_dil"))
+}
+print(fmt(pix_tab), row.names = FALSE)
+rm(lp_glmm)
+```
+
+## 7. Model comparison: log scores (named primary analysis 2) and Delta X^2
+
+Mean log probability per RAC of its pixel among the shoe's contact pixels
+(RAC-weighted) and the mean over shoes of each shoe's mean (shoe-weighted).
+Every interval is reported for two estimands (T7 review fix, finding 1;
+decision T7-13), both centred on the point estimate by `part2_shift_ci()`:
+- `_new`: the published fitted surfaces (what an examiner would use),
+  NEW-only shoe bootstrap with every fit held fixed;
+- `_two`: the model classes (each model fitted on an OLD-size collection),
+  two-sample bootstrap: the same OLD resample and NEW resample for every
+  model in a replicate. A replicate scores a model refitted on an OLD
+  resample, one layer of OLD estimation noise more than the point estimate,
+  so its raw percentile interval (`_two_raw`, the first run's interval) is
+  shifted against the point by `shift_two`.
+
+```{r logscore}
+ls_models <- c(models, "unif")
+ls_point <- function(u, md) {
+  l <- if (md == "unif") ls_unif$new[u] else EX$new[[md]]$ls[u]
+  c(rac = sum(l) / sum(prep$new$n[u]), shoe = mean(l / prep$new$n[u]))
+}
+# NEW-only replicates of a model's log score (its fit held fixed)
+ls_rep_new <- function(s, md, wt, Wm = W[[s]]) {
+  u <- sets[[s]]
+  l <- if (md == "unif") ls_unif$new[u] else EX$new[[md]]$ls[u]
+  n <- prep$new$n[u]
+  if (wt == "rac") {
+    as.vector(Wm %*% l) / as.vector(Wm %*% n)
+  } else {
+    as.vector(Wm %*% (l / n)) / rowSums(Wm)
+  }
+}
+ci_row <- function(point, v_new, v_two) {
+  cn <- part2_shift_ci(v_new, point)
+  ct <- part2_shift_ci(v_two, point)
+  data.frame(lo_new = cn$lo, hi_new = cn$hi, sd_new = cn$sd,
+             lo_two = ct$lo, hi_two = ct$hi, sd_two = ct$sd,
+             shift_two = ct$shift,
+             lo_two_raw = stats::quantile(v_two, 0.025, names = FALSE),
+             hi_two_raw = stats::quantile(v_two, 0.975, names = FALSE))
+}
+pairs_ls <- list(c("glmm", "r2022"), c("glmm", "unif"), c("r2022", "unif"),
+                 c("cml", "r2022"), c("glmm", "cml"), c("glmm", "r_newx"),
+                 c("glmm", "r_grid15"), c("r_grid15", "r2022"))
+ls_tab <- do.call(rbind, lapply(names(sets), function(s) {
+  u <- sets[[s]]
+  rows <- list()
+  for (wt in c("rac", "shoe")) {
+    for (md in ls_models) {
+      p <- ls_point(u, md)[[wt]]
+      rows[[length(rows) + 1]] <- cbind(
+        data.frame(set = s, weight = wt, comparison = md, LS = p),
+        ci_row(p, ls_rep_new(s, md, wt), rc(s, md, paste("LS", wt, sep = "_"))))
+    }
+    for (pp in pairs_ls) {
+      d <- ls_point(u, pp[1])[[wt]] - ls_point(u, pp[2])[[wt]]
+      rows[[length(rows) + 1]] <- cbind(
+        data.frame(set = s, weight = wt, comparison = paste(pp, collapse = " - "),
+                   LS = d),
+        ci_row(d, ls_rep_new(s, pp[1], wt) - ls_rep_new(s, pp[2], wt),
+               rc(s, pp[1], paste("LS", wt, sep = "_")) -
+                 rc(s, pp[2], paste("LS", wt, sep = "_"))))
+    }
+  }
+  do.call(rbind, rows)
+}))
+rownames(ls_tab) <- NULL
+ls_tab$ratio_per_rac <- ifelse(grepl(" - ", ls_tab$comparison),
+                               exp(ls_tab$LS), NA)
+print(fmt(ls_tab[ls_tab$set == "primary", ]), row.names = FALSE)
+pa2 <- ls_tab[ls_tab$set == "primary" & ls_tab$weight == "rac" &
+                ls_tab$comparison == "glmm - r2022", ]
+cat(sprintf(paste("Named primary analysis 2: LS_C - LS_R2022 = %.6f per RAC;",
+                  "published surfaces (NEW-only) [%.5f, %.5f]; model classes",
+                  "(two-sample, centred) [%.5f, %.5f]; first run's raw",
+                  "two-sample percentile [%.5f, %.5f] (shift %.5f); ratio of",
+                  "the probabilities per RAC %.4f\n"), pa2$LS, pa2$lo_new,
+            pa2$hi_new, pa2$lo_two, pa2$hi_two, pa2$lo_two_raw,
+            pa2$hi_two_raw, pa2$shift_two, exp(pa2$LS)))
+# the gain over uniform: observed (log-score difference), as a geometric-mean
+# probability ratio per RAC, against the gain the model expects for itself
+# (KL from uniform) and against the OLD in-sample gain (minor finding 7)
+gain_sets <- list(primary = list("new", sets$primary), all = list("new", sets$all),
+                  old_all = list("old", old_sets$old_all))
+ls_gain <- do.call(rbind, lapply(names(gain_sets), function(s) {
+  ds <- gain_sets[[s]][[1]]
+  u <- gain_sets[[s]][[2]]
+  n <- prep[[ds]]$n[u]
+  lu <- ls_unif[[ds]][u]
+  do.call(rbind, lapply(c("glmm", "cml", "r2022"), function(md) {
+    g <- EX[[ds]][[md]]$ls[u] - lu
+    kl <- kl_self[[ds]][[md]][u]
+    data.frame(set = s, model = md, gain_rac = sum(g) / sum(n),
+               gain_shoe = mean(g / n), gm_ratio_rac = exp(sum(g) / sum(n)),
+               self_rac = sum(n * kl) / sum(n), self_shoe = mean(kl),
+               share_of_self_rac = (sum(g) / sum(n)) / (sum(n * kl) / sum(n)))
+  }))
+}))
+old_gain <- ls_gain[ls_gain$set == "old_all", c("model", "gain_rac")]
+ls_gain$share_of_old_insample <- ls_gain$gain_rac /
+  old_gain$gain_rac[match(ls_gain$model, old_gain$model)]
+print(fmt(ls_gain), row.names = FALSE)
+# GLMM - 2022 by thirds of the shoes' RAC counts: the RAC-weighted tie and
+# the shoe-weighted lead come from different shoes
+ls_tercile <- do.call(rbind, lapply(detail_sets, function(s) {
+  u <- sets[[s]]
+  n <- prep$new$n[u]
+  d <- EX$new$glmm$ls[u] - EX$new$r2022$ls[u]
+  q <- cut(n, stats::quantile(n, c(0, 1, 2, 3) / 3), include.lowest = TRUE)
+  do.call(rbind, lapply(levels(q), function(l) {
+    k <- q == l
+    data.frame(set = s, racs_per_shoe = l, shoes = sum(k), racs = sum(n[k]),
+               glmm_minus_r2022_rac = sum(d[k]) / sum(n[k]),
+               glmm_minus_r2022_shoe = mean(d[k] / n[k]))
+  }))
+}))
+print(fmt(ls_tercile), row.names = FALSE)
+# Delta X^2 = X^2(GLMM) - X^2(2022) on the cells: NEW-only replicates with
+# both fits held fixed, two-sample replicates (both refitted on the OLD
+# resample), the first run's raw percentile, and the T7-7 rule for the
+# difference of the net misfits (replicates minus 2 (E0_C - E0_R))
+dx2_newonly <- function(obC, obR, Wm) {
+  vapply(seq_len(nrow(Wm)), function(b)
+    part2_boot_one(obC, obC$Em, Wm[b, ])$X2_unc -
+      part2_boot_one(obR, obR$Em, Wm[b, ])$X2_unc, 0)
+}
+dx2 <- do.call(rbind, lapply(names(sets), function(s) do.call(rbind,
+  lapply(c("g10", "g15", "g20", "a14"), function(cl) {
+    tc <- tests[tests$set == s & tests$model == "glmm" & tests$partition == cl, ]
+    tr <- tests[tests$set == s & tests$model == "r2022" & tests$partition == cl, ]
+    d <- tc$X2 - tr$X2
+    v_two <- rc(s, "glmm", cl, "X2_unc") - rc(s, "r2022", cl, "X2_unc")
+    v_new <- dx2_newonly(OB[[s]]$glmm[[cl]], OB[[s]]$r2022[[cl]], W[[s]])
+    dE0 <- tc$E0_two - tr$E0_two
+    cbind(data.frame(set = s, partition = cl, X2_glmm = tc$X2,
+                     X2_r2022 = tr$X2, dX2 = d),
+          ci_row(d, v_new, v_two),
+          data.frame(E0_glmm = tc$E0_two, E0_r2022 = tr$E0_two,
+                     dX2_net = d - dE0,
+                     lo_two_net = stats::quantile(v_two, 0.025, names = FALSE) - 2 * dE0,
+                     hi_two_net = stats::quantile(v_two, 0.975, names = FALSE) - 2 * dE0,
+                     label = if (cl == "a14") "tilted toward r2022 (its own areas, on raw x)" else ""))
+  }))))
+rownames(dx2) <- NULL
+print(fmt(dx2), row.names = FALSE)
+```
+
+## 7b. Shoes resampled in blocks of consecutive ids (A-038 proxy)
+
+Every interval above treats the NEW shoes as independent units. The plan's
+pair sensitivity (A-038) needs T3's frozen list of one-wearer pairs, which
+does not exist; until it does, NEW shoes are resampled in blocks of 2 and 4
+consecutive ids (`part2_block_groups()`, decision T7-16), a proxy for
+one-wearer pairs (consecutive ids, plan F26) and design batches. The same
+OLD draws; block versions of the named analyses, the dispersion, the model
+comparisons, the calibration slope and the pair ratio (primary set).
+
+```{r blocks}
+units <- c(shoes = "primary", blk2 = "primary_blk2", blk4 = "primary_blk4")
+Wu <- list(shoes = W$primary, blk2 = Wblk$blk2, blk4 = Wblk$blk4)
+up <- sets$primary
+blk_rows <- list()
+add_blk <- function(...) blk_rows[[length(blk_rows) + 1]] <<- data.frame(...)
+na <- NA_real_
+for (un in names(units)) {
+  rs <- units[[un]]
+  for (md in c("glmm", "r2022")) {
+    for (cl in cols) {
+      ob <- OB$primary[[md]][[cl]]
+      x2t <- rc(rs, md, cl, "X2_two")
+      x2n <- rc(rs, md, cl, "X2_new")
+      add_blk(analysis = "goodness of fit", partition = cl, comparison = md,
+              weight = "", unit = un, point = ob$X2, lo_new = na, hi_new = na,
+              sd_new = na, lo_two = na, hi_two = na, sd_two = na,
+              E0_two = mean(x2t), q95_two = stats::quantile(x2t, 0.95, names = FALSE),
+              p_two = (1 + sum(x2t >= ob$X2)) / (B + 1),
+              phi_new = mean(x2n) / (ob$K_merged - 1),
+              q95_new = stats::quantile(x2n, 0.95, names = FALSE))
+    }
+  }
+  for (pp in list(c("glmm", "r2022"), c("glmm", "unif"), c("r2022", "unif"))) {
+    for (wt in c("rac", "shoe")) {
+      d <- ls_point(up, pp[1])[[wt]] - ls_point(up, pp[2])[[wt]]
+      cr <- ci_row(d, ls_rep_new("primary", pp[1], wt, Wu[[un]]) -
+                     ls_rep_new("primary", pp[2], wt, Wu[[un]]),
+                   rc(rs, pp[1], paste("LS", wt, sep = "_")) -
+                     rc(rs, pp[2], paste("LS", wt, sep = "_")))
+      add_blk(analysis = "log score", partition = "pixels",
+              comparison = paste(pp, collapse = " - "), weight = wt, unit = un,
+              point = d, lo_new = cr$lo_new, hi_new = cr$hi_new,
+              sd_new = cr$sd_new, lo_two = cr$lo_two, hi_two = cr$hi_two,
+              sd_two = cr$sd_two, E0_two = na, q95_two = na, p_two = na,
+              phi_new = na, q95_new = na)
+    }
+  }
+  for (cl in c("g10", "g15", "g20", "a14")) {
+    obC <- OB$primary$glmm[[cl]]
+    obR <- OB$primary$r2022[[cl]]
+    d <- obC$X2 - obR$X2
+    cr <- ci_row(d, dx2_newonly(obC, obR, Wu[[un]]),
+                 rc(rs, "glmm", cl, "X2_unc") - rc(rs, "r2022", cl, "X2_unc"))
+    add_blk(analysis = "Delta X^2", partition = cl, comparison = "glmm - r2022",
+            weight = "", unit = un, point = d, lo_new = cr$lo_new,
+            hi_new = cr$hi_new, sd_new = cr$sd_new, lo_two = cr$lo_two,
+            hi_two = cr$hi_two, sd_two = cr$sd_two, E0_two = na, q95_two = na,
+            p_two = na, phi_new = na, q95_new = na)
+  }
+  for (md in c("glmm", "r2022")) {
+    ob <- OB$primary[[md]]$a14
+    EUm <- EU_all$a14[up, , drop = FALSE] %*% ob$map
+    a0 <- bench_tab$alpha[bench_tab$set == "primary" & bench_tab$model == md &
+                            bench_tab$partition == "a14"]
+    ab <- vapply(seq_len(B), function(b) part2_calib_slope(
+      ob$Om, ob$Em, EUm, w = Wu[[un]][b, ], start = a0)$alpha, 0)
+    ci <- part2_shift_ci(ab, a0)
+    add_blk(analysis = "calibration slope", partition = "a14", comparison = md,
+            weight = "", unit = un, point = a0, lo_new = ci$lo, hi_new = ci$hi,
+            sd_new = ci$sd, lo_two = na, hi_two = na, sd_two = na, E0_two = na,
+            q95_two = na, p_two = na, phi_new = na, q95_new = na)
+  }
+  rp <- PR$primary$raw$null2
+  o28 <- rp$obs[, "(2,4]"] + rp$obs[, "(4,8]"]
+  e28 <- rp$exp[, "(2,4]"] + rp$exp[, "(4,8]"]
+  br <- as.vector(Wu[[un]] %*% o28) / as.vector(Wu[[un]] %*% e28)
+  add_blk(analysis = "pair ratio (2,8] vs null 2", partition = "pixels",
+          comparison = "", weight = "pairs", unit = un,
+          point = sum(o28) / sum(e28),
+          lo_new = stats::quantile(br, 0.025, names = FALSE),
+          hi_new = stats::quantile(br, 0.975, names = FALSE), sd_new = stats::sd(br),
+          lo_two = na, hi_two = na, sd_two = na, E0_two = na, q95_two = na,
+          p_two = na, phi_new = na, q95_new = na)
+}
+blk_tab <- do.call(rbind, blk_rows)
+rownames(blk_tab) <- NULL
+cat(sprintf("blocks: %s shoes in %d blocks of 2 and %d blocks of 4\n",
+            length(up), length(unique(part2_block_groups(shoe_ids$new[up], 2L))),
+            length(unique(part2_block_groups(shoe_ids$new[up], 4L)))))
+print(fmt(blk_tab), row.names = FALSE)
+```
+
+## 8. OLD in-sample values (descriptive only)
+
+The same statistics on the OLD shoes with the OLD fits: not a validation
+(the fits saw these RACs). A regional model on its own fitting partition
+gives X^2 = 0 identically (Poisson score equations, F31): r_grid15 on g15.
+Dispersion: the shoe bootstrap of the OLD shoes with the fit fixed.
+
+The uniform placement (no spatial model) is added as a model (`unif`), with
+the in-sample calibration slope of every model (T7 review fix, finding 3):
+the benchmark of how much of OLD's own spatial signal the OLD fits carry.
+
+```{r old_insample}
+EU_old <- setNames(lapply(cols, function(cl) part2_uniform_expected(
+  part2_agg(prep$old, prep$old$groups$S, cl), prep$old$S_shoe, prep$old$n)),
+  cols)
+old_tests <- do.call(rbind, lapply(names(old_sets), function(s) do.call(rbind,
+  lapply(c(models, "unif"), function(md) do.call(rbind, lapply(cols, function(cl) {
+    u <- old_sets[[s]]
+    Eo <- if (md == "unif") EU_old[[cl]] else EX$old[[md]]$E[[cl]]
+    ob <- part2_obs_stats(obsO$old[[cl]][u, , drop = FALSE],
+                          Eo[u, , drop = FALSE], band_of(cl), nbr_of(cl))
+    x2n <- vapply(seq_len(B), function(b) part2_boot_one(ob, ob$Em,
+                                                         W_old[[s]][b, ])$X2_new, 0)
+    own <- (md == "r_grid15" && cl == "g15") || (md == "r_newx" && cl == "a14")
+    fit <- if (md == "unif") list(alpha = NA_real_, se = NA_real_) else
+      part2_calib_slope(ob$Om, ob$Em, EU_old[[cl]][u, , drop = FALSE] %*% ob$map)
+    data.frame(set = s, model = md, partition = cl, shoes = length(u),
+               N = ob$N, K_merged = ob$K_merged, X2 = ob$X2,
+               phi = mean(x2n) / (ob$K_merged - 1), phi0 = ob$phi0,
+               w = sqrt(ob$X2 / ob$N), alpha = fit$alpha,
+               alpha_se_indep = fit$se,
+               note = if (own) "identically 0 by construction (fitting partition)" else if (md == "unif") "uniform placement on the contact surface (benchmark)" else "in-sample, descriptive")
+  }))))))
+print(fmt(old_tests), row.names = FALSE)
+old_ls <- do.call(rbind, lapply(names(old_sets), function(s) {
+  u <- old_sets[[s]]
+  do.call(rbind, lapply(ls_models, function(md) {
+    l <- if (md == "unif") ls_unif$old[u] else EX$old[[md]]$ls[u]
+    data.frame(set = s, model = md, LS_rac = sum(l) / sum(prep$old$n[u]),
+               LS_shoe = mean(l / prep$old$n[u]))
+  }))
+}))
+print(fmt(old_ls), row.names = FALSE)
+```
+
+## 9. Sensitivities of the point estimates
+
+Offset 0 instead of the OLD `MEAN_OFFSET` (max change of a normalized
+expected count), binarized RAC counts (pixel indicator, A-011), and the NEW
+pixels outside the OLD boundary knots (share, and the primary analysis
+without them).
+
+```{r sens}
+px <- list(new = part2_pixel_table_cached(P_new))
+ev0 <- part2_eval(prep$new, par0$glmm, "logit", 0)
+dmax <- max(vapply(cols, function(cl) max(abs(
+  normalize_expected(part2_agg(prep$new, ev0$Eg, cl), prep$new$n) -
+    EX$new$glmm$E[[cl]])), 0))
+cat(sprintf("offset 0 vs MEAN_OFFSET: max |delta E~| over shoes and cells = %.3g RACs\n", dmax))
+bin_O <- setNames(lapply(cols, function(cl) {
+  pxb <- tapply(px$new$N > 0, prep$new$grp, sum)
+  part2_agg(prep$new, as.vector(pxb), cl)
+}), cols)
+nb <- prep$new$n
+sens_rows <- list()
+for (cl in cols) {
+  u <- sets$primary
+  Eb <- EX$new$glmm$E[[cl]] / nb * rowSums(bin_O[[cl]])
+  ob <- part2_obs_stats(bin_O[[cl]][u, ], Eb[u, ], band_of(cl), nbr_of(cl))
+  sens_rows[[length(sens_rows) + 1]] <- data.frame(
+    sensitivity = "binarized RAC counts", partition = cl, N = ob$N,
+    X2 = ob$X2, df = ob$df, w = sqrt(ob$X2 / ob$N))
+}
+outside <- px$new$new_x < basis$bknots_x[1] | px$new$new_x > basis$bknots_x[2] |
+  px$new$y < basis$bknots_y[1] | px$new$y > basis$bknots_y[2]
+cat(sprintf(paste("NEW pixels outside the OLD boundary knots: %d of %d",
+                  "(%.3f%%), RACs there: %d of %d\n"), sum(outside),
+            length(outside), 100 * mean(outside), sum(px$new$N[outside]),
+            sum(px$new$N)))
+keep_shoes <- sets$primary
+inside_O <- setNames(lapply(cols, function(cl) {
+  part2_agg(prep$new, as.vector(tapply(px$new$N * !outside, prep$new$grp, sum)), cl)
+}), cols)
+ev_in <- local({
+  v <- stats::plogis(part2_eta(prep$new$Bx, prep$new$By_img, prep$new$row,
+                               par0$glmm) + MEAN_OFFSET_OLD) * !outside
+  as.vector(rowsum(v, prep$new$grp, reorder = TRUE))
+})
+for (cl in cols) {
+  u <- keep_shoes
+  Oi <- inside_O[[cl]]
+  Ei <- normalize_expected(part2_agg(prep$new, ev_in, cl), rowSums(Oi))
+  ok <- rowSums(Oi[u, , drop = FALSE]) > 0
+  ob <- part2_obs_stats(Oi[u, ][ok, ], Ei[u, ][ok, ], band_of(cl), nbr_of(cl))
+  sens_rows[[length(sens_rows) + 1]] <- data.frame(
+    sensitivity = "pixels outside the OLD boundary knots removed",
+    partition = cl, N = ob$N, X2 = ob$X2, df = ob$df, w = sqrt(ob$X2 / ob$N))
+}
+sens_tab <- do.call(rbind, sens_rows)
+print(fmt(sens_tab), row.names = FALSE)
+```
+
+## 9b. K8 and basis sensitivities (plan section 9; A-027, A-119)
+
+The OLD GLMM refitted with the full tensor (main effects + interaction, 35
+fixed effects, Laplace; removes the K8 pinning of the left new_x edge and the
+heel edge) and with the nested finer y basis of F84 (85 fixed effects,
+nAGQ = 0), both by `tools/part2_k8_fits.R`. Point estimates and the NEW-only
+dispersion (fit fixed) of the named analyses; no two-sample bootstrap of
+their own (their E0 would be at least the step-3 model's). Also the
+heel-front band y in (-0.18, -0.10] of F78 and F84: O/E of the band per
+model with a NEW-only shoe-bootstrap interval (fit fixed).
+
+```{r k8}
+alt <- list(fulltensor = readRDS(part2_path(P_old, "glmm_fulltensor", "rds")),
+            finey = readRDS(part2_path(P_old, "glmm_finey", "rds")))
+alt_prep <- function(a) {
+  pr <- prep$new
+  pr$By_img <- part2_by(pr$y_levels, a$basis)
+  pr
+}
+eval_alt <- function(pr, parts) {
+  ev <- part2_eval(pr, parts, "logit", MEAN_OFFSET_OLD)
+  list(E = setNames(lapply(cols, function(cl)
+    normalize_expected(part2_agg(pr, ev$Eg, cl), pr$n)), cols),
+    ls = part2_ls_model(ev, pr$n))
+}
+EXalt <- list(step3 = EX$new$glmm)
+for (nm in names(alt)) EXalt[[nm]] <- eval_alt(alt_prep(alt[[nm]]),
+                                             part2_coef_parts(alt[[nm]]$fixef))
+k8_rows <- list()
+for (s in c("primary", "all")) {
+  u <- sets[[s]]
+  for (nm in names(EXalt)) {
+    for (cl in cols) {
+      ob <- part2_obs_stats(obsO$new[[cl]][u, , drop = FALSE],
+                            EXalt[[nm]]$E[[cl]][u, , drop = FALSE],
+                            band_of(cl), nbr_of(cl))
+      x2n <- vapply(seq_len(B), function(b) part2_boot_one(ob, ob$Em, W[[s]][b, ])$X2_new, 0)
+      lsd <- sum(EXalt[[nm]]$ls[u] - EX$new$r2022$ls[u]) / sum(prep$new$n[u])
+      k8_rows[[length(k8_rows) + 1]] <- data.frame(
+        set = s, model = nm, partition = cl, N = ob$N, X2 = ob$X2,
+        X2_minus_E0_step3 = ob$X2 - tests$E0_two[tests$set == s & tests$model == "glmm" & tests$partition == cl],
+        phi = mean(x2n) / (ob$K_merged - 1), phi0 = ob$phi0,
+        LS_minus_r2022 = lsd, max_abs_log_OE = max(abs(log(ob$O / ob$E))))
+    }
+  }
+}
+k8_tab <- do.call(rbind, k8_rows)
+print(fmt(k8_tab), row.names = FALSE)
+# cells next to the pinned edges (K8): the lowest new_x column of every y
+# band and the heel band, on the 15-cell grid, primary set
+edge_cells <- sort(unique(c(seq(1, 15, by = 3), 1:3)))
+k8_edge <- do.call(rbind, lapply(names(EXalt), function(nm) {
+  ob <- part2_obs_stats(obsO$new$g15[sets$primary, ], EXalt[[nm]]$E$g15[sets$primary, ],
+                        band_of("g15"), nbr_of("g15"))
+  data.frame(model = nm, cell = edge_cells, O = ob$O[edge_cells],
+             E = ob$E[edge_cells], OE = ob$O[edge_cells] / ob$E[edge_cells])
+}))
+print(fmt(k8_edge), row.names = FALSE)
+# the heel-front band (px$new was reloaded in the sens chunk)
+in_band <- px$new$y > -0.18 & px$new$y <= -0.10
+band_rows <- list()
+O_band <- as.vector(rowsum(px$new$N * in_band, px$new$code, reorder = TRUE))
+for (nm in c(names(EXalt), "r2022")) {
+  if (nm == "r2022") {
+    th <- theta$r2022
+    v <- th[naomi_area(-px$new$x, px$new$y)]
+  } else {
+    a <- if (nm == "step3") list(basis = basis, fixef = beta_old) else alt[[nm]]
+    By <- part2_by(prep$new$y_levels, a$basis)
+    v <- stats::plogis(part2_eta(prep$new$Bx, By, prep$new$row,
+                                 part2_coef_parts(a$fixef)) + MEAN_OFFSET_OLD)
+  }
+  tot <- as.vector(rowsum(v, px$new$code, reorder = TRUE))
+  E_band <- as.vector(rowsum(v * in_band, px$new$code, reorder = TRUE)) / tot * prep$new$n
+  for (s in c("primary", "all")) {
+    u <- sets[[s]]
+    rb <- as.vector(W[[s]] %*% O_band[u]) / as.vector(W[[s]] %*% E_band[u])
+    band_rows[[length(band_rows) + 1]] <- data.frame(
+      set = s, model = nm, O = sum(O_band[u]), E = sum(E_band[u]),
+      OE = sum(O_band[u]) / sum(E_band[u]), lo = quantile(rb, 0.025),
+      hi = quantile(rb, 0.975))
+  }
+}
+band_tab <- do.call(rbind, band_rows)
+rownames(band_tab) <- NULL
+print(fmt(band_tab), row.names = FALSE)
+rm(px)
+```
+
+## 10. Figures
+
+PDF and a PNG of the same drawing (for viewing) in
+`model_images/validation/new/`; every figure carries the NEW suffix (it
+shows NEW data; OLD in-sample panels are labelled).
+
+```{r figures}
+draw_both <- function(stem, width, height, fun) {
+  pdf_path <- part2_path(P_new, stem, "pdf", "images")
+  png_path <- part2_path(P_new, stem, "png", "images")
+  rac_ensure_dir(pdf_path)
+  grDevices::pdf(pdf_path, width = width, height = height)
+  fun()
+  grDevices::dev.off()
+  grDevices::png(png_path, width = width, height = height, units = "in",
+                 res = 150)  # rac: literal-ok PNG resolution in dpi, not a dataset value
+  fun()
+  grDevices::dev.off()
+  cat("wrote", sub(ROOT_PATH, "", pdf_path, fixed = TRUE), "and .png\n")
+}
+col_glmm <- "#1f5fa8"
+col_reg <- "#d9822b"
+col_cml <- "#5a9a3c"
+oe_panel <- function(cl, s = "primary") {
+  sub <- cell_tab[cell_tab$set == s & cell_tab$partition == cl, ]
+  g <- sub[sub$model == "glmm", ]
+  r <- sub[sub$model == "r2022", ]
+  cm <- sub[sub$model == "cml", ]
+  K <- nrow(g)
+  yl <- range(c(g$OE_lo, g$OE_hi, r$OE_lo, r$OE_hi, 0.8, 1.25), na.rm = TRUE)
+  par(mar = c(if (cl == "a14") 7 else 5, 4, 2.5, 1))
+  plot(NA, xlim = c(0.5, K + 0.5), ylim = yl, log = "y", xaxt = "n",
+       xlab = "", ylab = "observed / expected")
+  title(xlab = if (cl == "a14") "Naomi's area (- / + = side of Naomi's x; c = central part)" else "grid cell (band 1 = heel ... 5 = toe)",
+        line = if (cl == "a14") 5.6 else 3.5)
+  lab <- if (cl == "a14") {
+    c("1 heel-", "2 rear-", "3 mid-", "4 ball-", "5 fore-", "6 fore+",
+      "7 ball+", "8 mid+", "9 rear+", "10 heel+", "11 ball-c", "12 fore-c",
+      "13 fore+c", "14 ball+c")[as.integer(g$cells)]
+  } else {
+    g$cells
+  }
+  axis(1, at = seq_len(K), labels = lab, las = 2, cex.axis = 0.7)
+  abline(h = 1, col = "grey40")
+  if (cl != "a14") {
+    nx <- prep$new$K[[cl]] / length(unique(cuts$band))
+    abline(v = seq(nx, K - 1, by = nx) + 0.5, col = "grey85", lty = 2)
+  }
+  segments(seq_len(K) - 0.15, g$OE_lo, seq_len(K) - 0.15, g$OE_hi, col = col_glmm, lwd = 2)
+  points(seq_len(K) - 0.15, g$OE, pch = 19, col = col_glmm)
+  segments(seq_len(K) + 0.15, r$OE_lo, seq_len(K) + 0.15, r$OE_hi, col = col_reg, lwd = 2)
+  points(seq_len(K) + 0.15, r$OE, pch = 17, col = col_reg)
+  points(seq_len(K), cm$OE, pch = 4, col = col_cml, cex = 0.8)
+  tg <- tests[tests$set == s & tests$model == "glmm" & tests$partition == cl, ]
+  tr <- tests[tests$set == s & tests$model == "r2022" & tests$partition == cl, ]
+  title(main = sprintf("%s, %s set: GLMM X2 %.0f (E0 %.0f, p %.4f); 2022 X2 %.0f (E0 %.0f)",
+                       cl, s, tg$X2, tg$E0_two, tg$p_boot_two, tr$X2, tr$E0_two),
+        cex.main = 0.8)
+}
+draw_both("part2_obs_exp", 11, 8.5, function() {
+  op <- par(mfrow = c(2, 2), mar = c(5, 4, 2.5, 1))
+  for (cl in cols) oe_panel(cl)
+  legend("bottomleft", c("OLD GLMM (random effect 0)", "2022 regional model", "OLD CML"),
+         pch = c(19, 17, 4), col = c(col_glmm, col_reg, col_cml), bty = "n", cex = 0.8)
+  par(op)
+})
+draw_both("part2_obs_exp_all", 11, 8.5, function() {
+  op <- par(mfrow = c(2, 2), mar = c(5, 4, 2.5, 1))
+  for (cl in cols) oe_panel(cl, "all")
+  par(op)
+})
+
+# cell maps on the prototype frame (as the step-4 maps: x to the right, toe up)
+proto <- t(as.matrix(imager::load.image(rac_path(P_old, "prototype_mask"))))
+pxy <- part2_coords(P_old)
+inside <- which(proto == 1, arr.ind = TRUE)
+cell_map <- function(cl) {
+  x <- pxy$x[inside[, 2]]
+  y <- pxy$y[inside[, 1]]
+  if (cl == "a14") naomi_area(-x, y) else grid_cell(x, y, cuts[cuts$n_y * cuts$n_x == prep$new$K[[cl]], ])
+}
+map_panel <- function(cl, md, s = "primary", zl = log2(c(0.5, 2))) {
+  sub <- cell_tab[cell_tab$set == s & cell_tab$partition == cl & cell_tab$model == md, ]
+  ob <- OB[[s]][[md]][[cl]]
+  cm <- cell_map(cl)
+  v <- log2(sub$OE[ob$group[cm]])
+  M <- matrix(NA_real_, nrow(proto), ncol(proto))
+  M[inside] <- pmax(pmin(v, zl[2]), zl[1])
+  rows <- range(inside[, 1]) + c(-5, 5)
+  colsr <- range(inside[, 2]) + c(-5, 5)
+  Mc <- M[rows[1]:rows[2], colsr[1]:colsr[2]]
+  pal <- grDevices::colorRampPalette(c("#2c5aa0", "#9cc3e6", "#f7f7f7", "#f4a582", "#b2182b"))(41)
+  image(t(Mc)[, nrow(Mc):1], col = pal, zlim = zl, axes = FALSE,
+        asp = nrow(Mc) / ncol(Mc), useRaster = TRUE)
+  mtext("toe", side = 3, line = -1, cex = 0.6)
+  mtext("heel", side = 1, line = -0.2, cex = 0.6)
+  C <- matrix(NA_integer_, nrow(proto), ncol(proto))
+  C[inside] <- ob$group[cm]
+  Cc <- C[rows[1]:rows[2], colsr[1]:colsr[2]]
+  edge <- (Cc != cbind(Cc[, -1], NA)) | (Cc != rbind(Cc[-1, ], NA))
+  edge[is.na(edge)] <- FALSE
+  ee <- which(edge, arr.ind = TRUE)
+  points((ee[, 2] - 1) / (ncol(Cc) - 1), 1 - (ee[, 1] - 1) / (nrow(Cc) - 1),
+         pch = ".", col = "grey20")
+  for (k in seq_len(nrow(sub))) {
+    w <- which(Cc == k, arr.ind = TRUE)
+    if (!nrow(w)) next
+    text(mean((w[, 2] - 1) / (ncol(Cc) - 1)), mean(1 - (w[, 1] - 1) / (nrow(Cc) - 1)),
+         sprintf("%.2f", sub$OE[k]), cex = 0.55)
+  }
+  title(main = sprintf("%s, %s (%s set)", if (md == "glmm") "OLD GLMM" else "2022 model",
+                       cl, s), cex.main = 0.9)
+}
+map_key <- function(zl = log2(c(0.5, 2))) {
+  pal <- grDevices::colorRampPalette(c("#2c5aa0", "#9cc3e6", "#f7f7f7", "#f4a582", "#b2182b"))(41)
+  graphics::par(mar = c(2, 30, 0.5, 30))
+  image(matrix(seq(zl[1], zl[2], length.out = 41)), col = pal, axes = FALSE,
+        useRaster = TRUE)
+  axis(1, at = seq(0, 1, length.out = 5), labels = c("0.5", "0.71", "1", "1.41", "2"),
+       cex.axis = 0.6, mgp = c(1, 0.2, 0), tcl = -0.2)
+  mtext("observed / expected (NEW RACs vs the model's expectation)", side = 1,
+        line = 0.9, cex = 0.55)
+}
+draw_both("part2_cells_map", 12, 7.6, function() {
+  op <- par(mar = c(1.5, 0.5, 2.5, 0.5))
+  layout(matrix(c(1, 2, 3, 4, 5, 5, 5, 5), 2, byrow = TRUE), heights = c(1, 0.09))
+  map_panel("a14", "glmm")
+  map_panel("g15", "glmm")
+  map_panel("a14", "r2022")
+  map_panel("g15", "r2022")
+  map_key()
+  par(op)
+})
+draw_both("part2_cells_map_g20", 12, 7.6, function() {
+  op <- par(mar = c(1.5, 0.5, 2.5, 0.5))
+  layout(matrix(c(1, 2, 3, 4, 5, 5, 5, 5), 2, byrow = TRUE), heights = c(1, 0.09))
+  map_panel("g10", "glmm")
+  map_panel("g20", "glmm")
+  map_panel("g10", "r2022")
+  map_panel("g20", "r2022")
+  map_key()
+  par(op)
+})
+
+draw_both("part2_boot", 11, 4, function() {
+  op <- par(mfrow = c(1, 3), mar = c(4.5, 4, 3, 1))
+  for (spec in list(c("glmm", "a14"), c("glmm", "g15"), c("r2022", "g15"))) {
+    x2t <- rc("primary", spec[1], spec[2], "X2_two")
+    x2n <- rc("primary", spec[1], spec[2], "X2_new")
+    t1 <- tests[tests$set == "primary" & tests$model == spec[1] & tests$partition == spec[2], ]
+    br <- pretty(range(c(x2t, x2n, t1$X2, 0)), 40)
+    h1 <- hist(x2t, breaks = br, plot = FALSE)
+    h2 <- hist(x2n, breaks = br, plot = FALSE)
+    plot(h1, freq = FALSE, col = grDevices::adjustcolor(col_glmm, 0.5), border = NA,
+         main = sprintf("%s, %s (primary set)", spec[1], spec[2]),
+         xlab = "Pearson X^2", ylim = c(0, max(h1$density, h2$density)))
+    plot(h2, freq = FALSE, col = grDevices::adjustcolor("grey50", 0.5), border = NA,
+         add = TRUE)
+    abline(v = qchisq(0.95, t1$df), lty = 2, lwd = 2)
+    abline(v = t1$X2, col = "#b2182b", lwd = 3)
+    legend("topright", c("two-sample bootstrap (null; OLD error too)",
+                         "NEW-only bootstrap (null; fit fixed)",
+                         sprintf("chi^2_%d 95%% point", t1$df), "observed X^2"),
+           fill = c(grDevices::adjustcolor(col_glmm, 0.5), grDevices::adjustcolor("grey50", 0.5), NA, NA),
+           border = NA, lty = c(NA, NA, 2, 1), lwd = c(NA, NA, 2, 3),
+           col = c(NA, NA, "black", "#b2182b"), bty = "n", cex = 0.7)
+  }
+  par(op)
+})
+
+draw_both("part2_logscore", 11, 5.5, function() {
+  op <- par(mfrow = c(1, 2), mar = c(4.5, 11, 3, 1), oma = c(1.5, 0, 0, 0))
+  for (wt in c("rac", "shoe")) {
+    cmp <- c("glmm - r2022", "cml - r2022", "glmm - unif", "r2022 - unif", "glmm - cml")
+    sub <- ls_tab[ls_tab$weight == wt & ls_tab$comparison %in% cmp, ]
+    sub$set <- factor(sub$set, levels = names(sets))
+    sub <- sub[order(match(sub$comparison, cmp), sub$set), ]
+    yy <- rev(seq_len(nrow(sub)))
+    cl_pt <- ifelse(sub$set == "primary", col_glmm, "grey40")
+    plot(sub$LS, yy, xlim = range(c(sub$lo_two, sub$hi_two, 0)), yaxt = "n",
+         pch = 19, col = cl_pt, ylab = "",
+         xlab = "log-score difference (nats per RAC)",
+         main = if (wt == "rac") "RAC-weighted" else "shoe-weighted")
+    # thin: the model classes (two-sample, centred); thick: the published
+    # fitted surfaces (NEW-only)
+    segments(sub$lo_two, yy, sub$hi_two, yy, col = cl_pt, lwd = 1)
+    segments(sub$lo_new, yy, sub$hi_new, yy, col = cl_pt, lwd = 3.5)
+    abline(v = 0, col = "grey50")
+    axis(2, at = yy, labels = paste(sub$comparison, sub$set), las = 1, cex.axis = 0.6)
+  }
+  mtext(paste("95% intervals, both centred on the point: thick = the published",
+              "fitted surfaces (NEW-only bootstrap); thin = the model classes",
+              "(two-sample bootstrap, OLD estimation noise included)"),
+        side = 1, line = 0.5, outer = TRUE, cex = 0.7)
+  par(op)
+})
+
+# calibration: the model's contrast against uniform (x) and NEW's (y), per
+# area or cell, pooled over the primary set; dashed y = x (the OLD contrasts
+# hold), solid y = alpha x (the fitted conditional slope)
+draw_both("part2_calibration", 11, 9, function() {
+  op <- par(mfrow = c(2, 2), mar = c(4.5, 4.5, 4, 1))
+  for (cl in c("a14", "g15")) {
+    for (md in c("glmm", "r2022")) {
+      ct <- contrast_tab[contrast_tab$partition == cl & contrast_tab$model == md, ]
+      bt <- bench_tab[bench_tab$set == "primary" & bench_tab$partition == cl &
+                        bench_tab$model == md, ]
+      x <- log(ct$E_over_unif)
+      y <- log(ct$O_over_unif)
+      lim <- range(c(x, y, 0)) * 1.12
+      plot(x, y, xlim = lim, ylim = lim, asp = 1, pch = 19,
+           col = if (md == "glmm") col_glmm else col_reg,
+           xlab = sprintf("log(expected / uniform), %s",
+                          if (md == "glmm") "OLD GLMM" else "2022 model"),
+           ylab = "log(observed NEW / uniform)",
+           main = sprintf(paste("%s, %s (primary set)\nslope alpha %.2f [%.2f, %.2f];",
+                                "OLD noise alone %.2f; X^2 %.0f, recalibrated %.0f"),
+                          if (cl == "a14") "Naomi's areas" else "15-cell grid",
+                          if (md == "glmm") "OLD GLMM" else "2022 model",
+                          bt$alpha, bt$alpha_lo_new, bt$alpha_hi_new,
+                          bt$dil_mean, bt$X2, bt$X2_recal),
+           cex.main = 0.85)
+      abline(h = 0, v = 0, col = "grey85")
+      abline(0, 1, lty = 2, col = "grey30")
+      abline(0, bt$alpha, lwd = 2, col = if (md == "glmm") col_glmm else col_reg)
+      lab <- if (cl == "a14") {
+        c("1 heel-", "2 rear-", "3 mid-", "4 ball-", "5 fore-", "6 fore+",
+          "7 ball+", "8 mid+", "9 rear+", "10 heel+", "11 ball-c", "12 fore-c",
+          "13 fore+c", "14 ball+c")[ct$cell]
+      } else {
+        paste(ct$cell, " (band ", grid_band(ct$cell, prep$new$K[["g15"]] /
+                                              length(unique(cuts$band))), ")", sep = "")
+      }
+      text(x, y, lab, pos = 4, cex = 0.6, col = "grey20")
+      legend("topleft", c("y = x: the OLD contrasts hold",
+                          "y = alpha x: fitted slope"),
+             lty = c(2, 1), lwd = c(1, 2),
+             col = c("grey30", if (md == "glmm") col_glmm else col_reg),
+             bty = "n", cex = 0.7)
+    }
+  }
+  par(op)
+})
+
+draw_both("part2_pairs", 11, 4.5, function() {
+  op <- par(mfrow = c(1, 3), mar = c(4.5, 4, 3, 1))
+  for (s in c("primary", "all", "old_all")) {
+    bands <- c("d0", "(0,2]", "(2,4]", "(4,8]", "(8,16]", "(16,32]")
+    sub <- pair_tab[pair_tab$set == s & pair_tab$weight == "pairs" &
+                      pair_tab$band %in% bands, ]
+    yl <- range(c(sub$ci_lo, sub$ci_hi, sub$env_lo, sub$env_hi, 1), na.rm = TRUE)
+    plot(NA, xlim = c(0.5, 6.5), ylim = yl, xaxt = "n",
+         xlab = "distance band (px; d0 = same pixel)",
+         ylab = "observed / expected pairs",
+         main = switch(s, primary = "NEW primary set", all = "NEW all shoes",
+                       old_all = "OLD (in-sample)"))
+    axis(1, at = 1:6, labels = bands)
+    abline(h = 1, col = "grey50")
+    for (nl in c("null1", "null2")) {
+      z <- sub[sub$null == nl, ][match(bands, sub$band[sub$null == nl]), ]
+      dx <- if (nl == "null1") -0.12 else 0.12
+      cl <- if (nl == "null1") "grey30" else "#b2182b"
+      rect(1:6 + dx - 0.08, z$env_lo, 1:6 + dx + 0.08, z$env_hi,
+           col = grDevices::adjustcolor(cl, 0.2), border = NA)
+      segments(1:6 + dx, z$ci_lo, 1:6 + dx, z$ci_hi, col = cl, lwd = 2)
+      points(1:6 + dx, z$ratio, pch = 19, col = cl)
+    }
+    legend("topright", c("null 1: fitted surface", "null 2: + own RACs smoothed (24 px)",
+                         "box: 95% simulation envelope", "bar: shoe-bootstrap 95% interval"),
+           col = c("grey30", "#b2182b", NA, NA), pch = c(19, 19, NA, NA), bty = "n", cex = 0.7)
+  }
+  par(op)
+})
+```
+
+## 11. Outputs
+
+```{r outputs}
+write_out <- function(df, P, stem) {
+  path <- part2_path(P, stem)
+  rac_ensure_dir(path)
+  con <- file(path, "wb")
+  on.exit(close(con))
+  write.csv(df, con, row.names = FALSE, eol = "\n")
+  cat("wrote", sub(ROOT_PATH, "", path, fixed = TRUE), "\n")
+}
+cells_long <- do.call(rbind, lapply(cols, function(cl) {
+  K <- prep$new$K[[cl]]
+  data.frame(shoe = rep(shoe_ids$new, K),
+             partition = cl, cell = rep(seq_len(K), each = prep$new$n_code),
+             S = as.vector(part2_agg(prep$new, prep$new$groups$S, cl)),
+             O = as.vector(obsO$new[[cl]]),
+             E_glmm = as.vector(EX$new$glmm$E[[cl]]),
+             E_cml = as.vector(EX$new$cml$E[[cl]]),
+             E_r2022 = as.vector(EX$new$r2022$E[[cl]]),
+             E_r_newx = as.vector(EX$new$r_newx$E[[cl]]),
+             E_r_grid15 = as.vector(EX$new$r_grid15$E[[cl]]))
+}))
+write_out(cells_long, P_new, "part2_cells")
+write_out(tests, P_new, "part2_tests")
+write_out(wald_tab, P_new, "part2_wald_param")
+write_out(cell_tab, P_new, "part2_cell_oe")
+write_out(ls_tab, P_new, "part2_logscore")
+write_out(dx2, P_new, "part2_delta_x2")
+write_out(sens_tab, P_new, "part2_sensitivity")
+write_out(k8_tab, P_new, "part2_k8_sensitivity")
+write_out(k8_edge, P_new, "part2_k8_edge_cells")
+write_out(band_tab, P_new, "part2_heel_front_band")
+write_out(bench_tab, P_new, "part2_benchmark")
+write_out(contrast_tab, P_new, "part2_contrast")
+write_out(pix_tab, P_new, "part2_pixel_slope")
+write_out(ls_gain, P_new, "part2_logscore_gain")
+write_out(ls_tercile, P_new, "part2_logscore_tercile")
+write_out(blk_tab, P_new, "part2_block")
+old_cells <- do.call(rbind, lapply(cols, function(cl) {
+  K <- prep$old$K[[cl]]
+  data.frame(shoe = rep(shoe_ids$old, K),
+             partition = cl, cell = rep(seq_len(K), each = prep$old$n_code),
+             S = as.vector(part2_agg(prep$old, prep$old$groups$S, cl)),
+             O = as.vector(obsO$old[[cl]]),
+             E_glmm = as.vector(EX$old$glmm$E[[cl]]),
+             E_r2022 = as.vector(EX$old$r2022$E[[cl]]))
+}))
+write_out(pair_tab[pair_tab$set != "old_all", ], P_new, "part2_pairs")
+write_out(pair_tab[pair_tab$set == "old_all", ], P_old, "part2_pairs")
+write_out(old_cells, P_old, "part2_cells")
+write_out(old_tests, P_old, "part2_tests")
+write_out(old_ls, P_old, "part2_logscore")
+cat(sprintf("total time %.0f s\n", proc.time()[["elapsed"]] - t_start))
+```

@@ -1,0 +1,9 @@
+"sensitivity","partition","N","X2","df","w"
+"binarized RAC counts","a14",13622,298.193760915083,13,0.147954724717967
+"binarized RAC counts","g10",13622,176.739249168593,9,0.113905859343928
+"binarized RAC counts","g15",13622,205.978308137728,14,0.122967489146526
+"binarized RAC counts","g20",13622,235.857737726702,19,0.131584467208238
+"pixels outside the OLD boundary knots removed","a14",13628,295.791176696635,13,0.147325032334563
+"pixels outside the OLD boundary knots removed","g10",13628,174.229396285121,9,0.113069286964308
+"pixels outside the OLD boundary knots removed","g15",13628,203.089934300776,14,0.122075394689552
+"pixels outside the OLD boundary knots removed","g20",13628,232.629942585203,19,0.130652205194291
