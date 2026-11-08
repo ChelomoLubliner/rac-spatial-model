@@ -329,7 +329,7 @@ nn <- rpois(m, 30) + 2
 th <- exp(rnorm(K, 0, 0.6))
 EUc <- part2_uniform_expected(Sc, rowSums(Sc), nn)
 EMc <- normalize_expected(t(t(Sc) * th), nn)
-Lc <- ifelse(Sc > 0, log(EMc / pmax(EUc, 1e-300)), 0)
+Lc <- ifelse(Sc > 0, log(EMc / pmax(EUc, 1e-300)), 0)  # rac: literal-ok (numerical guard against log(0), not a dataset number)
 Pt <- EUc * exp(0.6 * Lc)
 Pt <- Pt / rowSums(Pt)
 Oc <- t(vapply(seq_len(m), function(i) as.vector(rmultinom(1, nn[i], Pt[i, ])),

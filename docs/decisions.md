@@ -923,3 +923,30 @@ Append new decisions at the end of the right section; never rewrite an old entry
 - **Date:** 2026-11-07. **Who:** agent call (T6 review fixes; the statistics reviewer's minor finding 6). **Status:** accepted. **Amends:** the "primary test" sentence of the first T6 run (A-045 still defines the test).
 - **Why:** every equality test takes Var(b_old - b_new) = V_old + V_new (independent samples); 67 NEW shoes are prints of OLD soles (F25), so with them Cov(b_old, b_new) > 0, V_old + V_new overstates the variance and the test is conservative (26 of the 89 reprinted or uncertain shoes are in group B, so the group-B test shares soles too). Only the comparisons without the reprints meet the assumption.
 - **Decision:** the primary test is the GLMM shoe bootstrap without the reprints: W 46.746, F(24, 976) p 0.0056 (`equality_wald_old_vs_new.csv`, columns `samples` and `primary`; recomputed from the two bootstrap records by `tests/r/test_compare_old_new.R`); the all-shoes tests are reported as conservative. The code comment of `t6_boot_pair` that called the datasets independent is corrected.
+
+### A-139 Finish T7 and the report with a small budget, on a separate branch
+- **Date:** 2026-11-08. **Who:** the user (Shlomo). **Status:** accepted.
+- **Why:** the workflow had used about 23M tokens and stopped on the weekly limit; the work had to reach Micha soon.
+- **Decision:** save `feature/new-shoes-pipeline` as is; finish on `feature/new-shoes-finish` without the workflow tool, with at most two reviewer agents instead of the planned four reviewers and the critic; md report first, HTML at the user's later request.
+
+### A-140 Knit T7 with three workers
+- **Date:** 2026-11-08. **Who:** agent call. **Status:** accepted.
+- **Why:** each forked worker of `validation_8.Rmd` takes about 3 GB and the machine has 15 GB (9 GB free); 8 workers would have run out of memory.
+- **Decision:** `RAC_WORKERS=3` (README states it); 4 for the real-structure calibration, whose workers are small.
+
+### A-141 The Wald p-value is reported as p < 1e-16 (model-based)
+- **Date:** 2026-11-08. **Who:** agent call, on the final reviewer's major finding 1. **Status:** accepted. **Applies:** T5 correction 5 (A-115) to the report.
+- **Decision:** the report and the suggested reply to Reviewer 1 give "p < 10^-16 (model-based; cluster-robust W 329)", never the digits of 2.1e-108, and do not compare W between the datasets.
+
+### A-142 The NEW-only log-score intervals under-cover; they are reported with that caveat
+- **Date:** 2026-11-08. **Who:** agent call, on the T7-17 calibration. **Status:** accepted.
+- **Why:** on real structure the NEW-only interval of the log-score difference covered E1 in 91.0% of 400 replicates (nominal 95%); the centred two-sample intervals over-cover (99.3-99.5%).
+- **Decision:** keep both intervals (T7-13) and state in `validation.md` (section 2.5) and in the report that the published-surface per-shoe lead (+0.0020 to +0.0132) is slightly optimistic; the model-class interval, which reaches 0, is the one that decides whether the lead is established (it is not).
+
+### A-143 Map regions in the report follow the data, not the step-3 map alone
+- **Date:** 2026-11-08. **Who:** agent call, on the HTML reviewer's major findings. **Status:** accepted.
+- **Decision:** a region is described as different between OLD and NEW only where T6's model-free regional table supports it; features of the NEW step-3 map that the data do not show (the right-edge stripe) are labelled as spline edge effects; the sole-design cause is stated as secondary to the y basis (T5, A-119/A-120). Side names are left/right as drawn, never inner/outer (the mirroring of the frame is not established).
+
+### A-144 The HTML report is committed at the plan's path
+- **Date:** 2026-11-08. **Who:** agent call. **Status:** accepted. **Applies:** plan task T8 and A-036.
+- **Decision:** `reports/new_shoes_report.html`, with one `.gitignore` exception (`!reports/new_shoes_report.html`; the March `reports/offset_changes_report.html` stays ignored). Figures are embedded as PNG data URIs rendered from the committed PDFs with PyMuPDF at 110-120 dpi, so the file is self-contained (about 2.6 MB).
