@@ -99,7 +99,15 @@ The p-value comes from a **two-sample shoe bootstrap** (B = 2,000), which includ
 | Both models vs uniform placement | about +1.1% probability for the pixel of a RAC |
 | Independence | pairs of RACs 2–8 px apart are **37% more frequent** than expected (old: 45%). The area counts are overdispersed (phi 1.6–2.0) |
 
-⚠️ **A few intervals in `validation.md` are still being recomputed** after the statistics review: the centred model-class intervals and the calibration slope. The point estimates above don't change.
+**After the statistics review (re-knit of 2026-11-08):**
+- **Why it misfits, part (a):** the OLD contrasts are too strong on NEW. The calibration slope is 0.70 (95% interval 0.55–0.85) on the areas, where a correct surface would give about 0.95 (one-sided p = 0.008). New RACs are spread more evenly.
+- **Part (b):** a shift along the shoe that recalibration doesn't fix (it removes only 9% of X²). There are more RACs at the rear midfoot and fewer in the central forefoot.
+- **Model comparison, two separate questions:**
+  - *Published surfaces:* the per-RAC interval is −0.0056 to +0.0050 (a tie); per shoe, +0.0020 to +0.0132 (continuous ahead).
+  - *Model classes,* including OLD estimation noise: per shoe the interval reaches 0 (−0.00003 to +0.0148), so the lead is not established.
+- **Lightly marked shoes:** the per-shoe lead is +0.013 nats in the third of shoes with the fewest RACs and +0.0003 in the third with the most.
+- **Treating consecutive ids as possible pairs of one wearer:** the dispersion rises (phi 1.74 to 2.20), and p_boot stays 0.0005.
+- ⏳ **One check is still running:** the simulation that checks the size of the test on real shoe structure. It doesn't change the numbers above, only how much we trust the p-value machinery.
 
 ## 6. Other findings for the paper
 

@@ -103,4 +103,4 @@ all      glmm - unif   RAC-weighted: point +0.011891, replicate mean - point -0.
 all      r2022 - unif  RAC-weighted: point +0.011888, replicate mean - point -0.0000361 (-0.018 sd); shoe-weighted: point +0.000899, shift -0.0000255 (-0.010 sd)
 ```
 
-The NEW-only replicates of a log score are shifted by at most 0.04 of their SD; the two-sample ones by @@ (section 6).
+The NEW-only replicates of a log score are shifted by at most 0.04 of their SD; the two-sample ones by up to 0.57 of their SD (median 0.24; `shift_two / sd_two` in `part2_logscore_new.csv`), which is why their intervals are centred on the point (T7-13) (section 6).
