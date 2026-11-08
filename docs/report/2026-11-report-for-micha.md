@@ -112,7 +112,7 @@ The p-value comes from a **two-sample shoe bootstrap** (B = 2,000), which includ
 ## 6. Other findings for the paper
 
 1. **Knots:** the 5 y knots are too coarse for the new data (5-fold CV by shoe favours a finer y basis on new, and not on old). This supports meeting issue 8.4: report a knot sensitivity analysis.
-2. **Sole design:** a post-hoc id group of 392 new shoes (probably one design) prints a heel-front band but has only about 0.3 of its own RAC density there. A single surface for all shoes doesn't hold everywhere. This is Reviewer 1's point 4 and the editor's "sole design" point.
+2. **Sole design:** a post-hoc id group of 392 new shoes (probably one design) prints a heel-front band but has only about 0.3 of its own RAC density there. One surface sits between this group and the rest. T5 found that the heel-front misfit itself comes mainly from the coarse y basis (a finer basis brings its observed/expected to 1.04), so the design effect is real but should not be overstated. This is Reviewer 1's point 4 and the editor's "sole design" point.
 3. **Naomi's 2022 estimator:** `optim` with the default Nelder-Mead **stops at its iteration limit**, so its intensities are up to 9.8% from the converged optimum. If Table 1 of 2022 came from this call, it is not at the optimum. This is immaterial for her conclusions (the Nelder-Mead point is only 1.61 log-likelihood units below the optimum), but worth telling Naomi.
 4. **Wald statistic and vcov:** W is 428.7 with the Hessian vcov and 427.8 with the RX vcov. State the vcov method in the paper. Don't compare W between the two datasets: it grows with the number of RACs.
 
