@@ -171,6 +171,17 @@ Rmds' own code (this machine has no PDF rasterizer; A-111).
 The plan and the decisions behind this are in `docs/plans/2026-11-05-new-shoes-pipeline.md` and
 `docs/decisions.md`; the fast tests run with `bash tests/run_all.sh`.
 
+**Old vs new and the out-of-sample validation.** `statistical_model/compare_old_new_7.Rmd` compares the
+two datasets (T6; results `docs/results/old-vs-new.md`, figures `model_images/compare/`).
+`statistical_model/validation_8.Rmd` is Part 2, the goodness of fit of the OLD-fitted model on the NEW
+shoes (T7; results `docs/results/validation.md`, outputs `processed_data/validation/`, figures
+`model_images/validation/`). Knit it with `RAC_WORKERS=3` at most on a 16 GB machine (each worker takes
+about 3 GB); it takes about 35 min once its pixel caches exist. The slow check of its test on real shoe
+structure is `RAC_WORKERS=4 Rscript tests/r/slow/test_validation_real_calibration.R` (about 2 h 10 min).
+
+**Report.** The summary for the co-authors is `reports/new_shoes_report.html` (self-contained, figures
+embedded) and its text version `docs/report/2026-11-report-for-micha.md`.
+
 ### Skip the fitting
 
 The pre-fitted OLD models ship in `saved_models/` and the OLD figures in `model_images/`. Steps 4--6

@@ -23,6 +23,7 @@ Thumbs.db
 
 # Knit output
 *.html
+!reports/new_shoes_report.html
 *.nb.html
 
 # Work folders of the contour code (Python step 0) and run logs; never tracked
