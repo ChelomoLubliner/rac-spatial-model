@@ -1,6 +1,6 @@
 # New shoes: full pipeline, old vs new, and out-of-sample validation (report for Micha)
 
-**Date:** 2026-11-08 · **Branch:** `feature/new-shoes-finish` (based on `feature/new-shoes-pipeline`) · **Status:** draft. The final reviews of the whole branch are still to do (planned for 2026-11-11).
+**Date:** 2026-11-08 · **Branch:** `feature/new-shoes-finish` (based on `feature/new-shoes-pipeline`) · **Status:** final for discussion. One final review of the whole branch was done on 2026-11-08, and its fixes are applied.
 
 Every number below is taken from the result documents, which cite their sources (CSVs, commands, outputs):
 - `docs/tests/T5-new-pipeline-results.md` (model on the new shoes)
@@ -22,11 +22,11 @@ Every number below is taken from the result documents, which cite their sources 
 | 11-07 | T6 | Old vs new comparison, with a statistics review and fixes |
 | 11-07 | T7 | Part 2 goodness of fit; the test was corrected to a two-sample shoe bootstrap after review |
 | 11-08 | Stop | The run hit the weekly usage limit before the last re-knit and final reviews; the work was saved as is (`7e8d44d`) |
-| 11-08 | Finish | Re-knit of T7 to fill the last intervals; this report |
+| 11-08 | Finish | Re-knit of T7 to fill the last intervals; the real-structure calibration simulation (T7-17); one final reviewer (statistics and reproducibility: no blockers, old outputs intact; its wording fixes applied); this report |
 
 Each step had independent reviewers (statistician, code, visual QA); their verdicts and every decision are in `docs/progress/LOG.md` and `docs/decisions.md`.
 
-**Still to do:** a final review of the whole branch, and the open questions in section 8.
+**Still to do:** the open questions in section 8, and merging the branch once Micha agrees.
 
 ## 1. What was asked (meeting of 2026-11-05)
 
@@ -44,7 +44,7 @@ Each step had independent reviewers (statistician, code, visual QA); their verdi
 **⚠️ Overlap (decision D-012):** the team said in the meeting that the datasets don't overlap. The data disagree.
 - About **67 new shoes are very likely reprints of old shoes**, and 22 more are uncertain. That is 15.8% of the new RACs.
 - Evidence that doesn't depend on judging the images: consecutive new ids map onto consecutive old ids far more often than chance would (16 of 57 pairs, where about 0.3 would be expected).
-- **Please confirm with Sarena or Yoram.** The validation uses the shoes that are not reprints (478 shoes).
+- **Please confirm with Sarena or Yoram.** The validation uses 478 shoes: those that are not reprints or uncertain and that pass the quality rule. The overlap evidence comes from a screen of 121 flagged shoes, not from all new shoes.
 
 ## 3. Part 1: snake and model on the new shoes
 
@@ -61,7 +61,7 @@ Each step had independent reviewers (statistician, code, visual QA); their verdi
 |---|---|---|
 | Case-control rows | 51,849 | 83,090 |
 | GLMM sigma² (no offset, as committed) | 0.960 | 0.756 |
-| Wald test, all 24 spatial terms = 0 (RX vcov) | W = 427.8 | **W = 585.9, p ≈ 10⁻¹⁰⁸** |
+| Wald test, all 24 spatial terms = 0 (RX vcov, model-based) | W = 427.8 | **W = 585.9, p < 10⁻¹⁶** (cluster-robust W = 329) |
 | CML Wald | 420.7 | 576.0 |
 
 → On an independent collection, RAC intensity is again **far from uniform**.
@@ -93,10 +93,10 @@ The p-value comes from a **two-sample shoe bootstrap** (B = 2,000), which includ
 | Result | Value |
 |---|---|
 | **Goodness of fit, 14 areas (primary)** | **X² = 298 on 13 df, noise floor 49, p_boot = 0.0005**. The old surface does **not** transfer exactly to the new shoes |
-| Same test for the 2022 regional model | X² = 170 |
+| Same test for the 2022 regional model | X² = 170, p_boot = 0.0015: also rejected |
 | Continuous vs 2022, per RAC (log-score) | **a tie** (+0.000003 nats) |
-| Continuous vs 2022, per shoe | continuous ahead by about **0.8%**. The lead is in the lightly marked shoes |
-| Both models vs uniform placement | about +1.1% probability for the pixel of a RAC |
+| Continuous vs 2022, per shoe | continuous ahead by about **0.8%** (published surface; not established once OLD estimation noise is included). Descriptively, the lead is in the lower two thirds of shoes by RAC count |
+| Both models vs uniform placement | about +1.1% probability for the pixel of a RAC (per RAC; per shoe the 2022 model is level with uniform) |
 | Independence | pairs of RACs 2–8 px apart are **37% more frequent** than expected (old: 45%). The area counts are overdispersed (phi 1.6–2.0) |
 
 **After the statistics review (re-knit of 2026-11-08):**
@@ -107,18 +107,18 @@ The p-value comes from a **two-sample shoe bootstrap** (B = 2,000), which includ
   - *Model classes,* including OLD estimation noise: per shoe the interval reaches 0 (−0.00003 to +0.0148), so the lead is not established.
 - **Lightly marked shoes:** the per-shoe lead is +0.013 nats in the third of shoes with the fewest RACs and +0.0003 in the third with the most.
 - **Treating consecutive ids as possible pairs of one wearer:** the dispersion rises (phi 1.74 to 2.20), and p_boot stays 0.0005.
-- ⏳ **One check is still running:** the simulation that checks the size of the test on real shoe structure. It doesn't change the numbers above, only how much we trust the p-value machinery.
+- **Simulation check on real shoe structure** (correct model, 400 replicates): the goodness-of-fit test rejects a true model 5.2% of the time at the 5% level, so the p-values are valid. The model-class intervals are conservative (99.5% coverage). One check failed: the published-surface log-score interval covers 91% instead of 95%, so the per-shoe lead interval is slightly optimistic.
 
 ## 6. Other findings for the paper
 
 1. **Knots:** the 5 y knots are too coarse for the new data (5-fold CV by shoe favours a finer y basis on new, and not on old). This supports meeting issue 8.4: report a knot sensitivity analysis.
-2. **Sole design:** one design (392 new shoes) prints a heel-front band but almost never has RACs there. A single surface for all shoes doesn't hold everywhere. This is Reviewer 1's point 4 and the editor's "sole design" point.
-3. **Naomi's 2022 estimator:** `optim` with the default Nelder-Mead **stops at its iteration limit**, so its intensities are up to 9.8% from the converged optimum. If Table 1 of 2022 came from this call, it is not at the optimum. **Tell Naomi.**
-4. **Wald statistic and vcov:** W is 428.7 with the Hessian vcov and 427.8 with the RX vcov. State the vcov method in the paper.
+2. **Sole design:** a post-hoc id group of 392 new shoes (probably one design) prints a heel-front band but has only about 0.3 of its own RAC density there. A single surface for all shoes doesn't hold everywhere. This is Reviewer 1's point 4 and the editor's "sole design" point.
+3. **Naomi's 2022 estimator:** `optim` with the default Nelder-Mead **stops at its iteration limit**, so its intensities are up to 9.8% from the converged optimum. If Table 1 of 2022 came from this call, it is not at the optimum. This is immaterial for her conclusions (the Nelder-Mead point is only 1.61 log-likelihood units below the optimum), but worth telling Naomi.
+4. **Wald statistic and vcov:** W is 428.7 with the Hessian vcov and 427.8 with the RX vcov. State the vcov method in the paper. Don't compare W between the two datasets: it grows with the number of RACs.
 
 ## 7. Suggested message to Reviewer 1 (points 1 and 6), to discuss
 
-> We validated the model on an independent collection of 631 shoe prints (478 after excluding reprints of the original shoes). The spatial non-uniformity replicates strongly (Wald p ≈ 10⁻¹⁰⁸). The fitted surface transfers only partly: a goodness-of-fit test that accounts for estimation error rejects exact transfer (p = 0.0005), and the shapes differ in a few bands while the overall level agrees. Per RAC, the continuous surface predicts as well as the 2022 regional model, and per shoe the published surface is slightly better, although this lead is not established once the estimation error of the original fit is included. RACs within a shoe are not independent: pairs at short range are about 40% more frequent than expected. We therefore present the model as a description of where single RACs tend to occur, not as a tool to compute the probability of a set of RACs. We discuss sole design and dataset differences as limitations.
+> We validated the model on an independent collection of 631 shoe prints (478 after excluding reprints of the original shoes). The spatial non-uniformity replicates strongly (Wald p < 10⁻¹⁶, model-based; it also holds with a cluster-robust variance). The fitted surface transfers only partly: a goodness-of-fit test that accounts for estimation error rejects exact transfer (p = 0.0005), and the shapes differ in a few bands, while the overall level is not significantly different (ratio 1.06, 95% CI 0.93–1.22). Per RAC, the continuous surface predicts as well as the 2022 regional model, and per shoe the published surface is slightly better, although this lead is not established once the estimation error of the original fit is included. RACs within a shoe are not independent: pairs at short range are about 40% more frequent than expected. We therefore present the model as a description of where single RACs tend to occur, not as a tool to compute the probability of a set of RACs. We discuss sole design and dataset differences as limitations.
 
 ## 8. Open questions
 

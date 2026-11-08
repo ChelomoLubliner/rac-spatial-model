@@ -1,0 +1,12 @@
+real structure (400 replicates, inner B 100, 7759 s; OLD-like 60 shoes, 1654 RACs; NEW-like 100 shoes, 3318 RACs):
+  named analysis 1 (Naomi's areas), rejection at 5%: two-sample 0.052, NEW-only 0.750, fixed surface 0.797; mean X^2 34.3, mean E0 34.7
+  log score GLMM - 2022 (RAC-weighted): E2 0.00654 (sd of E1 over replicates 0.00306); mean point 0.00664; mean shift of the two-sample replicates -0.00659 (-0.88 of their sd)
+    coverage: NEW-only of E1 0.910; two-sample centred of E2 0.995; raw two-sample of E2 0.905; NEW-only of E2 0.828
+  Delta X^2 on the 15-cell grid: E2 9.40 (sd of E1 10.58); mean point 9.54; mean shift 19.60 (0.75 of the sd)
+    coverage: NEW-only of E1 0.935; two-sample centred of E2 0.993; raw two-sample of E2 0.958; NEW-only of E2 0.825
+PASS the two-sample bootstrap holds its size on real structure (0.05 +- 2.5 SE) 
+FAIL log score: the NEW-only interval covers the fitted surfaces' expectation E1 
+PASS log score: the centred two-sample interval covers the model classes' expectation E2 (at least nominal) 
+PASS Delta X^2: the NEW-only interval covers E1 
+PASS Delta X^2: the centred two-sample interval covers E2 (at least nominal) 
+SOME CHECKS FAILED test_validation_real_calibration (7759 s)
