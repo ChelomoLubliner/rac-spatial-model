@@ -109,6 +109,15 @@ The p-value comes from a **two-sample shoe bootstrap** (B = 2,000), which includ
 - **Treating consecutive ids as possible pairs of one wearer:** the dispersion rises (phi 1.74 to 2.20), and p_boot stays 0.0005.
 - **Simulation check on real shoe structure** (correct model, 400 replicates): the goodness-of-fit test rejects a true model 5.2% of the time at the 5% level, so the p-values are valid. The model-class intervals are conservative (99.5% coverage). One check failed: the published-surface log-score interval covers 91% instead of 95%, so the per-shoe lead interval is slightly optimistic.
 
+## 5b. Robustness checks (2026-11-09)
+
+| Question | Answer |
+|---|---|
+| Same scale and size? | Yes. The 67 soles printed in both collections have the same outline size (new/old length 1.013, 10–90%: 0.98–1.04; width 1.026; area 1.021). Over all shoes, median length 311 px (old) vs 314 px (new). Step 2 keeps the raw y, so equal lengths matter; the new images are only a smaller frame. |
+| Non-uniformity robust to dependence within shoes? | Yes. Shoe-bootstrap Wald (B = 1,000, GLMM, 24 spatial terms): old W = 255.3 (p 2e-34), new on the old knots 377.1 (p 1e-52), new without reprints 311.4 (p 5e-43); model-based old 428.7. Cluster-robust CML: old 234.4, new 329.0. |
+| Do the knots matter? | 5-fold CV by shoe: on old, no finer basis does better (z −1.4 to +0.8); on new, the finest does (z 2.1) and fixes the heel-front band (0.64 → 0.92). Part 2 with a finer old basis: X² 298 → 257, still far above the noise floor; log score still level with 2022. |
+| Is the 2022 comparison fair? | Yes. Part 2 refits the 2022 model by exact conditional ML (converged), not with Naomi's `optim` call, and refits it in every bootstrap resample. |
+
 ## 6. Other findings for the paper
 
 1. **Knots:** the 5 y knots are too coarse for the new data (5-fold CV by shoe favours a finer y basis on new, and not on old). This supports meeting issue 8.4: report a knot sensitivity analysis.

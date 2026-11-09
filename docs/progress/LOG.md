@@ -2260,3 +2260,7 @@ Scratch root in the session scratchpad; logs in `logs/final_gate/` (ignored).
 - Rerun 2 (log written outside the repository): **ALL PASS, exit 0**, the work-tree check included.
 
 With `tests/regress_old.sh --steps 0-6` and `tests/rebuild_new.sh` (previous entry), the final gate of the branch passes.
+
+## 2026-11-09, robustness section of the report (main session)
+
+From existing outputs only, no new fit: (1) outline size from the two committed contour files: median length 311 px (old) vs 314 px (new), width 119 vs 122; on the 67 `same_shoe` pairs of `docs/qa/T0/compare/overlap_verdicts_t0_old_vs_new.csv`, new/old length 1.013 (p10-p90 0.983-1.043), width 1.026, area 1.021: the same scale. (2) Shoe-bootstrap Wald of the 24 spatial terms from the T6 PIRLS bootstrap records (B = 1,000; W = b' cov(draws)^-1 b, Hotelling F(24, 976)): OLD 255.3 (p 1.7e-34; T7's 2,000 surrogate draws gave 243.6), NEW on the OLD basis 377.1 (p 1.0e-52), NEW without reprints 311.4 (p 4.9e-43). (3) Knots: T5 second review fixes, 5-fold CV by shoe, and T7 section 4.1. (4) The 2022 comparator of Part 2 is T7's exact conditional MLE (T7-11). Added to `reports/new_shoes_report.html` (section "Robustness checks", sixth summary point) and to the md report (section 5b).

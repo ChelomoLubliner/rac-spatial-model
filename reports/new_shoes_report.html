@@ -85,12 +85,13 @@ a { color: var(--accent); }
 </header>
 
 <section>
-  <h2>In five points</h2>
+  <h2>In six points</h2>
   <ol class="points">
     <li><span><strong>Part 1 is done.</strong> The full model runs on the 631 new shoes with an adapted snake. The non-uniformity replicates strongly (Wald p &lt; 10<sup>−16</sup>). The old results reproduce exactly after every step.</span></li>
     <li><span><strong>Part 2 is done.</strong> The old surface does not transfer exactly to the new shoes: X² = 298 on Naomi's 14 areas, p = 0.0005. A simulation confirms the test is valid. The 2022 regional model is rejected too.</span></li>
     <li><span><strong>Why it misfits.</strong> New RACs are spread more evenly than the old surface says (calibration slope 0.70), and they shift along the shoe: more toward the heel and the rear midfoot, fewer in the central forefoot (Fig. 5).</span></li>
     <li><span><strong>Continuous against 2022.</strong> Per RAC they predict equally well. Per shoe the continuous surface is slightly ahead, but that lead is not established once the old estimation error is included.</span></li>
+    <li><span><strong>Robust.</strong> Same scale and same shoe size in both collections (checked on the 67 soles printed twice); non-uniformity survives a shoe bootstrap (p &lt; 10<sup>−34</sup>); the conclusions do not depend on the knots.</span></li>
     <li><span><strong>Decisions for Micha.</strong> About 67 new shoes look like reprints of old shoes; the per-shoe offset; the knot sensitivity analysis; the suggested reply to Reviewer 1.</span></li>
   </ol>
 </section>
@@ -255,6 +256,47 @@ a { color: var(--accent); }
     <li><span class="verdict">Pass.</span> The intervals that include the old estimation error are conservative (99.3–99.5% coverage).</li>
     <li><span class="fail">Fail.</span> The per-RAC log-score interval for the published surfaces covers 91% instead of 95%. The per-shoe lead interval above is therefore slightly optimistic.</li>
   </ul>
+</section>
+
+<section>
+  <h2>Robustness checks</h2>
+  <p>Four questions a reviewer is likely to ask, answered from the existing fits and bootstrap records.</p>
+
+  <h3>Are the new shoes on the same scale, and the same size?</h3>
+  <p>The new images are smaller (255 × 367 against 307 × 395), but that is the frame, not the shoe. The decisive check uses the 67 soles printed in both collections: the same physical sole has the same size in pixels in both, so the scale is the same.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Snake outline</th><th>Old (386)</th><th>New (631)</th><th>Same 67 soles: new / old</th></tr></thead>
+    <tbody>
+      <tr><td>Length, median (10%–90%)</td><td>311 px (302–317)</td><td>314 px (306–319)</td><td>1.013 (0.98–1.04)</td></tr>
+      <tr><td>Width, median (10%–90%)</td><td>119 px (112–127)</td><td>122 px (115–132)</td><td>1.026 (0.95–1.08)</td></tr>
+      <tr><td>Enclosed area</td><td></td><td></td><td>1.021 (0.98–1.07)</td></tr>
+    </tbody>
+  </table></div>
+  <p>The shoes are the same size within 1–2.5%. This matters because step 2 standardizes x (each RAC's share of its own shoe's half-width) but keeps the raw y: with equal lengths, no length scaling is needed, and the reprinted soles line up in y with a median shift of 0 px (T5). What is smaller on new shoes is the contact area inside the outline (−12%): less of the sole touches the paper. The new collection's own prototype is computed (the overlay of all 631 shoes, 34,509 px, reproduced byte for byte by the final gate) and used to clean the images; the model coordinates use the old prototype on purpose, so that both collections share one shoe.</p>
+
+  <h3>Does non-uniformity survive the dependence between RACs?</h3>
+  <p>The Wald test above treats RACs as independent. Resampling whole shoes (1,000 shoe bootstrap refits per collection) gives a covariance that allows any dependence within a shoe:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Wald test, all 24 spatial terms = 0 (GLMM)</th><th>Model-based W</th><th>Shoe-bootstrap W</th><th>p (Hotelling F)</th></tr></thead>
+    <tbody>
+      <tr><td>Old, 386 shoes</td><td>428.7</td><td>255.3</td><td>2 × 10<sup>−34</sup></td></tr>
+      <tr><td>New, 631 shoes (old knots)</td><td>—</td><td>377.1</td><td>1 × 10<sup>−52</sup></td></tr>
+      <tr><td>New without reprints (old knots)</td><td>—</td><td>311.4</td><td>5 × 10<sup>−43</sup></td></tr>
+    </tbody>
+  </table></div>
+  <p>W drops by about 40% once the dependence is allowed for, and the conclusion does not move. The cluster-robust CML agrees (old 234.4, new 329.0). The new fits here use the old knots, the common basis of the old-against-new comparison.</p>
+
+  <h3>Do the knots matter?</h3>
+  <p>The paper's basis has 3 knots across the shoe and 5 along it. Cross-validation by shoe (5 folds) compares it with finer bases:</p>
+  <ul>
+    <li><strong>Old shoes:</strong> no finer basis predicts held-out shoes better (z between −1.4 and +0.8). The paper's choice is supported.</li>
+    <li><strong>New shoes:</strong> the finest basis predicts better (z = 2.1) and removes most of the heel-front misfit (held-out observed/expected 0.64 → 0.92).</li>
+    <li><strong>Part 2 with a finer old basis:</strong> X² on Naomi's areas falls from 298 to 257 and stays far above its noise floor; the log score stays level with the 2022 model. The conclusion of the goodness of fit does not depend on the knots.</li>
+  </ul>
+  <p>This supports reporting a knot sensitivity analysis in the paper (meeting issue 8.4), with the result that the main findings hold.</p>
+
+  <h3>Is the 2022 comparison fair?</h3>
+  <p>Naomi's original <code>optim</code> call stops before convergence. Part 2 does not use it: the 2022 model is refitted by its exact conditional maximum likelihood (a Poisson GLM, converged) on the old shoes, and refitted again in every bootstrap resample. The comparison with the continuous model is therefore against a properly fitted 2022 model.</p>
 </section>
 
 <section>
