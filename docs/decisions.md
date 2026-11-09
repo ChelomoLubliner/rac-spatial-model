@@ -950,3 +950,16 @@ Append new decisions at the end of the right section; never rewrite an old entry
 ### A-144 The HTML report is committed at the plan's path
 - **Date:** 2026-11-08. **Who:** agent call. **Status:** accepted. **Applies:** plan task T8 and A-036.
 - **Decision:** `reports/new_shoes_report.html`, with one `.gitignore` exception (`!reports/new_shoes_report.html`; the March `reports/offset_changes_report.html` stays ignored). Figures are embedded as PNG data URIs rendered from the committed PDFs with PyMuPDF at 110-120 dpi, so the file is self-contained (about 2.6 MB).
+
+### A-145 An OLD-side T7 output gained rows and columns; its write-once checksum is updated
+- **Date:** 2026-11-09. **Who:** agent call, on the independent critic's major finding 3. **Status:** accepted.
+- **Why:** the T7 re-knit of 2026-11-08 (`e376065`) added 8 rows (`unif`) and 2 columns (`alpha`, `alpha_se_indep`) to `processed_data/validation/part2_tests.csv`; the 40 earlier rows are identical in every column (checked in `e376065`), but the file's sha256 in `tests/baseline/old_added_t7.sha256` (written once at `7e8d44d`) no longer matched, and nothing recorded it.
+- **Decision:** the list is updated to the new hash after the 2026-11-09 knit reproduced it; the change is an extension of an OLD-side T7 table, not a change of an OLD result of the paper (steps 0-6 are covered by `tests/regress_old.sh`, which passed on 2026-11-08).
+
+### A-146 Figure labels in plain words, built from the data
+- **Date:** 2026-11-09. **Who:** Shlomo (the labels "OLD GLMM", "a14", "primary set" were not understandable), agent call for the wording. **Status:** accepted.
+- **Decision:** the figures of `validation_8.Rmd` say "Our model", "2022 model", "Our model, CML estimate", "Naomi's 14 areas", "15-cell grid", "noise floor", "p < 0.001", and the shoe counts of each set read from `tests$shoes` (no literal 478/631, which the no-hardcoding test forbids and which would go stale when the set is frozen). Only titles, legends and axis labels change; no CSV.
+
+### A-147 The HTML reports are committed at fixed paths
+- **Date:** 2026-11-09. **Who:** agent call. **Status:** accepted. **Amends:** A-144.
+- **Decision:** two `.gitignore` exceptions: `reports/new_shoes_report.html` (the reference report, about 3 MB) and `reports/new_shoes_pipeline_atlas.html` (pipeline pictures, about 1.7 MB); both self-contained.

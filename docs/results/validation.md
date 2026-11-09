@@ -388,6 +388,7 @@ The brief asked T7 not to edit the shared files (`docs/decisions.md`, `docs/prog
 | `processed_data/validation/new/part2_{cells,tests,cell_oe,logscore,delta_x2,wald_param,pairs,sensitivity,k8_sensitivity,k8_edge_cells,heel_front_band}_new.csv` | the NEW results (`logscore` and `delta_x2` with the intervals of T7-13: `_new`, `_two`, and the first run's `_two_raw`) |
 | `processed_data/validation/new/part2_{benchmark,contrast,pixel_slope,logscore_gain,logscore_tercile,block}_new.csv` | review fixes: the uniform benchmark and the cell-level calibration slopes, the per-area contrasts against uniform, the pixel-level slopes, the gains over uniform against the self-predicted and the OLD in-sample gains, the log-score difference by thirds of the RAC counts, the block bootstrap |
 | `model_images/validation/new/part2_{obs_exp,obs_exp_all,cells_map,cells_map_g20,boot,logscore,pairs,calibration}_new.{pdf,png}` | the figures (`calibration`: review fixes) |
+| `docs/qa/T7/probes/t7_area_shares_map.R` (2026-11-09) | a probe outside the knit: reads `part2_contrast_new.csv`, writes `processed_data/validation/new/part2_area_shares_new.csv` and `model_images/validation/new/part2_area_shares_new.*`, `part2_oe_simple_new.*` (report figures 3 and 4); rerun it after every knit |
 | `tests/baseline/old_added_t7.sha256` | the OLD-side files T7 added (write-once list, read by the collision check of `tests/r/test_new_outputs.R`) |
 | not tracked: `processed_data/**/pixels_full*.rds`, `logs/validation/` | the pixel tables and the bootstrap, pair and pixel-slope caches |
 

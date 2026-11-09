@@ -180,7 +180,8 @@ about 3 GB); it takes about 35 min once its pixel caches exist. The slow check o
 structure is `RAC_WORKERS=4 Rscript tests/r/slow/test_validation_real_calibration.R` (about 2 h 10 min).
 
 **Report.** The summary for the co-authors is `reports/new_shoes_report.html` (self-contained, figures
-embedded) and its text version `docs/report/2026-11-report-for-micha.md`.
+embedded); `reports/new_shoes_pipeline_atlas.html` shows each pipeline step on the new shoes in pictures.
+`docs/report/2026-11-report-for-micha.md` is an earlier text draft; where it differs, the HTML report holds.
 
 ### Skip the fitting
 

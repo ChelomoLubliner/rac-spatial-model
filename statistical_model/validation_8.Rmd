@@ -1306,6 +1306,13 @@ draw_both <- function(stem, width, height, fun) {
 col_glmm <- "#1f5fa8"
 col_reg <- "#d9822b"
 col_cml <- "#5a9a3c"
+# Plain labels for the figures (report readers): model, partition, shoe set.
+MODEL_LAB <- c(glmm = "Our model", r2022 = "2022 model", cml = "Our model (CML)")
+PART_LAB <- c(a14 = "Naomi's 14 areas", g10 = "10-cell grid", g15 = "15-cell grid", g20 = "20-cell grid")
+n_set <- function(st) tests$shoes[tests$set == st][1]
+SET_LAB <- c(primary = sprintf("%d new shoes", n_set("primary")),
+             all = sprintf("all %d new shoes", n_set("all")))
+fmt_p <- function(p) if (p < 0.001) "< 0.001" else sprintf("%.4f", p)
 oe_panel <- function(cl, s = "primary") {
   sub <- cell_tab[cell_tab$set == s & cell_tab$partition == cl, ]
   g <- sub[sub$model == "glmm", ]
@@ -1338,14 +1345,14 @@ oe_panel <- function(cl, s = "primary") {
   points(seq_len(K), cm$OE, pch = 4, col = col_cml, cex = 0.8)
   tg <- tests[tests$set == s & tests$model == "glmm" & tests$partition == cl, ]
   tr <- tests[tests$set == s & tests$model == "r2022" & tests$partition == cl, ]
-  title(main = sprintf("%s, %s set: GLMM X2 %.0f (E0 %.0f, p %.4f); 2022 X2 %.0f (E0 %.0f)",
-                       cl, s, tg$X2, tg$E0_two, tg$p_boot_two, tr$X2, tr$E0_two),
+  title(main = sprintf("%s, %s. X2: our model %.0f (noise floor %.0f, p %s); 2022 model %.0f (noise floor %.0f)",
+                       PART_LAB[[cl]], SET_LAB[[s]], tg$X2, tg$E0_two, fmt_p(tg$p_boot_two), tr$X2, tr$E0_two),
         cex.main = 0.8)
 }
 draw_both("part2_obs_exp", 11, 8.5, function() {
   op <- par(mfrow = c(2, 2), mar = c(5, 4, 2.5, 1))
   for (cl in cols) oe_panel(cl)
-  legend("bottomleft", c("OLD GLMM (random effect 0)", "2022 regional model", "OLD CML"),
+  legend("bottomleft", c("Our model (fitted on the original shoes, random effect 0)", "2022 model", "Our model, CML estimate"),
          pch = c(19, 17, 4), col = c(col_glmm, col_reg, col_cml), bty = "n", cex = 0.8)
   par(op)
 })
@@ -1393,8 +1400,8 @@ map_panel <- function(cl, md, s = "primary", zl = log2(c(0.5, 2))) {
     text(mean((w[, 2] - 1) / (ncol(Cc) - 1)), mean(1 - (w[, 1] - 1) / (nrow(Cc) - 1)),
          sprintf("%.2f", sub$OE[k]), cex = 0.55)
   }
-  title(main = sprintf("%s, %s (%s set)", if (md == "glmm") "OLD GLMM" else "2022 model",
-                       cl, s), cex.main = 0.9)
+  title(main = sprintf("%s, %s (%s)", MODEL_LAB[[md]],
+                       PART_LAB[[cl]], SET_LAB[[s]]), cex.main = 0.9)
 }
 map_key <- function(zl = log2(c(0.5, 2))) {
   pal <- grDevices::colorRampPalette(c("#2c5aa0", "#9cc3e6", "#f7f7f7", "#f4a582", "#b2182b"))(41)
@@ -1437,14 +1444,14 @@ draw_both("part2_boot", 11, 4, function() {
     h1 <- hist(x2t, breaks = br, plot = FALSE)
     h2 <- hist(x2n, breaks = br, plot = FALSE)
     plot(h1, freq = FALSE, col = grDevices::adjustcolor(col_glmm, 0.5), border = NA,
-         main = sprintf("%s, %s (primary set)", spec[1], spec[2]),
+         main = sprintf("%s, %s", MODEL_LAB[[spec[1]]], PART_LAB[[spec[2]]]),
          xlab = "Pearson X^2", ylim = c(0, max(h1$density, h2$density)))
     plot(h2, freq = FALSE, col = grDevices::adjustcolor("grey50", 0.5), border = NA,
          add = TRUE)
     abline(v = qchisq(0.95, t1$df), lty = 2, lwd = 2)
     abline(v = t1$X2, col = "#b2182b", lwd = 3)
-    legend("topright", c("two-sample bootstrap (null; OLD error too)",
-                         "NEW-only bootstrap (null; fit fixed)",
+    legend("topright", c("correct model, both collections resampled (reference)",
+                         "correct model, new shoes resampled only",
                          sprintf("chi^2_%d 95%% point", t1$df), "observed X^2"),
            fill = c(grDevices::adjustcolor(col_glmm, 0.5), grDevices::adjustcolor("grey50", 0.5), NA, NA),
            border = NA, lty = c(NA, NA, 2, 1), lwd = c(NA, NA, 2, 3),
@@ -1495,13 +1502,12 @@ draw_both("part2_calibration", 11, 9, function() {
       lim <- range(c(x, y, 0)) * 1.12
       plot(x, y, xlim = lim, ylim = lim, asp = 1, pch = 19,
            col = if (md == "glmm") col_glmm else col_reg,
-           xlab = sprintf("log(expected / uniform), %s",
-                          if (md == "glmm") "OLD GLMM" else "2022 model"),
-           ylab = "log(observed NEW / uniform)",
-           main = sprintf(paste("%s, %s (primary set)\nslope alpha %.2f [%.2f, %.2f];",
-                                "OLD noise alone %.2f; X^2 %.0f, recalibrated %.0f"),
+           xlab = sprintf("log(predicted / even spread), %s", MODEL_LAB[[md]]),
+           ylab = "log(observed / even spread), new shoes",
+           main = sprintf(paste("%s, %s\nslope %.2f [%.2f, %.2f];",
+                                "if correct about %.2f; X^2 %.0f, after recalibration %.0f"),
                           if (cl == "a14") "Naomi's areas" else "15-cell grid",
-                          if (md == "glmm") "OLD GLMM" else "2022 model",
+                          MODEL_LAB[[md]],
                           bt$alpha, bt$alpha_lo_new, bt$alpha_hi_new,
                           bt$dil_mean, bt$X2, bt$X2_recal),
            cex.main = 0.85)
@@ -1537,8 +1543,8 @@ draw_both("part2_pairs", 11, 4.5, function() {
     plot(NA, xlim = c(0.5, 6.5), ylim = yl, xaxt = "n",
          xlab = "distance band (px; d0 = same pixel)",
          ylab = "observed / expected pairs",
-         main = switch(s, primary = "NEW primary set", all = "NEW all shoes",
-                       old_all = "OLD (in-sample)"))
+         main = switch(s, primary = sprintf("New shoes (%d)", n_set("primary")), all = sprintf("New shoes (all %d)", n_set("all")),
+                       old_all = "Original shoes (the model was fitted on them)"))
     axis(1, at = 1:6, labels = bands)
     abline(h = 1, col = "grey50")
     for (nl in c("null1", "null2")) {
