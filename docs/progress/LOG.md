@@ -2268,3 +2268,7 @@ From existing outputs only, no new fit: (1) outline size from the two committed 
 ## 2026-11-09, Part 2 predicted and observed share per area (main session)
 
 `docs/qa/T7/probes/t7_area_shares_map.R` (new; reads only `part2_contrast_new.csv` and the OLD prototype, no fit) draws Naomi's 14 areas with the OLD GLMM's predicted share of the NEW RACs (sum of p * S, b = 0, primary set), the observed share and observed / predicted (`model_images/validation/new/part2_area_shares_new.{png,pdf}`, `processed_data/validation/new/part2_area_shares_new.csv`). Its observed / predicted panel equals `part2_cells_map_new` (a14, glmm) cell by cell. Added to the report as figure 7.
+
+## 2026-11-09, report layout for Micha (main session)
+
+On Shlomo's reading of the HTML: figures renumbered in reading order (1 maps, 2 shape only, 3 predicted and observed share per area, 4 observed / predicted on the shoe, 5 the same with intervals); the duplicate and busy figures moved to an appendix (A1 the maps with axes, A2 one colour scale, A3 both models on 14 areas and 15 cells, A4 the 10- and 20-cell grids); a worked example for reading figure 3; a box naming the models ("OLD GLMM" in the R figures = our model fitted on the old shoes; the 2022 model = Naomi's 14-area model); "old GLMM" renamed "our model" in the text. New simple figure 4 (`part2_oe_simple_new`, our model only, 14 areas and 15 cells) drawn by `docs/qa/T7/probes/t7_area_shares_map.R`; its values equal `part2_cells_map_new` cell by cell.
