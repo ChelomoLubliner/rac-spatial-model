@@ -48,6 +48,7 @@ ul, ol { padding-left: 1.3rem; display: flex; flex-direction: column; gap: 0.35r
 strong { font-weight: 700; }
 code { font-size: 0.88em; background: var(--sheet); border: 1px solid var(--rule); padding: 0 0.3em; border-radius: 3px; overflow-wrap: anywhere; }
 .lede { color: var(--muted); }
+.purpose { color: var(--muted); font-style: italic; border-left: 2px solid var(--rule); padding-left: .7rem; }
 .meta { color: var(--muted); font-size: 0.92rem; }
 .table-wrap { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; font-size: 0.95rem; font-variant-numeric: tabular-nums; background: var(--sheet); }
@@ -86,6 +87,7 @@ a { color: var(--accent); }
 
 <section>
   <h2>In six points</h2>
+  <p class="purpose">What this section is for: the whole report in six sentences.</p>
   <p>Micha asked for two things at the meeting of 5 November: (1) fit the model of the paper on the second collection, with the same standardization of the shoe; (2) test whether the surface fitted on the original shoes predicts where RACs fall on the new shoes, by summing p·S with the random effect at 0 over parts of the shoe (Naomi's 14 areas, or a grid of 10 to 20 cells).</p>
   <ol class="points">
     <li><span><strong>Request 1 is done.</strong> The model runs on all 631 new shoes. RAC intensity is again far from uniform, also when whole shoes are resampled (p &lt; 10<sup>−16</sup>). The original results reproduce exactly.</span></li>
@@ -99,6 +101,7 @@ a { color: var(--accent); }
 
 <section>
   <h2>Data</h2>
+  <p class="purpose">What this section is for: how many shoes and RACs each collection has, and which new shoes were left out and why.</p>
   <div class="table-wrap"><table>
     <thead><tr><th></th><th>Original collection (paper)</th><th>New collection</th></tr></thead>
     <tbody>
@@ -116,6 +119,7 @@ a { color: var(--accent); }
 
 <section>
   <h2>The two maps, original and new</h2>
+  <p class="purpose">What this section is for: the final maps of our model on each collection, and how to compare them fairly.</p>
   <p>These are the final maps of our model: the RAC intensity at each pixel of the standardized shoe, with the random effect set to 0. The toe is at the top, the heel at the bottom.</p>
 
   <div class="plates">
@@ -178,6 +182,7 @@ a { color: var(--accent); }
 
 <section>
   <h2>Request 1: the model on the new shoes</h2>
+  <p class="purpose">What this section is for: Micha's first request. The model of the paper, fitted again on the new shoes.</p>
   <p>The outline of every shoe is found by an active contour (the "snake"). All 631 outlines were built; images of every shoe were checked by eye three times. Stickers and frame lines were erased; 23 shoes needed a fallback setting and one a different starting ellipse. Quality matches the original shoes.</p>
   <div class="table-wrap"><table>
     <thead><tr><th></th><th>Original</th><th>New</th></tr></thead>
@@ -195,6 +200,7 @@ a { color: var(--accent); }
 
 <section>
   <h2>Request 2: goodness of fit on the new shoes</h2>
+  <p class="purpose">What this section is for: Micha's second request. Does the model fitted on the original shoes predict where the RACs fall on the new shoes?</p>
   <p>As Micha asked: for each new shoe, p·S is summed over each part of the shoe, with our model fitted on the original shoes and the random effect at 0, and scaled to the shoe's observed number of RACs. The parts are Naomi's 14 areas and grids of 10, 15 and 20 cells. The test statistic is Pearson's X² over the parts. Its reference distribution comes from a two-sample shoe bootstrap (B = 2,000) that resamples both the original shoes (refitting the model) and the new shoes, so it includes the estimation error of the original fit, overdispersion and the differences between shoes. A naive χ² with fixed expected counts would reject a correct model about 80% of the time.</p>
 
   <div class="callout" style="background:var(--sheet);border-left-color:var(--accent)">
@@ -279,6 +285,7 @@ a { color: var(--accent); }
 
 <section>
   <h2>Robustness checks</h2>
+  <p class="purpose">What this section is for: four questions a reviewer could raise, and the answers.</p>
   <p>Four questions a reviewer is likely to ask, answered from the existing fits and bootstrap records.</p>
 
   <h3>Are the new shoes on the same scale, and the same size?</h3>
@@ -319,13 +326,14 @@ a { color: var(--accent); }
 </section>
 
 <section>
-  <h2>Suggested reply to Reviewer 1</h2>
-  <p class="meta">Points 1 and 6, to discuss.</p>
+  <h2>Draft answer to the journal's Reviewer 1</h2>
+  <p class="purpose">What this section is for: the journal (Forensic Science International) asked us to revise the paper. Its Reviewer 1 asked, in point 1, what the paper adds beyond Naomi's 2022 paper, and in point 6, for validation on real out-of-sample data. The new shoes are that out-of-sample data. Below is a <strong>first draft</strong> of a paragraph for our response letter, written from the results above. It is not a result and not a decision: Micha and Naomi decide what we answer. In particular, its last sentences narrow what the paper claims, which only they can decide.</p>
   <blockquote>We applied the model to a second collection of 631 shoe prints. Sixty-seven of them are reprints of soles in the original collection; the validation set of 478 excludes these, uncertain matches and poor prints. The spatial non-uniformity of RAC locations replicates: it holds without the reprints and under a bootstrap that resamples whole shoes (p &lt; 10<sup>−16</sup>). The surface fitted on the original collection transfers only partly. A goodness-of-fit test that accounts for the estimation error of the original fit rejects exact transfer (p &lt; 0.001); the fitted surface reproduces 39% of the new shoes' departure from a uniform spread, and the 2022 regional model, also rejected, 65%. The overall RAC density does not differ significantly between the collections (ratio 1.06, 95% CI 0.93–1.22). Per RAC, the continuous surface predicts the new RACs no better than the 2022 regional model. RACs within a shoe are not independent: pairs 2–8 pixels apart are 37% (new) and 45% (original) more frequent than independent placement predicts. We therefore present the model as a description of where single RACs tend to occur, not as a tool to compute the probability of a set of RACs. Because the collections differ in source, scanning and marking, the misfit may reflect a different population as much as model error; we discuss sole design and these differences as limitations.</blockquote>
 </section>
 
 <section>
   <h2>Open questions</h2>
+  <p class="purpose">What this section is for: decisions and facts we need from co-authors before the numbers are final.</p>
   <div class="table-wrap"><table>
     <thead><tr><th>For</th><th>Question</th></tr></thead>
     <tbody>
@@ -341,6 +349,7 @@ a { color: var(--accent); }
 
 <section>
   <h2>Appendix: further figures</h2>
+  <p class="purpose">What this section is for: extra figures that repeat or extend the ones above; not needed to follow the report.</p>
   <p>These repeat or extend the figures above.</p>
   <div class="plates">
     <figure>
@@ -370,6 +379,7 @@ a { color: var(--accent); }
 
 <section>
   <h2>How the work was done</h2>
+  <p class="purpose">What this section is for: the timeline, and how the work was checked.</p>
   <div class="table-wrap"><table>
     <thead><tr><th>Date</th><th>Step</th></tr></thead>
     <tbody>
