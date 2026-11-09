@@ -8,6 +8,8 @@ Every number below is taken from the result documents, which cite their sources 
 - `docs/results/validation.md` (T7)
 - `docs/qa/snake-qa.md` (snake)
 
+> **The reference version of this report is `reports/new_shoes_report.html`** (revised on 2026-11-09 after a statistical and an editorial review: p-values reported as bounds, the noise floor defined, the log-score comparison worded as "no detectable difference", multiplicity in the per-part intervals, the knot claim narrowed, and the reply to Reviewer 1 rewritten). Where the two differ, the HTML is correct.
+
 ---
 
 ## 0. What happened (how the work was done)
