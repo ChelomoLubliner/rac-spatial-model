@@ -30,6 +30,7 @@ Checked by `tests/run_all.sh` (`sha256sum -c`), `tests/python/test_baseline_raw_
 | File | Content | Made by |
 |---|---|---|
 | `old_added_t2.sha256` | sha256 of the two OLD files that T2 added (plan section 5): `processed_data/shoe_codes.csv` (step 1) and `processed_data/wald_test.csv` (step 5, in its form without the car columns, decision A-082). Added in the T2 review fixes (2026-11-06, LOG entry), written once like the lists above; a later task that adds OLD files adds its own list | `sha256sum processed_data/shoe_codes.csv processed_data/wald_test.csv > tests/baseline/old_added_t2.sha256` |
+| `old_added_t6.sha256`, `old_added_t7.sha256` | sha256 of the OLD-side files that T6 (old vs new) and T7 (Part 2: OLD-only definitions, OLD in-sample tables, the OLD bootstrap draws) added. Written once; checked by `tests/run_all.sh` since 2026-11-09. One exception: the `part2_tests.csv` line of the T7 list was updated once, after the 2026-11-08 re-knit added rows and columns while keeping the 40 earlier rows identical (decision A-145) | written by T6 and T7 |
 
 Checked by `tests/run_all.sh` (`sha256sum -c`); `tests/regress_old.sh` compares the regenerated files
 with it (never with the work-tree files, A-070).

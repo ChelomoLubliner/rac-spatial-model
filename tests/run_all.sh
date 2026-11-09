@@ -91,6 +91,10 @@ run_check "sha256 old_baseline (11 OLD artifacts)" \
   sha256sum --quiet -c tests/baseline/old_baseline.sha256
 run_check "sha256 old_added_t2 (the 2 OLD files T2 added)" \
   sha256sum --quiet -c tests/baseline/old_added_t2.sha256
+run_check "sha256 old_added_t6 (the OLD-side files T6 added)" \
+  sha256sum --quiet -c tests/baseline/old_added_t6.sha256
+run_check "sha256 old_added_t7 (the OLD-side files T7 added; updated once, A-145)" \
+  sha256sum --quiet -c tests/baseline/old_added_t7.sha256
 # the OLD snake reruns need numpy's OpenBLAS at the library default and its
 # own kernel, as the baselines (tests/baseline/local/openblas_tier_b.txt,
 # A-103, A-108); the NEW tests that need one thread set it in their own

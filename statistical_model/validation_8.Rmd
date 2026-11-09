@@ -1312,7 +1312,7 @@ PART_LAB <- c(a14 = "Naomi's 14 areas", g10 = "10-cell grid", g15 = "15-cell gri
 n_set <- function(st) tests$shoes[tests$set == st][1]
 SET_LAB <- c(primary = sprintf("%d new shoes", n_set("primary")),
              all = sprintf("all %d new shoes", n_set("all")))
-fmt_p <- function(p) if (p < 0.001) "< 0.001" else sprintf("%.4f", p)
+fmt_p <- function(p) if (p < 0.001) "< 0.001" else sprintf("= %.4f", p)
 oe_panel <- function(cl, s = "primary") {
   sub <- cell_tab[cell_tab$set == s & cell_tab$partition == cl, ]
   g <- sub[sub$model == "glmm", ]
