@@ -115,6 +115,28 @@ a { color: var(--accent); }
     <p><strong class="tag">The collections overlap.</strong> The team said in the meeting that they don't; the data disagree. 67 new shoes are very likely reprints of original shoes and 22 more are uncertain, together 15.8% of the new RACs. Consecutive new ids map onto consecutive original ids far more often than chance (16 of 57 pairs, where about 0.3 would be expected). The evidence comes from a screen of 121 flagged shoes, not of all new shoes.</p>
     <p><strong>Please confirm with Sarena or Yoram.</strong> The primary set of 478 excludes the likely and the uncertain reprints and the prints that fail an automatic quality rule; 31 flagged candidates were not reviewed by eye.</p>
   </div>
+
+  <h3>Why the goodness of fit uses 478 of the 631 new shoes</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Step</th><th>Shoes left</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td>All new shoes</td><td>631</td><td></td></tr>
+      <tr><td>Remove the 67 likely and 22 uncertain reprints</td><td>542</td><td>A reprint is the same physical sole as an original shoe, so it is not new data; keeping it would make the out-of-sample test too easy and break the independence of the two samples that the bootstrap assumes.</td></tr>
+      <tr><td>Remove the 64 prints that fail the quality rule</td><td><strong>478</strong></td><td>Prints where many RACs do not fall on the sole's contact area (a poor scan or a misalignment), so p·S cannot describe them.</td></tr>
+    </tbody>
+  </table></div>
+  <p>The choice does not change the conclusion. Goodness of fit of our model on Naomi's 14 areas, for every shoe set:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Shoe set</th><th>Shoes</th><th>X²</th><th>Noise floor</th><th>p</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Primary (used in the report)</strong></td><td><strong>478</strong></td><td><strong>298</strong></td><td>49</td><td>&lt; 0.001</td></tr>
+      <tr><td>All new shoes</td><td>631</td><td>504</td><td>62</td><td>&lt; 0.001</td></tr>
+      <tr><td>Only the likely reprints removed</td><td>495</td><td>294</td><td>50</td><td>&lt; 0.001</td></tr>
+      <tr><td>Reprints removed, no quality rule</td><td>542</td><td>398</td><td>54</td><td>&lt; 0.001</td></tr>
+      <tr><td>Also the 31 unreviewed candidates removed</td><td>453</td><td>263</td><td>47</td><td>&lt; 0.001</td></tr>
+    </tbody>
+  </table></div>
+  <p>With all 631 shoes the misfit is larger, so the primary set is the cautious choice. The set is provisional until the reprint list is confirmed. Numbers from <code>processed_data/validation/new/part2_tests_new.csv</code>.</p>
 </section>
 
 <section>
