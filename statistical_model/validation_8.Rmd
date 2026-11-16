@@ -53,6 +53,22 @@ P_old <- rac_profile("old", root = ROOT_PATH)
 P_new <- rac_profile("new", root = ROOT_PATH)
 WORKERS <- as.integer(rac_env("RAC_WORKERS", "4"))
 B <- as.integer(rac_env("RAC_PART2_B", "2000"))
+# RAC_PART2_SHOESET: "provisional" (default; outputs as before) or "all" (the
+# main analysis uses all 631 NEW shoes; outputs and caches in a subfolder
+# all_new_shoes/, so the default outputs are untouched)
+SHOESET <- rac_env("RAC_PART2_SHOESET", "provisional")
+stopifnot(SHOESET %in% c("provisional", "all"))
+VARIANT <- if (SHOESET == "all") "all_new_shoes" else NULL
+# output and cache paths of this run (the default reproduces part2_path and
+# part2_cache_path exactly; a variant goes one folder deeper)
+out_path <- function(P, stem, ext = "csv", kind = "data") {
+  p <- part2_path(P, stem, ext, kind)
+  if (is.null(VARIANT)) p else file.path(dirname(p), VARIANT, basename(p))
+}
+cache_path <- function(P, stem) {
+  p <- part2_cache_path(P, stem)
+  if (is.null(VARIANT)) p else file.path(dirname(p), VARIANT, basename(p))
+}
 t_start <- proc.time()[["elapsed"]]
 
 glmm_old <- readRDS(rac_model_path(P_old, "NEW_X_NS_XY"))
@@ -168,7 +184,8 @@ Shoe sets of the NEW analysis (provisional; see the decisions in
 `docs/results/validation.md`):
 
 ```{r sets}
-set_cols <- c(primary = "include_primary", all = "in_all",
+set_cols <- c(primary = if (SHOESET == "all") "in_all" else "include_primary",
+              all = "in_all",
               same_only = "in_same_only", quality_off = "in_quality_off",
               quality_raw = "in_quality_raw",
               excl_candidates = "in_excl_candidates")
@@ -351,7 +368,7 @@ pair_run <- function(ds, codes, Wb) {
 }
 pair_key <- c(base_key, pairs = unname(tools::md5sum(paste(ROOT_PATH,
   "statistical_model/R/pairs.R", sep = ""))))
-pair_cache <- part2_cache_path(P_new, "part2_pairs")
+pair_cache <- cache_path(P_new, "part2_pairs")
 PR <- NULL
 if (file.exists(pair_cache)) {
   cached <- readRDS(pair_cache)
@@ -488,7 +505,7 @@ replicate_one <- function(b) {
   out
 }
 boot_key <- c(base_key, draws = unname(tools::md5sum(draws_path)))
-boot_cache <- part2_cache_path(P_new, "part2_boot")
+boot_cache <- cache_path(P_new, "part2_boot")
 R <- NULL
 if (file.exists(boot_cache)) {
   cached <- readRDS(boot_cache)
@@ -786,7 +803,7 @@ for (s in detail_sets) {
 pix_tab <- do.call(rbind, pix_rows)
 # the OLD-noise dilution of the GLMM's pixel-level slope (primary set)
 pix_key <- c(boot_key, pixel_draws = PIXEL_DRAWS)
-pix_cache <- part2_cache_path(P_new, "part2_pixel_slope")
+pix_cache <- cache_path(P_new, "part2_pixel_slope")
 dil_pix <- NULL
 if (file.exists(pix_cache)) {
   cached <- readRDS(pix_cache)
@@ -1291,8 +1308,8 @@ shows NEW data; OLD in-sample panels are labelled).
 
 ```{r figures}
 draw_both <- function(stem, width, height, fun) {
-  pdf_path <- part2_path(P_new, stem, "pdf", "images")
-  png_path <- part2_path(P_new, stem, "png", "images")
+  pdf_path <- out_path(P_new, stem, "pdf", "images")
+  png_path <- out_path(P_new, stem, "png", "images")
   rac_ensure_dir(pdf_path)
   grDevices::pdf(pdf_path, width = width, height = height)
   fun()
@@ -1568,7 +1585,7 @@ draw_both("part2_pairs", 11, 4.5, function() {
 
 ```{r outputs}
 write_out <- function(df, P, stem) {
-  path <- part2_path(P, stem)
+  path <- out_path(P, stem)
   rac_ensure_dir(path)
   con <- file(path, "wb")
   on.exit(close(con))

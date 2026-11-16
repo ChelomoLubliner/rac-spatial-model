@@ -25,6 +25,8 @@ Thumbs.db
 *.html
 !reports/new_shoes_report.html
 !reports/new_shoes_pipeline_atlas.html
+!reports/new_shoes_report_all631.html
+!reports/new_shoes_pipeline_atlas_all631.html
 *.nb.html
 
 # Work folders of the contour code (Python step 0) and run logs; never tracked

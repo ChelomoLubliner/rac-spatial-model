@@ -963,3 +963,9 @@ Append new decisions at the end of the right section; never rewrite an old entry
 ### A-147 The HTML reports are committed at fixed paths
 - **Date:** 2026-11-09. **Who:** agent call. **Status:** accepted. **Amends:** A-144.
 - **Decision:** two `.gitignore` exceptions: `reports/new_shoes_report.html` (the reference report, about 3 MB) and `reports/new_shoes_pipeline_atlas.html` (pipeline pictures, about 1.7 MB); both self-contained.
+
+### A-148 Reports on all 631 new shoes, at Shlomo's request
+- **Date:** 2026-11-12. **Who:** Shlomo (user request), implemented by agent. **Status:** accepted. **Departs from:** D-013 and the planned primary set (478 shoes, `validation.md` section 1).
+- **Decision:** two additional reports (`reports/new_shoes_report_all631.html`, `reports/new_shoes_pipeline_atlas_all631.html`) use all 631 new shoes against the 386 original ones, without sub-categories, so Micha sees only "original vs new". `validation_8.Rmd` takes `RAC_PART2_SHOESET=all`; outputs go to `.../all_new_shoes/`; the default (478) run and its checksums are unchanged (`R/validation.R` untouched).
+- **Disclosure (required by two independent reviews):** the 631 include 67 reprints of original soles and 75 prints failing the quality rule (64 apart from the reprints; 31 unreviewed possible reprints are in every set). The reports state this, give X^2 per set (478: 298/49; 542: 398/54; 631: 504/62), report the shape test without reprints (W 46.7, p 0.0056) beside W 51.9, and the reply draft says it too. The main conclusions do not change between 478 and 631; the per-shoe log-score comparison depends on the shoe set.
+- **Note:** both reports are committed through `.gitignore` exceptions, as in A-147.
