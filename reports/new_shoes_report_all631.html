@@ -149,7 +149,7 @@ a { color: var(--accent); }
   <p>Random effects and CML agree in shape within about 2% on both collections (the CML map's level is set equal to the random-effects map's), so neither shape depends on the estimation method.</p>
 
   <div class="callout">
-    <p><strong class="tag">Read the shapes, not the colours.</strong> Each map has its own colour scale: the original one runs up to about 0.0020 and the new one up to about 0.0028. The rainbow palette turns a 20% change into a jump from yellow to red. The new map is on average about 1.36 times higher. About 1.11 of this is the plotting factor exp(−σ²/2) (σ² 0.96 against 0.76), a convention, not data. The remaining 1.23 is real for a typical shoe: a typical new print has about as many RACs on about 14% less contact area (median per-shoe density 1.20 times higher, 95% CI 1.03–1.41, shoe bootstrap). Pooled over all RACs the density differs by only 6% (0.93–1.22), because the original collection has more very densely marked shoes. A version of Figs 1a and 1b on one colour scale: <code>model_images/compare/pixel_inten_JASAup_common_scale_old_vs_new.png</code>.</p>
+    <p><strong class="tag">Read the shapes, not the colours.</strong> Each map has its own colour scale: the original one runs up to about 0.0020 and the new one up to about 0.0028. The rainbow palette turns a 20% change into a jump from yellow to red. The new map is on average about 1.36 times higher. About 1.11 of this is the plotting factor exp(−σ²/2) (σ² 0.96 against 0.76), a convention, not data. The remaining 1.23 is real for a typical shoe: a typical new print has slightly more RACs (about 6%) on about 14% less contact area (geometric mean) (median per-shoe density 1.20 times higher, 95% CI 1.03–1.41, shoe bootstrap). Pooled over all RACs the density differs by only 6% (0.93–1.22), because the original collection has more very densely marked shoes. A version of Figs 1a and 1b on one colour scale: <code>model_images/compare/pixel_inten_JASAup_common_scale_old_vs_new.png</code>.</p>
   </div>
 
   <h3>The shapes compared properly</h3>
@@ -314,7 +314,7 @@ a { color: var(--accent); }
       <tr><td>Outline perimeter, median</td><td>700 px</td><td>709 px</td></tr>
     </tbody>
   </table></div>
-  <p>New shoes are about 1% longer and 2.5–3% wider (medians and means), a small but systematic difference. The standardization rescales x but keeps the raw y, so equal lengths matter, and they hold. What is smaller on new shoes is the contact area inside the outline (−12%): less of the sole touches the paper.</p>
+  <p>New shoes are about 1% longer and 2.5–3% wider (medians and means), a small but systematic difference. The standardization rescales x but keeps the raw y, so equal lengths matter, and they hold. What is smaller on new shoes is the contact area inside the outline (−12% median, −14% geometric mean): less of the sole touches the paper.</p>
 
   <h3>Does non-uniformity survive the dependence between RACs?</h3>
   <p>The Wald tests above treat RACs as independent. Resampling whole shoes (1,000 shoe-bootstrap refits of the fixed effects per collection, by fast PIRLS fits with σ² held at its fitted value) allows any dependence within a shoe.</p>
